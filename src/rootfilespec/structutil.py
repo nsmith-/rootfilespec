@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import struct
-from typing import Any, Callable, TypeVar, get_type_hints
+from typing import Any, Callable, TypeVar, get_args, get_origin, get_type_hints
 
 
 @dataclasses.dataclass
@@ -82,10 +82,13 @@ class ROOTSerializable:
         namespace = get_type_hints(cls)
         for field in dataclasses.fields(cls):  # type: ignore[arg-type]
             ftype = namespace[field.name]
-            if issubclass(ftype, ROOTSerializable):
+            if isinstance(ftype, type) and issubclass(ftype, ROOTSerializable):
                 arg, buffer = ftype.read(buffer)
+            elif get_origin(ftype) is ListFrame:
+                itemtype = get_args(ftype)[0]
+                arg, buffer = ListFrame.read(buffer, itemtype)
             else:
-                msg = f"Cannot read field {field.name} of type {ftype}"
+                msg = f"Cannot read field {field.name} of type {ftype} (type: {type(ftype)})"
                 raise NotImplementedError(msg)
             args.append(arg)
         return cls(*args), buffer
@@ -123,3 +126,50 @@ def structify(big_endian: bool):
 def sfield(fmt: str):
     """A dataclass field that has a struct format."""
     return dataclasses.field(metadata={"format": fmt})
+
+
+@dataclasses.dataclass
+class ListFrame[Item: ROOTSerializable]:
+    size: int
+    nitems: int
+    items: list[Item]
+
+    @classmethod
+    def read(cls, buffer: ReadBuffer, itemtype: type[Item]) -> tuple[ListFrame[Item], ReadBuffer]:
+        (size,), buffer = buffer.unpack(">i")
+        (nitems,), buffer = buffer.unpack(">i")
+        items: list[Item] = []
+        for _ in range(nitems):
+            item, buffer = itemtype.read(buffer)
+            items.append(item)
+        return cls(size, nitems, items), buffer
+
+
+@structify(big_endian=True)
+@dataclasses.dataclass
+class PageLink(StructClass):
+    offset: int = sfield("i")
+    nbytes: int = sfield("i")
+
+
+@dataclasses.dataclass
+class Cluster(ROOTSerializable):
+    pages: ListFrame[PageLink]
+
+
+if __name__ == "__main__":
+    expected = Cluster(ListFrame(16, 2, [PageLink(32, 32), PageLink(64, 32)]))
+
+    data = (
+        b"\x00\x00\x00\x10"  # size
+        b"\x00\x00\x00\x02"  # nitems
+        b"\x00\x00\x00\x20"  # item1 offset
+        b"\x00\x00\x00\x20"  # item1 nbytes
+        b"\x00\x00\x00\x40"  # item2 offset
+        b"\x00\x00\x00\x20"  # item2 nbytes
+    )
+
+    cluster, remaining = Cluster.read(ReadBuffer(memoryview(data), 0, 0))
+    assert remaining.data == b""
+    assert cluster == expected
+    print(cluster)
