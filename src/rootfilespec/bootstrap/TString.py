@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.structutil import ReadBuffer, ROOTSerializable, serializable
 
 
@@ -14,3 +15,6 @@ class TString(ROOTSerializable):
             (length,), buffer = buffer.unpack(">i")
         data, buffer = buffer.consume(length)
         return (data,), buffer
+
+
+DICTIONARY["TString"] = TString

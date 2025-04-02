@@ -3,9 +3,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Annotated
 
-from rootfilespec.bootstrap.TKey import DICTIONARY, TKey
+from rootfilespec.bootstrap.TKey import TKey
 from rootfilespec.bootstrap.TUUID import TUUID
 from rootfilespec.bootstrap.util import fDatime_to_datetime
+from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.structutil import (
     DataFetcher,
     Fmt,
@@ -114,7 +115,7 @@ class TDirectory(ROOTSerializable):
         return key.read_object(fetch_cached, objtype=TKeyList)
 
 
-DICTIONARY[b"TDirectory"] = TDirectory
+DICTIONARY["TDirectory"] = TDirectory
 
 
 @serializable
@@ -129,10 +130,12 @@ class TKeyList(ROOTSerializable, Mapping[str, TKey]):
         while len(keys) < nKeys:
             key, buffer = TKey.read(buffer)
             keys.append(key)
-        # suspicion: there will be 8*nshort trailing bytes
-        # corresponding to padding in case seeks need to be 64 bit
-        npad = 8 * sum(1 for k in keys if k.is_short())
-        padding, buffer = buffer.consume(npad)
+        padding = b""
+        if not all(k.is_short() for k in keys):
+            # suspicion: there will be 8*nshort trailing bytes
+            # corresponding to padding in case seeks need to be 64 bit
+            npad = 8 * sum(1 for k in keys if k.is_short())
+            padding, buffer = buffer.consume(npad)
         return (keys, padding), buffer
 
     def __len__(self):

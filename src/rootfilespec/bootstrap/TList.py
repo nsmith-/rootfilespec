@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from rootfilespec.bootstrap.streamedobject import read_streamed_item
-from rootfilespec.bootstrap.TKey import DICTIONARY
 from rootfilespec.bootstrap.TObject import StreamHeader, TObject, TObjectBits
 from rootfilespec.bootstrap.TString import TString
+from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.structutil import ReadBuffer, serializable
 
 
@@ -58,7 +58,7 @@ class TList(TObject):
         return (fName, fN, items), buffer
 
 
-DICTIONARY[b"TList"] = TList
+DICTIONARY["TList"] = TList
 
 
 @serializable
@@ -75,6 +75,9 @@ class TObjArray(TObject):
         objects: list[TObject] = []
         for _ in range(nObjects):
             item, buffer = read_streamed_item(buffer)
+            if isinstance(item, StreamHeader):
+                # TODO: Resolve or build pointer to TObject
+                continue
             if not isinstance(item, TObject):
                 msg = f"Expected TObject but got {item!r}"
                 raise ValueError(msg)
@@ -82,4 +85,4 @@ class TObjArray(TObject):
         return (fName, nObjects, fLowerBound, objects), buffer
 
 
-DICTIONARY[b"TObjArray"] = TObjArray
+DICTIONARY["TObjArray"] = TObjArray

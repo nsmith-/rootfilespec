@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Annotated, Any, TypeVar
 
-from rootfilespec.bootstrap.TKey import DICTIONARY
 from rootfilespec.bootstrap.TString import TString
+from rootfilespec.dispatch import DICTIONARY, normalize
 from rootfilespec.structutil import (
     Fmt,
     ReadBuffer,
@@ -53,21 +53,22 @@ class StreamHeader(ROOTSerializable):
 
     @classmethod
     def read(cls, buffer: ReadBuffer):
-        (fByteCount, tmp), buffer = buffer.unpack(">iH")
+        # read all we might need in one go and advance later (optimization)
+        (fByteCount, tmp1, tmp2), _ = buffer.unpack(">iHH")
         if fByteCount & _StreamConstants.kByteCountMask:
             fByteCount &= ~_StreamConstants.kByteCountMask
         else:
-            msg = f"ByteCount mask not set: {fByteCount:08x}"
-            msg += f"\nfByteCount: {fByteCount}, tmp: {tmp:04x}"
-            msg += f"\nBuffer: {buffer}"
-            raise ValueError(msg)
+            # This is a reference to another object in the buffer
+            _, buffer = buffer.consume(4)
+            return cls(0, None, None, fByteCount), buffer
         fVersion, fClassName, fClassRef = None, None, None
-        if not (tmp & _StreamConstants.kNotAVersion):
-            fVersion = tmp
+        if not (tmp1 & _StreamConstants.kNotAVersion):
+            fVersion = tmp1
+            _, buffer = buffer.consume(6)  # now advance the buffer
         else:
             fVersion = None
-            (more,), buffer = buffer.unpack(">H")
-            fClassInfo: int = (tmp << 16) | more
+            fClassInfo: int = (tmp1 << 16) | tmp2
+            _, buffer = buffer.consume(8)  # now advance the buffer
             if fClassInfo == _StreamConstants.kNewClassTag:
                 fClassRef = buffer.relpos - 4
                 fClassName = b""
@@ -107,29 +108,11 @@ class TObjectBits(IntEnum):
     kNotSure = 0x00010000
 
 
-T = TypeVar("T", bound="TObject")
+T = TypeVar("T", bound="StreamedObject")
 
 
 @serializable
-class TObject(ROOTSerializable):
-    """Format for TObject class.
-
-    Reference: https://root.cern/doc/master/tobject.html
-
-    Attributes:
-        header (TObject_header): Header data for TObject class.
-        pidf (int): An identifier of the TProcessID record for the process that wrote the
-            object. This identifier is an unsigned short. The relevant record
-            has a name that is the string "ProcessID" concatenated with the ASCII
-            decimal representation of "pidf" (no leading zeros). 0 is a valid pidf.
-            Only present if the object is referenced by a pointer to persistent object.
-    """
-
-    fVersion: Annotated[int, Fmt(">h")]
-    fUniqueID: Annotated[int, Fmt(">i")]
-    fBits: Annotated[int, Fmt(">i")]
-    pidf: int | None
-
+class StreamedObject(ROOTSerializable):
     @classmethod
     def read(cls: type[T], buffer: ReadBuffer) -> tuple[T, ReadBuffer]:
         args, buffer = cls._read_all_members(buffer)
@@ -139,18 +122,32 @@ class TObject(ROOTSerializable):
     def _read_all_members(
         cls: type[T], buffer: ReadBuffer, indent=0
     ) -> tuple[tuple[Any, ...], ReadBuffer]:
+        # TODO move this to a free function
         start_position = buffer.relpos
         itemheader, buffer = StreamHeader.read(buffer)
-        if itemheader.fClassName and itemheader.fClassName != cls.__name__.encode(
-            "utf-8"
-        ):
+        # TODO: this is not the right place for version-specific logic
+        if cls is TNamed and itemheader.fVersion == 1:
+            # Early versions don't have the TObject stream header
+            args0, buffer = TObject.read_members(buffer)
+            args1, buffer = TNamed.read_members(buffer)
+            return (args0 + args1), buffer
+        if cls.__name__ == "TObjString" and itemheader.fVersion == 1:
+            args0, buffer = TObject.read_members(buffer)
+            args1, buffer = TString.read_members(buffer)
+            return (args0 + args1), buffer
+        if cls.__name__ == "TObjArray" and itemheader.fVersion == 3:
+            args0, buffer = TObject.read_members(buffer)
+            args1, buffer = cls.read_members(buffer)
+            return (args0 + args1), buffer
+        if itemheader.fClassName and normalize(itemheader.fClassName) != cls.__name__:
             msg = f"Expected class {cls.__name__} but got {itemheader.fClassName}"
             raise ValueError(msg)
         end_position = start_position + itemheader.fByteCount + 4
         args = ()
-        superclass = cls.__mro__[1]
-        if issubclass(superclass, TObject):
-            args, buffer = superclass._read_all_members(buffer, indent + 1)
+        for base in reversed(cls.__bases__):
+            if issubclass(base, StreamedObject) and base is not StreamedObject:
+                base_args, buffer = base._read_all_members(buffer, indent + 1)
+                args += base_args
         try:
             cls_args, buffer = cls.read_members(buffer)
         except NotImplementedError:
@@ -173,6 +170,27 @@ class TObject(ROOTSerializable):
             raise ValueError(msg)
         return args, buffer
 
+
+@serializable
+class TObject(StreamedObject):
+    """Format for TObject class.
+
+    Reference: https://root.cern/doc/master/tobject.html
+
+    Attributes:
+        header (TObject_header): Header data for TObject class.
+        pidf (int): An identifier of the TProcessID record for the process that wrote the
+            object. This identifier is an unsigned short. The relevant record
+            has a name that is the string "ProcessID" concatenated with the ASCII
+            decimal representation of "pidf" (no leading zeros). 0 is a valid pidf.
+            Only present if the object is referenced by a pointer to persistent object.
+    """
+
+    fVersion: Annotated[int, Fmt(">h")]
+    fUniqueID: Annotated[int, Fmt(">i")]
+    fBits: Annotated[int, Fmt(">i")]
+    pidf: int | None
+
     @classmethod
     def read_members(cls, buffer: ReadBuffer) -> tuple[tuple[Any, ...], ReadBuffer]:
         (fVersion, fUniqueID, fBits), buffer = buffer.unpack(">hii")
@@ -182,7 +200,7 @@ class TObject(ROOTSerializable):
         return (fVersion, fUniqueID, fBits, pidf), buffer
 
 
-DICTIONARY[b"TObject"] = TObject
+DICTIONARY["TObject"] = TObject
 
 
 @serializable
@@ -199,4 +217,4 @@ class TNamed(TObject):
     fTitle: TString
 
 
-DICTIONARY[b"TNamed"] = TNamed
+DICTIONARY["TNamed"] = TNamed

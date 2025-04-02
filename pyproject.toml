@@ -29,12 +29,13 @@ classifiers = [
   "Typing :: Typed",
 ]
 dynamic = ["version"]
-dependencies = ["cramjam", "xxhash"]
+dependencies = ["cramjam", "xxhash", "numpy"]
 
 [project.optional-dependencies]
 test = [
   "pytest >=6",
   "pytest-cov >=3",
+  "scikit-hep-testdata",
 ]
 dev = [
   "pytest >=6",

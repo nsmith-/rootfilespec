@@ -5,6 +5,7 @@ from typing import Annotated, TypeVar, overload
 from rootfilespec.bootstrap.compression import RCompressed
 from rootfilespec.bootstrap.TString import TString
 from rootfilespec.bootstrap.util import fDatime_to_datetime
+from rootfilespec.dispatch import DICTIONARY, normalize
 from rootfilespec.structutil import (
     DataFetcher,
     Fmt,
@@ -12,8 +13,6 @@ from rootfilespec.structutil import (
     ROOTSerializable,
     serializable,
 )
-
-DICTIONARY: dict[bytes, type[ROOTSerializable]] = {}
 
 
 @serializable
@@ -122,16 +121,16 @@ class TKey(ROOTSerializable):
                 relpos=self.header.fKeylen,
             )
         if objtype is not None:
-            typename = objtype.__name__.encode("ascii")
+            typename = objtype.__name__
             # if self.fClassName.fString != typename:
             #     msg = f"TKey.read_object: type mismatch: expected {typename!r} but got {self.fClassName.fString!r}"
             #     raise ValueError(msg)
             obj, buffer = objtype.read(buffer)
         else:
-            typename = self.fClassName.fString
+            typename = normalize(self.fClassName.fString)
             obj, buffer = DICTIONARY[typename].read(buffer)  # type: ignore[assignment]
         if buffer:
-            msg = f"TKey.read_object: buffer not empty after reading object of type {typename!r}."
+            msg = f"TKey.read_object: buffer not empty after reading object of type {typename}."
             msg += f"\n{self=}"
             msg += f"\n{compressed=}"
             msg += f"\n{obj=}"
