@@ -64,7 +64,8 @@ class TDirectory_header_v622(ROOTSerializable):
 
 @serializable
 class TDirectory(ROOTSerializable):
-    """TDirectory object
+    """TDirectory object.
+    Binary Spec (the DATA section): https://root.cern.ch/doc/master/tdirectory.html
 
     Attributes:
         header (TDirectory_header_v622): TDirectory header information
@@ -74,6 +75,7 @@ class TDirectory(ROOTSerializable):
         fUUID (TUUID): Universally Unique Identifier
     """
 
+    # Fields for a TDirectory
     header: TDirectory_header_v622
     fSeekDir: int
     fSeekParent: int
@@ -83,6 +85,7 @@ class TDirectory(ROOTSerializable):
     @classmethod
     def read_members(cls, buffer: ReadBuffer):
         header, buffer = TDirectory_header_v622.read(buffer)
+
         if header.fVersion < 1000:
             (fSeekDir, fSeekParent, fSeekKeys), buffer = buffer.unpack(">iii")
         else:
@@ -93,10 +96,14 @@ class TDirectory(ROOTSerializable):
             buffer = buffer[12:]
         return (header, fSeekDir, fSeekParent, fSeekKeys, fUUID), buffer
 
-    def get_KeyList(self, fetch_data: DataFetcher):
+    def get_KeyList(self, fetch_data: DataFetcher) -> TKeyList:
+        # The TKeyList for a TDirectory contains all the (visible) TKeys
+        #   For RNTuples, it will only contain the RNTuple Anchor TKey(s)
+        # Binary Spec: https://root.cern.ch/doc/master/keyslist.html
         buffer = fetch_data(
             self.fSeekKeys, self.header.fNbytesName + self.header.fNbytesKeys
         )
+
         key, _ = TKey.read(buffer)
         if key.fSeekKey != self.fSeekKeys:
             msg = f"TDirectory.read_keylist: fSeekKey mismatch {key.fSeekKey} != {self.fSeekKeys}"
@@ -120,6 +127,11 @@ DICTIONARY["TDirectory"] = TDirectory
 
 @serializable
 class TKeyList(ROOTSerializable, Mapping[str, TKey]):
+    # The TKeyList for a TDirectory contains all the (visible) TKeys
+    #   For RNTuples, it will only contain the RNTuple Anchor TKey(s)
+    # Binary Spec: https://root.cern.ch/doc/master/keyslist.html
+
+    # Fields for a TKeyList
     fKeys: list[TKey]
     padding: bytes
 

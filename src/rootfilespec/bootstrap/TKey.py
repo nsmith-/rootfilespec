@@ -28,12 +28,12 @@ class TKey_header(ROOTSerializable):
         fCycle (int): Cycle of key
     """
 
-    fNbytes: Annotated[int, Fmt(">i")]
-    fVersion: Annotated[int, Fmt(">h")]
-    fObjlen: Annotated[int, Fmt(">i")]
+    fNbytes: Annotated[int, Fmt(">I")]
+    fVersion: Annotated[int, Fmt(">H")]
+    fObjlen: Annotated[int, Fmt(">I")]
     fDatime: Annotated[int, Fmt(">I")]
-    fKeylen: Annotated[int, Fmt(">h")]
-    fCycle: Annotated[int, Fmt(">h")]
+    fKeylen: Annotated[int, Fmt(">H")]
+    fCycle: Annotated[int, Fmt(">H")]
 
     def write_time(self):
         """Date and time when record was written to file"""
@@ -58,6 +58,7 @@ class TKey(ROOTSerializable):
     See https://root.cern/doc/master/classTKey.html for more information.
     """
 
+    # Fields for a TKey
     header: TKey_header
     fSeekKey: int
     fSeekPdir: int
@@ -70,9 +71,9 @@ class TKey(ROOTSerializable):
         initial_size = len(buffer)
         header, buffer = TKey_header.read(buffer)
         if header.fVersion < 1000:
-            (fSeekKey, fSeekPdir), buffer = buffer.unpack(">ii")
+            (fSeekKey, fSeekPdir), buffer = buffer.unpack(">II")
         else:
-            (fSeekKey, fSeekPdir), buffer = buffer.unpack(">qq")
+            (fSeekKey, fSeekPdir), buffer = buffer.unpack(">QQ")
         fClassName, buffer = TString.read(buffer)
         fName, buffer = TString.read(buffer)
         fTitle, buffer = TString.read(buffer)
@@ -98,11 +99,16 @@ class TKey(ROOTSerializable):
         objtype: type[ObjType] | None = None,
     ) -> ObjType | ROOTSerializable:
         buffer = fetch_data(
-            self.fSeekKey + self.header.fKeylen,
-            self.header.fNbytes - self.header.fKeylen,
+            self.fSeekKey
+            + self.header.fKeylen,  # Points to the start of the object data
+            self.header.fNbytes - self.header.fKeylen,  # The size of the object data
         )
+
         compressed = None
+        # fObjlen is the number of bytes of uncompressed data
+        # The length of the buffer is the number of bytes of compressed data
         if len(buffer) != self.header.fObjlen:
+            # This is a compressed object
             compressed, buffer = RCompressed.read(buffer)
             if compressed.header.uncompressed_size() != self.header.fObjlen:
                 msg = "TKey.read_object: uncompressed size mismatch. "
