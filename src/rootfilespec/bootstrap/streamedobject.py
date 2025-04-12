@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from rootfilespec.bootstrap.TObject import StreamHeader
 from rootfilespec.dispatch import DICTIONARY, normalize
 from rootfilespec.structutil import ReadBuffer, ROOTSerializable

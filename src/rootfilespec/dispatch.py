@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from rootfilespec.structutil import ROOTSerializable
 
 DICTIONARY: dict[str, type[ROOTSerializable]] = {}

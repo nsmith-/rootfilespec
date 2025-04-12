@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import dataclasses
 import struct
 import sys
@@ -9,7 +7,9 @@ from typing import (
     Any,
     Callable,
     Generic,
+    Optional,
     TypeVar,
+    Union,
     get_args,
     get_origin,
     get_type_hints,
@@ -26,8 +26,8 @@ def _get_annotations(cls: type) -> dict[str, Any]:
 
         return get_annotations(cls)
     return {
-        field: type
-        for field, type in cls.__annotations__
+        field: ann
+        for field, ann in cls.__dict__.get("__annotations__", {}).items()
         if not field.startswith("_") and field != "self"
     }
 
@@ -47,11 +47,11 @@ class ReadBuffer:
     """
 
     data: memoryview
-    abspos: int | None
+    abspos: Optional[int]
     relpos: int
     local_refs: dict[int, bytes] = dataclasses.field(default_factory=dict)
 
-    def __getitem__(self, key: slice) -> ReadBuffer:
+    def __getitem__(self, key: slice):
         """Get a slice of the buffer."""
         start: int = key.start or 0
         if start > len(self.data):
@@ -89,7 +89,9 @@ class ReadBuffer:
     def __bool__(self) -> bool:
         return bool(self.data)
 
-    def unpack(self, fmt: str | struct.Struct) -> tuple[tuple[Any, ...], ReadBuffer]:
+    def unpack(
+        self, fmt: Union[str, struct.Struct]
+    ) -> tuple[tuple[Any, ...], "ReadBuffer"]:
         """Unpack the buffer according to the given format."""
         if isinstance(fmt, struct.Struct):
             return fmt.unpack(self.data[: fmt.size]), self[fmt.size :]
@@ -97,7 +99,7 @@ class ReadBuffer:
         out = struct.unpack(fmt, self.data[:size])
         return out, self[size:]
 
-    def consume(self, size: int) -> tuple[bytes, ReadBuffer]:
+    def consume(self, size: int) -> tuple[bytes, "ReadBuffer"]:
         """Consume the given number of bytes from the buffer."""
         out = self.data[:size].tobytes()
         return out, self[size:]
@@ -109,7 +111,7 @@ ReadMethod = Callable[[ReadBuffer, Args], tuple[Args, ReadBuffer]]
 OutType = TypeVar("OutType")
 
 
-def _read_wrapper(cls: type[ROOTSerializable]) -> ReadMethod:
+def _read_wrapper(cls: type["ROOTSerializable"]) -> ReadMethod:
     """A wrapper to call the read method of a ROOTSerializable class."""
 
     def read(buffer: ReadBuffer, args: Args) -> tuple[Args, ReadBuffer]:
@@ -180,7 +182,7 @@ class ROOTSerializable:
 
 @dataclasses.dataclass
 class Pointer(ROOTSerializable, Generic[T]):
-    obj: int | None
+    obj: Optional[int]
 
     @classmethod
     def read(cls, buffer: ReadBuffer):

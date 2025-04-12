@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import Annotated
+from typing import Annotated, Optional
 
 from rootfilespec.bootstrap.TKey import TKey
 from rootfilespec.bootstrap.TUUID import TUUID
@@ -86,7 +84,7 @@ class TDirectory(ROOTSerializable):
     fSeekDir: int
     fSeekParent: int
     fSeekKeys: int
-    fUUID: TUUID | None
+    fUUID: Optional[TUUID]
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer):

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.structutil import ReadBuffer, ROOTSerializable, serializable
 

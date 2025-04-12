@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 from rootfilespec.bootstrap.streamedobject import read_streamed_item

@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from typing import Annotated, Protocol
+from typing import Annotated, Optional, Protocol
 
 import cramjam  # type: ignore[import-not-found]
 
@@ -46,9 +44,7 @@ class RCompressionHeader(ROOTSerializable):
 
 
 class Decompressor(Protocol):
-    def __call__(
-        self, data: bytes | memoryview, output_len: int | None = None
-    ) -> bytes: ...
+    def __call__(self, data: memoryview, output_len: Optional[int] = None) -> bytes: ...
 
 
 def get_decompressor(algorithm: bytes) -> Decompressor:
@@ -76,7 +72,7 @@ class RCompressed(ROOTSerializable):
     """
 
     header: RCompressionHeader
-    checksum: bytes | None
+    checksum: Optional[bytes]
     payload: memoryview
 
     @classmethod

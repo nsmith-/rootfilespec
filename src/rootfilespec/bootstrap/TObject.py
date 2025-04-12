@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Annotated, Any, TypeVar
+from typing import Annotated, Any, Optional, TypeVar
 
 from rootfilespec.bootstrap.TString import TString
 from rootfilespec.dispatch import DICTIONARY, normalize
@@ -46,9 +44,9 @@ class StreamHeader(ROOTSerializable):
     """
 
     fByteCount: int
-    fVersion: int | None
-    fClassName: bytes | None
-    fClassRef: int | None
+    fVersion: Optional[int]
+    fClassName: Optional[bytes]
+    fClassRef: Optional[int]
 
     @classmethod
     def read(cls, buffer: ReadBuffer):
@@ -187,7 +185,7 @@ class TObject(StreamedObject):
     fVersion: Annotated[int, Fmt(">h")]
     fUniqueID: Annotated[int, Fmt(">i")]
     fBits: Annotated[int, Fmt(">i")]
-    pidf: int | None
+    pidf: Optional[int]
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer) -> tuple[tuple[Any, ...], ReadBuffer]:

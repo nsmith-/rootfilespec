@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from typing import Annotated, TypeVar, overload
+from typing import Annotated, Optional, TypeVar, Union, overload
 
 from rootfilespec.bootstrap.compression import RCompressed
 from rootfilespec.bootstrap.TString import TString
@@ -101,8 +99,8 @@ class TKey(ROOTSerializable):
     def read_object(
         self,
         fetch_data: DataFetcher,
-        objtype: type[ObjType] | None = None,
-    ) -> ObjType | ROOTSerializable:
+        objtype: Optional[type[ObjType]] = None,
+    ) -> Union[ObjType, ROOTSerializable]:
         buffer = fetch_data(
             self.fSeekKey + self.header.fKeylen,
             self.header.fNbytes - self.header.fKeylen,

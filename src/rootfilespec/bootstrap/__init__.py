@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from rootfilespec.bootstrap.assumed import ROOT3a3aTIOFeatures
 from rootfilespec.bootstrap.TDirectory import TDirectory, TKeyList
 from rootfilespec.bootstrap.TFile import ROOTFile, TFile
