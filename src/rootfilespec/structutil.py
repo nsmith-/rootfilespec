@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import dataclasses
 import struct
+import sys
 from functools import partial
-from inspect import get_annotations  # type: ignore[attr-defined]
 from typing import (
     Annotated,
     Any,
@@ -17,6 +17,19 @@ from typing import (
 
 import numpy as np
 from typing_extensions import dataclass_transform  # in typing for Python 3.11+
+
+
+def _get_annotations(cls: type) -> dict[str, Any]:
+    """Get the annotations of a class, including private attributes."""
+    if sys.version_info >= (3, 10):
+        from inspect import get_annotations
+
+        return get_annotations(cls)
+    return {
+        field: type
+        for field, type in cls.__annotations__
+        if not field.startswith("_") and field != "self"
+    }
 
 
 @dataclasses.dataclass
@@ -227,7 +240,7 @@ def serializable(cls: type[T]) -> type[T]:
     names: list[str] = []
     constructors: list[ReadMethod] = []
     namespace = get_type_hints(cls, include_extras=True)
-    for field in get_annotations(cls):
+    for field in _get_annotations(cls):
         names.append(field)
         ftype = namespace[field]
         if isinstance(ftype, type) and issubclass(ftype, ROOTSerializable):
