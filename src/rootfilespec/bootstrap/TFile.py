@@ -159,6 +159,8 @@ class ROOTFile(ROOTSerializable):
         return key.read_object(fetch_data, objtype=TFile)
 
     def get_StreamerInfo(self, fetch_data: DataFetcher):
+        if self.header.fNbytesInfo == 0:
+            return None
         buffer = fetch_data(self.header.fSeekInfo, self.header.fNbytesInfo)
         key, _ = TKey.read(buffer)
         if key.fSeekKey != self.header.fSeekInfo:

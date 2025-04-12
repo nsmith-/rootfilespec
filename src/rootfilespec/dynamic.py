@@ -21,10 +21,12 @@ from rootfilespec.bootstrap import (
     TObjArray,
     TObject,
     TString,
+    string,
 )
 from rootfilespec.bootstrap.assumed import (
     ROOT3a3aTIOFeatures,
     TArrayD,
+    TArrayF,
     TArrayI,
     TVirtualIndex,
 )

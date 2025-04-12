@@ -35,7 +35,11 @@ class RCompressionHeader(ROOTSerializable):
     fUncompressedSize: Annotated[bytes, Fmt("3s")]
 
     def compressed_size(self) -> int:
-        return sum(s << (8 * i) for i, s in enumerate(self.fCompressedSize))
+        out = sum(s << (8 * i) for i, s in enumerate(self.fCompressedSize))
+        if self.fAlgorithm == b"L4":
+            #  LZ4 doesn't account for the checksum, so we need to subtract that
+            out -= 8
+        return out
 
     def uncompressed_size(self) -> int:
         return sum(s << (8 * i) for i, s in enumerate(self.fUncompressedSize))
@@ -53,7 +57,7 @@ def get_decompressor(algorithm: bytes) -> Decompressor:
     if algorithm == b"XZ":
         return cramjam.xz.decompress  # type: ignore[no-any-return]
     if algorithm == b"L4":
-        return cramjam.lz4.decompress  # type: ignore[no-any-return]
+        return cramjam.lz4.decompress_block  # type: ignore[no-any-return]
     if algorithm == b"ZS":
         return cramjam.zstd.decompress  # type: ignore[no-any-return]
     msg = f"Unknown compression algorithm {algorithm!r}"
@@ -79,7 +83,7 @@ class RCompressed(ROOTSerializable):
     def read_members(cls, buffer: ReadBuffer):
         header, buffer = RCompressionHeader.read(buffer)
         if header.fAlgorithm == b"L4":
-            checksum, buffer = buffer.consume(4)
+            checksum, buffer = buffer.consume(8)
         else:
             checksum = None
         # Not using .consume() to avoid copying the payload
@@ -88,13 +92,13 @@ class RCompressed(ROOTSerializable):
         return (header, checksum, payload), buffer
 
     def decompress(self) -> memoryview:
-        decompressor = get_decompressor(self.header.fAlgorithm)
-        out = decompressor(self.payload, output_len=self.header.uncompressed_size())
         if self.checksum is not None:
             import xxhash  # type: ignore[import-not-found]
 
-            checksum = xxhash.xxh64(out, seed=0).digest()
+            checksum = xxhash.xxh64(self.payload, seed=0).digest()
             if checksum != self.checksum:
                 msg = f"Checksum mismatch: {checksum!r} != {self.checksum!r}"
                 raise ValueError(msg)
+        decompressor = get_decompressor(self.header.fAlgorithm)
+        out = decompressor(self.payload, output_len=self.header.uncompressed_size())
         return memoryview(out)

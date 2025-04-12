@@ -29,7 +29,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dynamic = ["version"]
-dependencies = ["cramjam", "xxhash", "numpy"]
+dependencies = ["cramjam", "xxhash", "numpy", "typing_extensions"]
 
 [project.optional-dependencies]
 test = [

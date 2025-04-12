@@ -40,7 +40,7 @@ class TDirectory_header_v622(ROOTSerializable):
     Header information from https://root.cern/doc/master/tdirectory.html
 
     Attributes:
-        fVersion (int): TDirectory class version identifier
+        fVersion (int): TDirectory class version identifier (+ 1000 if seek is 64 bit)
         fDatimeC (int): Date and time when directory was created
         fDatimeM (int): Date and time when directory was last modified
         fNbytesKeys (int): Number of bytes in the associated KeysList record
@@ -52,6 +52,14 @@ class TDirectory_header_v622(ROOTSerializable):
     fDatimeM: Annotated[int, Fmt(">I")]
     fNbytesKeys: Annotated[int, Fmt(">i")]
     fNbytesName: Annotated[int, Fmt(">i")]
+
+    def version(self) -> int:
+        """Version of the TDirectory class"""
+        return self.fVersion % 1000
+
+    def is_large(self) -> bool:
+        """True if the file is larger than 2GB"""
+        return self.fVersion > 1000
 
     def create_time(self):
         """Date and time when directory was created"""
@@ -78,17 +86,20 @@ class TDirectory(ROOTSerializable):
     fSeekDir: int
     fSeekParent: int
     fSeekKeys: int
-    fUUID: TUUID
+    fUUID: TUUID | None
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer):
         header, buffer = TDirectory_header_v622.read(buffer)
-        if header.fVersion < 1000:
-            (fSeekDir, fSeekParent, fSeekKeys), buffer = buffer.unpack(">iii")
-        else:
+        if header.is_large():
             (fSeekDir, fSeekParent, fSeekKeys), buffer = buffer.unpack(">qqq")
-        fUUID, buffer = TUUID.read(buffer)
-        if header.fVersion < 1000:
+        else:
+            (fSeekDir, fSeekParent, fSeekKeys), buffer = buffer.unpack(">iii")
+        if header.version() > 1:
+            fUUID, buffer = TUUID.read(buffer)
+        else:
+            fUUID = None
+        if not header.is_large():
             # Extra space to allow seeks to become 64 bit without moving this header
             buffer = buffer[12:]
         return (header, fSeekDir, fSeekParent, fSeekKeys, fUUID), buffer
@@ -115,7 +126,9 @@ class TDirectory(ROOTSerializable):
         return key.read_object(fetch_cached, objtype=TKeyList)
 
 
+# TODO: are these different?
 DICTIONARY["TDirectory"] = TDirectory
+DICTIONARY["TDirectoryFile"] = TDirectory
 
 
 @serializable

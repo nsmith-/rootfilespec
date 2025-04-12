@@ -19,9 +19,19 @@ class TArrayI(ROOTSerializable):
     @classmethod
     def read_members(cls, buffer: ReadBuffer):
         (n,), buffer = buffer.unpack(">i")
-        if n > 0:
-            raise NotImplementedError
         a, buffer = buffer.unpack(f">{n}i")
+        return (n, list(a)), buffer
+
+
+@serializable
+class TArrayF(ROOTSerializable):
+    fN: Annotated[int, ">i"]
+    fA: Annotated[list[float], ">f"]
+
+    @classmethod
+    def read_members(cls, buffer: ReadBuffer):
+        (n,), buffer = buffer.unpack(">i")
+        a, buffer = buffer.unpack(f">{n}f")
         return (n, list(a)), buffer
 
 
@@ -33,8 +43,6 @@ class TArrayD(ROOTSerializable):
     @classmethod
     def read_members(cls, buffer: ReadBuffer):
         (n,), buffer = buffer.unpack(">i")
-        if n > 0:
-            raise NotImplementedError
         a, buffer = buffer.unpack(f">{n}d")
         return (n, list(a)), buffer
 

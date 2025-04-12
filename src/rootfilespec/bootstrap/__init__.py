@@ -12,7 +12,7 @@ from rootfilespec.bootstrap.TStreamerInfo import (
     TStreamerInfo,
     TStreamerString,
 )
-from rootfilespec.bootstrap.TString import TString
+from rootfilespec.bootstrap.TString import TString, string
 
 __all__ = [
     "ROOT3a3aTIOFeatures",
@@ -31,4 +31,5 @@ __all__ = [
     "TStreamerInfo",
     "TStreamerString",
     "TString",
+    "string",
 ]

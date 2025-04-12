@@ -81,11 +81,13 @@ class ReadBuffer:
         if isinstance(fmt, struct.Struct):
             return fmt.unpack(self.data[: fmt.size]), self[fmt.size :]
         size = struct.calcsize(fmt)
-        return struct.unpack(fmt, self.data[:size]), self[size:]
+        out = struct.unpack(fmt, self.data[:size])
+        return out, self[size:]
 
     def consume(self, size: int) -> tuple[bytes, ReadBuffer]:
         """Consume the given number of bytes from the buffer."""
-        return bytes(self.data[:size]), self[size:]
+        out = self.data[:size].tobytes()
+        return out, self[size:]
 
 
 DataFetcher = Callable[[int, int], ReadBuffer]
@@ -140,7 +142,7 @@ class _BasicArrayReadMethod:
         n = args[self.sizeidx]
         pad, buffer = buffer.consume(1)
         if not ((n == 0 and pad == b"\x00") or (n > 0 and pad == b"\x01")):
-            msg = f"Expected null or 0x01 pad byte but got {pad!r}"
+            msg = f"Expected null or 0x01 pad byte but got {pad!r} for size {n}"
             raise ValueError(msg)
         data, buffer = buffer.consume(n * self.dtype.itemsize)
         arg = np.frombuffer(data, dtype=self.dtype, count=n)
@@ -191,13 +193,17 @@ class StdVector(ROOTSerializable, Generic[T]):
     def read_as(
         cls, outtype: type[T], buffer: ReadBuffer, args: Args
     ) -> tuple[Args, ReadBuffer]:
-        raise NotImplementedError
-        # (n,), buffer = buffer.unpack(">i")
-        # out: list[T] = []
-        # for _ in range(n):
-        #     obj, buffer = outtype.read(buffer)
-        #     out.append(obj)
-        # return (*args, cls(out)), buffer
+        (n,), buffer = buffer.unpack(">i")
+        out: list[T] = []
+        for _ in range(n):
+            if outtype is StdVector:
+                (interior_type,) = get_args(outtype)
+                iargs, buffer = outtype.read_as(interior_type, buffer, args)  # type: ignore[attr-defined]
+                obj = outtype(*iargs)
+            else:
+                obj, buffer = outtype.read(buffer)
+            out.append(obj)
+        return (*args, cls(out)), buffer
 
 
 @dataclass_transform()
@@ -249,6 +255,7 @@ def serializable(cls: type[T]) -> type[T]:
                 constructors.append(_read_wrapper(origin))
             elif origin is StdVector:
                 (ftype,) = get_args(ftype)
+                # TODO: nested std::vectors here instead of in StdVector.read_as
                 constructors.append(partial(StdVector.read_as, ftype))
             else:
                 msg = f"Cannot read field {field} of subscripted type {ftype} with origin {origin}"

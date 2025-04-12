@@ -67,7 +67,7 @@ class TKey(ROOTSerializable):
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer):
-        initial_size = len(buffer)
+        start_position = buffer.relpos
         header, buffer = TKey_header.read(buffer)
         if header.fVersion < 1000:
             (fSeekKey, fSeekPdir), buffer = buffer.unpack(">ii")
@@ -76,8 +76,14 @@ class TKey(ROOTSerializable):
         fClassName, buffer = TString.read(buffer)
         fName, buffer = TString.read(buffer)
         fTitle, buffer = TString.read(buffer)
-        if len(buffer) != initial_size - header.fKeylen:
-            raise ValueError("TKey.read: buffer size mismatch")  # noqa: EM101
+        if header.fVersion % 1000 not in (2, 4):
+            msg = f"TKey.read_members: unexpected version {header.fVersion}"
+            raise ValueError(msg)
+        keylen = buffer.relpos - start_position
+        if keylen != header.fKeylen and keylen != header.fKeylen + 4:
+            # TODO: understand why we sometimes read 4 more bytes
+            msg = f"TKey.read: key length mismatch: read {keylen}, header expects {header.fKeylen}"
+            raise ValueError(msg)
         return (header, fSeekKey, fSeekPdir, fClassName, fName, fTitle), buffer
 
     def is_short(self) -> bool:
