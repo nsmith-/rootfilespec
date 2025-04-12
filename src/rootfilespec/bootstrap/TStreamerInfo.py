@@ -26,9 +26,19 @@ class TStreamerInfo(TNamed):
         """Get the class name of this streamer info."""
         return normalize(self.fName.fString)
 
+    def base_classes(self) -> list[str]:
+        """Get the base classes of this streamer info."""
+        bases: list[str] = []
+        for element in self.fObjects.objects:
+            if isinstance(element, TStreamerBase):
+                bases.append(element.member_name())
+        if not bases:
+            bases.append("StreamedObject")
+        return bases
+
     def class_definition(self) -> ClassDef:
         """Get the class definition code of this streamer info."""
-        bases: list[str] = []
+        bases = self.base_classes()
         members: list[str] = []
         dependencies: list[str] = []
         for element in self.fObjects.objects:
@@ -36,14 +46,11 @@ class TStreamerInfo(TNamed):
                 msg = f"Unexpected element: {element}"
                 raise TypeError(msg)
             if isinstance(element, TStreamerBase):
-                bases.append(element.member_name())
                 continue
             mdef, dep = element.member_definition(parent=self)
             dependencies.extend(dep)
             members.append(mdef)
         clsname = self.class_name()
-        if len(bases) == 0:
-            bases.append("StreamedObject")
         basestr = ", ".join(reversed(bases))
         lines: list[str] = []
         lines.append(f"# Generated for {self}")
@@ -316,7 +323,10 @@ class TStreamerBasicPointer(TStreamerElement):
 
     def member_definition(self, parent: TStreamerInfo):
         _, fmt = ElementType(self.fType - ElementType.kOffsetP).as_fmt()
-        if self.fCountClass != parent.fName:
+        if not (
+            self.fCountClass == parent.fName
+            or normalize(self.fCountClass.fString) in parent.base_classes()
+        ):
             msg = f"fCountClass {self.fCountClass} != parent.fName {parent.fName}"
             raise ValueError(msg)
 

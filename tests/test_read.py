@@ -4,6 +4,7 @@ import pytest
 from skhep_testdata import data_path, known_files  # type: ignore[import-not-found]
 
 from rootfilespec.bootstrap import ROOTFile, TDirectory
+from rootfilespec.dynamic import streamerinfo_to_classes
 from rootfilespec.structutil import DataFetcher, ReadBuffer
 
 TESTABLE_FILES = [f for f in known_files if f.endswith(".root")]
@@ -37,14 +38,14 @@ def test_read_file(filename: str):
             raise ValueError(msg)
 
         # oldkeys = set(DICTIONARY)
-        streamerinfo = file.get_StreamerInfo(fetch_data)  # noqa: F841
+        streamerinfo = file.get_StreamerInfo(fetch_data)
 
-        # if streamerinfo:
-        #     try:
-        #         classes = streamerinfo_to_classes(streamerinfo)
-        #         exec(classes, globals())
-        #     except NotImplementedError as ex:
-        #         pytest.xfail(reason=str(ex))
+        if streamerinfo:
+            try:
+                streamerinfo_to_classes(streamerinfo)
+                # exec(classes, globals())
+            except NotImplementedError as ex:
+                pytest.xfail(reason=str(ex))
 
         # newkeys = set(DICTIONARY) - oldkeys
         # tfile = file.get_TFile(fetch_cached)
