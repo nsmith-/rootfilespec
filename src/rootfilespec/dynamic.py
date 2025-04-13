@@ -22,9 +22,12 @@ from rootfilespec.bootstrap import (
 )
 from rootfilespec.bootstrap.assumed import (
     ROOT3a3aTIOFeatures,
+    TArrayC,
     TArrayD,
     TArrayF,
     TArrayI,
+    TArrayS,
+    TAtt3D,
     TVirtualIndex,
 )
 from rootfilespec.bootstrap.TKey import DICTIONARY
@@ -46,9 +49,12 @@ BOOTSTRAP_TYPES: set[str] = {
     "TString",
     "string",
     "ROOT3a3aTIOFeatures",
+    "TArrayC",
     "TArrayD",
     "TArrayF",
     "TArrayI",
+    "TArrayS",
+    "TAtt3D",
     "TVirtualIndex",
     "BasicArray",
     "Fmt",

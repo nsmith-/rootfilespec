@@ -16,6 +16,32 @@ from rootfilespec.structutil import (
     serializable,
 )
 
+# TODO: template these classes
+
+
+@serializable
+class TArrayC(ROOTSerializable):
+    fN: Annotated[int, ">i"]
+    fA: Annotated[list[int], ">B"]
+
+    @classmethod
+    def read_members(cls, buffer: ReadBuffer):
+        (n,), buffer = buffer.unpack(">i")
+        a, buffer = buffer.unpack(f">{n}B")
+        return (n, list(a)), buffer
+
+
+@serializable
+class TArrayS(ROOTSerializable):
+    fN: Annotated[int, ">i"]
+    fA: Annotated[list[int], ">h"]
+
+    @classmethod
+    def read_members(cls, buffer: ReadBuffer):
+        (n,), buffer = buffer.unpack(">i")
+        a, buffer = buffer.unpack(f">{n}h")
+        return (n, list(a)), buffer
+
 
 @serializable
 class TArrayI(ROOTSerializable):
@@ -60,6 +86,11 @@ class TVirtualIndex(ROOTSerializable):
     @classmethod
     def read_members(cls, buffer: ReadBuffer):
         raise NotImplementedError
+
+
+@serializable
+class TAtt3D(ROOTSerializable):
+    """Empty class for marking a TH1 as 3D"""
 
 
 @serializable

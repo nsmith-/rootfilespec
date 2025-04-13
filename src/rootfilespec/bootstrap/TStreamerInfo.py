@@ -1,4 +1,5 @@
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Annotated
@@ -233,9 +234,18 @@ class ArrayDim:
     dim4: int
 
 
-_tpl = re.compile(rb"^(?:std::)?(\w*)<(.*)>$")
+_tpl = re.compile(rb"^(?:std::)?(\w*)<(.*) *>$")
 _cpp_primitives = {
     b"bool": "Annotated[bool, Fmt('>?')]",
+    b"char": "Annotated[int, Fmt('>b')]",
+    b"unsigned char": "Annotated[int, Fmt('>B')]",
+    b"short": "Annotated[int, Fmt('>h')]",
+    b"unsigned short": "Annotated[int, Fmt('>H')]",
+    b"int": "Annotated[int, Fmt('>i')]",
+    b"unsigned int": "Annotated[int, Fmt('>I')]",
+    b"Long64_t": "Annotated[int, Fmt('>q')]",
+    b"long": "Annotated[int, Fmt('>q')]",
+    b"unsigned long": "Annotated[int, Fmt('>Q')]",
     b"float": "Annotated[float, Fmt('>f')]",
     b"double": "Annotated[float, Fmt('>d')]",
 }
@@ -244,27 +254,115 @@ _cpp_templates = {
 }
 
 
-def _cpptype_to_pytype(cppname: bytes) -> tuple[str, set[str]]:
-    """Convert C++ type name to Python type name."""
-    # Remove pointer
-    cppname = cppname.removesuffix(b"*")
-    # Remove const
-    cppname = cppname.removeprefix(b"const ")
-    # Handle templated types
-    if m := _tpl.match(cppname):
-        cpptpl, cppargs = m.groups()
-        tplclass = _cpp_templates.get(cpptpl, normalize(cpptpl))
+_tokenize = re.compile(rb"([\w:]+)|([<>,\*])|(?:\s+)")
+_Token = tuple[bytes, bytes]
+_ignored_terminals: set[_Token] = {
+    (b"", b""),
+    (b"const", b""),
+    (b"", b"*"),
+}
+
+
+class _TokenStream:
+    def __init__(self, tokens: Iterable[_Token]):
+        self._tokens = iter(tokens)
+        self._current = next(self._tokens, None)
+
+    def peek(self) -> _Token | None:
+        return self._current
+
+    def next(self) -> _Token | None:
+        token, self._current = self._current, next(self._tokens, None)
+        return token
+
+
+@dataclass
+class _CppTypeAstNode:
+    name: bytes
+
+    def to_pytype(self) -> tuple[str, set[str]]:
+        """Convert C++ type name to Python type name."""
+        if self.name in _cpp_primitives:
+            return _cpp_primitives[self.name], set()
+        pyname = normalize(self.name)
+        return pyname, {pyname}
+
+
+@dataclass
+class _CppTypeAstTemplate(_CppTypeAstNode):
+    args: tuple[_CppTypeAstNode, ...]
+
+    def to_pytype(self) -> tuple[str, set[str]]:
+        """Convert C++ type name to Python type name."""
+        if self.name in _cpp_templates:
+            pyname = _cpp_templates[self.name]
+        else:
+            msg = f"STL template type {self.name} not implemented"
+            raise NotImplementedError(msg)
         args = []
         deps: set[str] = set()
-        for cpparg in cppargs.split(b","):
-            arg, deps = _cpptype_to_pytype(cpparg.strip())
-            args.append(arg)
-            deps = deps.union(deps)
-        return f"{tplclass}[{', '.join(args)}]", deps
-    if prim := _cpp_primitives.get(cppname):
-        return prim, set()
-    name = normalize(cppname)
-    return name, {name}
+        for arg in self.args:
+            argname, argdeps = arg.to_pytype()
+            args.append(argname)
+            deps = deps.union(argdeps)
+        return f"{pyname}[{', '.join(args)}]", deps
+
+
+def _template_args(stream: _TokenStream) -> tuple[_CppTypeAstNode, ...]:
+    token = stream.next()
+    assert token == (b"", b"<")
+    args: tuple[_CppTypeAstNode, ...] = ()
+    while True:
+        token = stream.peek()
+        if not token:
+            msg = "Unexpected end of stream"
+            raise ValueError(msg)
+        if token == (b"", b">"):
+            stream.next()
+            break
+        if token == (b"", b","):
+            stream.next()
+            continue
+        arg = _value(stream)
+        args = (*args, arg)
+    return args
+
+
+def _value(stream: _TokenStream):
+    token = stream.next()
+    if not token:
+        msg = "Unexpected end of stream"
+        raise ValueError(msg)
+    if token[1]:
+        msg = f"Unexpected token {token}"
+        raise ValueError(msg)
+    name = token[0]
+    token = stream.peek()
+    if not token or token in ((b"", b">"), (b"", b",")):
+        # we are in a simple type
+        return _CppTypeAstNode(name)
+    if token == (b"", b"<"):
+        # we are in template rule
+        return _CppTypeAstTemplate(name, _template_args(stream))
+    if not token[1]:
+        # we are in typeid
+        while (token := stream.peek()) and not token[1]:
+            name += b" " + token[0]
+            stream.next()
+        return _CppTypeAstNode(name)
+    msg = f"Unexpected token {token}"
+    raise ValueError(msg)
+
+
+def _cpptype_to_pytype(cppname: bytes) -> tuple[str, set[str]]:
+    """Convert C++ type name to Python type name.
+
+    This uses a very simple parser that only handles the types we need.
+    """
+    alltokens: list[_Token] = _tokenize.findall(cppname)
+    stream = _TokenStream(t for t in alltokens if t not in _ignored_terminals)
+    ast = _value(stream)
+    return ast.to_pytype()
 
 
 @serializable
@@ -495,24 +593,9 @@ class TStreamerSTL(TStreamerElement):
 
     def member_definition(self, parent: TStreamerInfo):  # noqa: ARG002
         if self.fSTLtype == 1:
-            typename = "StdVector"
-            if self.fCType == ElementType.kTString:
-                typename += "[TString]"
-            elif self.fCType == ElementType.kObject:
-                interior_type = normalize(
-                    self.fTypeName.fString.removeprefix(b"vector<").removesuffix(b">")
-                )
-                if interior_type == "TString":
-                    typename += "[TString]"
-                elif interior_type in DICTIONARY:
-                    typename += f"[{interior_type}]"
-                else:
-                    msg = f"STL vector type with {interior_type=} not implemented yet"
-                    raise NotImplementedError(msg)
-            else:
-                msg = f"STL vector type {self.type_name()} ({self.fCType=}) not implemented yet"
-                raise NotImplementedError(msg)
-            return f"{self.member_name()}: {typename}", []
+            typename, dependencies = _cpptype_to_pytype(self.cpp_typename())
+            assert typename.startswith("StdVector[")
+            return f"{self.member_name()}: {typename}", list(dependencies)
         msg = f"STL type {self.type_name()} not implemented yet"
         raise NotImplementedError(msg)
 
