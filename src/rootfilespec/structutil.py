@@ -32,6 +32,9 @@ def _get_annotations(cls: type) -> dict[str, Any]:
     }
 
 
+Args = tuple[Any, ...]
+
+
 @dataclasses.dataclass
 class ReadBuffer:
     """A ReadBuffer is a memoryview that keeps track of the absolute and relative
@@ -89,9 +92,7 @@ class ReadBuffer:
     def __bool__(self) -> bool:
         return bool(self.data)
 
-    def unpack(
-        self, fmt: Union[str, struct.Struct]
-    ) -> tuple[tuple[Any, ...], "ReadBuffer"]:
+    def unpack(self, fmt: Union[str, struct.Struct]) -> tuple[Args, "ReadBuffer"]:
         """Unpack the buffer according to the given format."""
         if isinstance(fmt, struct.Struct):
             return fmt.unpack(self.data[: fmt.size]), self[fmt.size :]
@@ -106,7 +107,7 @@ class ReadBuffer:
 
 
 DataFetcher = Callable[[int, int], ReadBuffer]
-Args = tuple[Any, ...]
+Members = dict[str, Any]
 ReadMethod = Callable[[ReadBuffer, Args], tuple[Args, ReadBuffer]]
 OutType = TypeVar("OutType")
 
@@ -175,7 +176,7 @@ class ROOTSerializable:
         return cls(*members), buffer
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer) -> tuple[tuple[Any, ...], ReadBuffer]:
+    def read_members(cls, buffer: ReadBuffer) -> tuple[Args, ReadBuffer]:
         msg = "Unimplemented method: {cls.__name__}.read_members"
         raise NotImplementedError(msg)
 
@@ -202,22 +203,31 @@ class StdVector(ROOTSerializable, Generic[T]):
         items (list[T]): The list of objects in the vector.
     """
 
-    items: list[T]
+    items: tuple[T, ...]
 
     @classmethod
     def read_as(
         cls, outtype: type[T], buffer: ReadBuffer, args: Args
     ) -> tuple[Args, ReadBuffer]:
         (n,), buffer = buffer.unpack(">i")
-        out: list[T] = []
-        for _ in range(n):
-            if outtype is StdVector:
-                (interior_type,) = get_args(outtype)
-                iargs, buffer = outtype.read_as(interior_type, buffer, args)  # type: ignore[attr-defined]
-                obj = outtype(*iargs)
+        out: tuple[T, ...] = ()
+        if outtype is StdVector:
+            (interior_type,) = get_args(outtype)
+            for _ in range(n):
+                out, buffer = StdVector.read_as(interior_type, buffer, out)
+        elif getattr(outtype, "_name", None) == "Annotated":
+            # TODO: this should be handled in the serializable decorator
+            (ftype, fmt) = get_args(outtype)
+            if isinstance(fmt, Fmt):
+                for _ in range(n):
+                    out, buffer = fmt.read_as(ftype, buffer, out)
             else:
+                msg = f"Cannot read field of type {outtype} with format {fmt}"
+                raise NotImplementedError(msg)
+        else:
+            for _ in range(n):
                 obj, buffer = outtype.read(buffer)
-            out.append(obj)
+                out += (obj,)
         return (*args, cls(out)), buffer
 
 
@@ -259,6 +269,10 @@ def serializable(cls: type[T]) -> type[T]:
                     constructors.append(partial(format.read_as, ftype))
                 elif isinstance(format, BasicArray):
                     assert ftype is np.ndarray
+                    if format.shapefield not in names:
+                        # TODO: to implement this we need to migrate read_members to return Members rather than Args
+                        msg = f"Cannot yet read {field} because shape field {format.shapefield} is in base class"
+                        raise NotImplementedError(msg)
                     fieldindex = names.index(format.shapefield)
                     constructors.append(
                         _BasicArrayReadMethod(format.dtype, fieldindex).read

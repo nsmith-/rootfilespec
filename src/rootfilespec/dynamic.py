@@ -37,11 +37,31 @@ from rootfilespec.structutil import (
 )
 """
 
+BOOTSTRAP_TYPES: set[str] = {
+    "StreamedObject",
+    "TList",
+    "TNamed",
+    "TObjArray",
+    "TObject",
+    "TString",
+    "string",
+    "ROOT3a3aTIOFeatures",
+    "TArrayD",
+    "TArrayF",
+    "TArrayI",
+    "TVirtualIndex",
+    "BasicArray",
+    "Fmt",
+    "Pointer",
+    "StdVector",
+}
+
 
 def streamerinfo_to_classes(streamerinfo: TList) -> str:
     lines: list[str] = list(PREAMBLE.split("\n"))
 
     classes: dict[str, ClassDef] = {}
+    declared: set[str] = set(BOOTSTRAP_TYPES)
 
     for item in streamerinfo.items:
         if not isinstance(item, TStreamerInfo):
@@ -49,6 +69,7 @@ def streamerinfo_to_classes(streamerinfo: TList) -> str:
         clsname = normalize(item.fName.fString)
         if clsname in DICTIONARY:
             lines.append(f"# Class {clsname} already in dictionary, skipping\n")
+            declared.add(clsname)
             continue
         if "edm3a3a" in clsname:
             lines.append(f"# Class {clsname} is an EDM class, skipping\n")
@@ -62,7 +83,11 @@ def streamerinfo_to_classes(streamerinfo: TList) -> str:
             depdef = classes.pop(dep, None)
             if depdef is not None:
                 write(depdef)
+            elif dep not in declared:
+                msg = f"Class {classdef.name} depends on {dep}, which is not declared"
+                raise ValueError(msg)
         lines.append(classdef.code)
+        declared.add(classdef.name)
 
     while classes:
         _, classdef = classes.popitem()

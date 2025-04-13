@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Annotated
@@ -232,6 +233,40 @@ class ArrayDim:
     dim4: int
 
 
+_tpl = re.compile(rb"^(?:std::)?(\w*)<(.*)>$")
+_cpp_primitives = {
+    b"bool": "Annotated[bool, Fmt('>?')]",
+    b"float": "Annotated[float, Fmt('>f')]",
+    b"double": "Annotated[float, Fmt('>d')]",
+}
+_cpp_templates = {
+    b"vector": "StdVector",
+}
+
+
+def _cpptype_to_pytype(cppname: bytes) -> tuple[str, set[str]]:
+    """Convert C++ type name to Python type name."""
+    # Remove pointer
+    cppname = cppname.removesuffix(b"*")
+    # Remove const
+    cppname = cppname.removeprefix(b"const ")
+    # Handle templated types
+    if m := _tpl.match(cppname):
+        cpptpl, cppargs = m.groups()
+        tplclass = _cpp_templates.get(cpptpl, normalize(cpptpl))
+        args = []
+        deps: set[str] = set()
+        for cpparg in cppargs.split(b","):
+            arg, deps = _cpptype_to_pytype(cpparg.strip())
+            args.append(arg)
+            deps = deps.union(deps)
+        return f"{tplclass}[{', '.join(args)}]", deps
+    if prim := _cpp_primitives.get(cppname):
+        return prim, set()
+    name = normalize(cppname)
+    return name, {name}
+
+
 @serializable
 class TStreamerElement(TNamed):
     """TStreamerElement class.
@@ -257,6 +292,10 @@ class TStreamerElement(TNamed):
     def member_name(self) -> str:
         """Get the member name of this streamer element."""
         return normalize(self.fName.fString)
+
+    def cpp_typename(self) -> bytes:
+        """Get the C++ type name of this streamer element."""
+        return self.fTypeName.fString
 
     def type_name(self) -> str:
         """Get the type name of this streamer element."""
@@ -291,6 +330,9 @@ DICTIONARY["TStreamerBase"] = TStreamerBase
 @serializable
 class TStreamerBasicType(TStreamerElement):
     def member_definition(self, parent: TStreamerInfo):  # noqa: ARG002
+        if self.fArrayLength > 0:
+            msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
+            raise NotImplementedError(msg)
         type_, fmt = self.fType.as_fmt()
         return f"{self.member_name()}: Annotated[{type_}, Fmt({fmt!r})]", []
 
@@ -301,6 +343,9 @@ DICTIONARY["TStreamerBasicType"] = TStreamerBasicType
 @serializable
 class TStreamerString(TStreamerElement):
     def member_definition(self, parent: TStreamerInfo):  # noqa: ARG002
+        if self.fArrayLength > 0:
+            msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
+            raise NotImplementedError(msg)
         return f"{self.member_name()}: TString", []
 
 
@@ -322,6 +367,9 @@ class TStreamerBasicPointer(TStreamerElement):
     fCountClass: TString
 
     def member_definition(self, parent: TStreamerInfo):
+        if self.fArrayLength > 0:
+            msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
+            raise NotImplementedError(msg)
         _, fmt = ElementType(self.fType - ElementType.kOffsetP).as_fmt()
         if not (
             self.fCountClass == parent.fName
@@ -344,6 +392,9 @@ DICTIONARY["TStreamerBasicPointer"] = TStreamerBasicPointer
 @serializable
 class TStreamerObject(TStreamerElement):
     def member_definition(self, parent: TStreamerInfo):
+        if self.fArrayLength > 0:
+            msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
+            raise NotImplementedError(msg)
         typename = self.type_name()
         dependencies = []
         if typename == parent.class_name():
@@ -362,6 +413,9 @@ DICTIONARY["TStreamerObject"] = TStreamerObject
 @serializable
 class TStreamerObjectPointer(TStreamerElement):
     def member_definition(self, parent: TStreamerInfo):
+        if self.fArrayLength > 0:
+            msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
+            raise NotImplementedError(msg)
         typename = self.type_name()
         dependencies = []
         assert typename.endswith("*")
@@ -399,8 +453,16 @@ DICTIONARY["TStreamerLoop"] = TStreamerLoop
 
 @serializable
 class TStreamerObjectAny(TStreamerElement):
-    def member_definition(self, parent: TStreamerInfo):  # noqa: ARG002
-        return f"{self.member_name()}: {self.type_name()}", []
+    def member_definition(self, parent: TStreamerInfo):
+        if self.fArrayLength > 0:
+            msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
+            raise NotImplementedError(msg)
+        if self.type_name() == parent.class_name():
+            return f"{self.member_name()}: Self", []
+        # This may be a non-trivial type, e.g. vector<double>
+        # or vector<TLorentzVector>
+        typename, dependencies = _cpptype_to_pytype(self.cpp_typename())
+        return f"{self.member_name()}: {typename}", list(dependencies)
 
 
 DICTIONARY["TStreamerObjectAny"] = TStreamerObjectAny
@@ -408,8 +470,7 @@ DICTIONARY["TStreamerObjectAny"] = TStreamerObjectAny
 
 @serializable
 class TStreamerObjectAnyPointer(TStreamerElement):
-    def member_definition(self, parent: TStreamerInfo):  # noqa: ARG002
-        return f"{self.member_name()}: {self.type_name()}", []
+    pass
 
 
 DICTIONARY["TStreamerObjectAnyPointer"] = TStreamerObjectAnyPointer
@@ -459,17 +520,7 @@ DICTIONARY["TStreamerSTL"] = TStreamerSTL
 
 @serializable
 class TStreamerSTLstring(TStreamerSTL):
-    """STL string streamer element.
-
-    Attributes:
-        uninterpreted (bytes): Uninterpreted data.
-            TODO: According to ROOT docs, there should not be any extra data here
-    """
-
-    def member_definition(self, parent: TStreamerInfo):
-        msg = "TStreamerSTLstring does not yet implement member_definition"
-        raise NotImplementedError(msg)
-        # return f"{self.member_name()}: unknown", []
+    """STL string streamer element."""
 
 
 # the lower case "string" is intentional

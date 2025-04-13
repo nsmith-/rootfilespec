@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Annotated, Any, Optional, TypeVar
+from typing import Annotated, Optional, TypeVar
 
 from rootfilespec.bootstrap.TString import TString
 from rootfilespec.dispatch import DICTIONARY, normalize
 from rootfilespec.structutil import (
+    Args,
     Fmt,
     ReadBuffer,
     ROOTSerializable,
@@ -134,7 +135,7 @@ class StreamedObject(ROOTSerializable):
     @classmethod
     def _read_all_members(
         cls: type[T], buffer: ReadBuffer, indent=0
-    ) -> tuple[tuple[Any, ...], ReadBuffer]:
+    ) -> tuple[Args, ReadBuffer]:
         # TODO move this to a free function
         start_position = buffer.relpos
         if cls is TObject and indent > 0:
@@ -145,7 +146,7 @@ class StreamedObject(ROOTSerializable):
             msg = f"Expected class {cls.__name__} but got {normalize(itemheader.fClassName)}"
             raise ValueError(msg)
         end_position = start_position + itemheader.fByteCount + 4
-        args = ()
+        args: Args = ()
         for base in reversed(cls.__bases__):
             if base is StreamedObject:
                 continue
@@ -188,7 +189,7 @@ class TObject(StreamedObject):
     pidf: Optional[int]
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer) -> tuple[tuple[Any, ...], ReadBuffer]:
+    def read_members(cls, buffer: ReadBuffer) -> tuple[Args, ReadBuffer]:
         (fVersion, fUniqueID, fBits), buffer = buffer.unpack(">hii")
         pidf = None
         if fBits & TObjectBits.kIsReferenced:
