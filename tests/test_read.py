@@ -13,7 +13,7 @@ from rootfilespec.structutil import DataFetcher, ReadBuffer
 TESTABLE_FILES = [f for f in known_files if f.endswith(".root")]
 
 
-def _walk(dir: TDirectory, fetch_data: DataFetcher, depth=0, maxdepth=1):
+def _walk(dir: TDirectory, fetch_data: DataFetcher, depth=0, maxdepth=-1):
     keylist = dir.get_KeyList(fetch_data)
     for item in keylist.values():
         obj = item.read_object(fetch_data)
@@ -47,7 +47,7 @@ def test_read_file(filename: str):
         streamerinfo = file.get_StreamerInfo(fetch_data)
         if not streamerinfo:
             # Try to read all objects anyway
-            _walk(rootdir, fetch_data, maxdepth=-1)
+            _walk(rootdir, fetch_data)
             return None
 
         # Render the class definitions into python code
@@ -64,7 +64,7 @@ def test_read_file(filename: str):
             exec(classes, module.__dict__)
 
             # Read all objects from the file
-            return _walk(rootdir, fetch_data, maxdepth=1)
+            return _walk(rootdir, fetch_data)
         except NotImplementedError as ex:
             return pytest.xfail(reason=str(ex))
         finally:
