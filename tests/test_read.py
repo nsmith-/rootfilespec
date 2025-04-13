@@ -62,11 +62,11 @@ def test_read_file(filename: str):
             module = types.ModuleType(f"rootfilespec.generated_{id(streamerinfo)}")
             sys.modules[module.__name__] = module
             exec(classes, module.__dict__)
+
+            # Read all objects from the file
+            return _walk(rootdir, fetch_data, maxdepth=1)
         except NotImplementedError as ex:
             return pytest.xfail(reason=str(ex))
         finally:
             for key in set(DICTIONARY) - oldkeys:
                 DICTIONARY.pop(key)
-
-        # TODO: Read all objects from the file
-        # _walk(rootdir, fetch_data, maxdepth=1)

@@ -88,6 +88,10 @@ class TKey(ROOTSerializable):
         """Return if the key is short (i.e. the seeks are 32 bit)"""
         return self.header.fVersion < 1000
 
+    def is_compressed(self) -> bool:
+        """Return if the key is compressed"""
+        return self.header.fNbytes != self.header.fObjlen + self.header.fKeylen
+
     @overload
     def read_object(self, fetch_data: DataFetcher) -> ROOTSerializable: ...
 
@@ -101,12 +105,11 @@ class TKey(ROOTSerializable):
         fetch_data: DataFetcher,
         objtype: Optional[type[ObjType]] = None,
     ) -> Union[ObjType, ROOTSerializable]:
-        buffer = fetch_data(
-            self.fSeekKey + self.header.fKeylen,
-            self.header.fNbytes - self.header.fKeylen,
-        )
+        buffer = fetch_data(self.fSeekKey, self.header.fNbytes)
+        # TODO: should we compare the key in the buffer with ourself?
+        buffer = buffer[self.header.fKeylen :]
         compressed = None
-        if len(buffer) != self.header.fObjlen:
+        if self.is_compressed():
             compressed, buffer = RCompressed.read(buffer)
             if compressed.header.uncompressed_size() != self.header.fObjlen:
                 msg = "TKey.read_object: uncompressed size mismatch. "
@@ -133,6 +136,10 @@ class TKey(ROOTSerializable):
         else:
             typename = normalize(self.fClassName.fString)
             obj, buffer = DICTIONARY[typename].read(buffer)  # type: ignore[assignment]
+        if typename == "ROOT3a3aRNTuple":
+            # A checksum is added to the end of the buffer
+            # TODO: implement checksum verification
+            buffer = buffer[8:]
         if buffer:
             msg = f"TKey.read_object: buffer not empty after reading object of type {typename}."
             msg += f"\n{self=}"
