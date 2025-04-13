@@ -132,7 +132,6 @@ DICTIONARY["TDirectoryFile"] = TDirectory
 @serializable
 class TKeyList(ROOTSerializable, Mapping[str, TKey]):
     fKeys: list[TKey]
-    padding: bytes
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer):
@@ -141,13 +140,7 @@ class TKeyList(ROOTSerializable, Mapping[str, TKey]):
         while len(keys) < nKeys:
             key, buffer = TKey.read(buffer)
             keys.append(key)
-        padding = b""
-        if not all(k.is_short() for k in keys):
-            # suspicion: there will be 8*nshort trailing bytes
-            # corresponding to padding in case seeks need to be 64 bit
-            npad = 8 * sum(1 for k in keys if k.is_short())
-            padding, buffer = buffer.consume(npad)
-        return (keys, padding), buffer
+        return (keys,), buffer
 
     def __len__(self):
         return len(self.fKeys)

@@ -11,10 +11,25 @@ def normalize(s: bytes) -> str:
 
     This is used to generate the class name in the DICTIONARY.
     """
-    out = s.decode(ENCODING)
-    return out.replace(":", "3a")
+    return (
+        s.decode(ENCODING)
+        .replace(":", "3a")
+        .replace("<", "3c")
+        .replace(">", "3e")
+        .replace(",", "2c")
+        .replace(" ", "_")
+        .replace("*", "2a")
+    )
 
 
 def pyclass_to_cppname(pyclass: str) -> bytes:
     """Convert the Python class name to a ROOT C++ class name."""
-    return pyclass.replace("3a", ":").encode(ENCODING)
+    return (
+        pyclass.replace("*", "2a")
+        .replace(" ", "_")
+        .replace(",", "2c")
+        .replace(">", "3e")
+        .replace("<", "3c")
+        .replace(":", "3a")
+        .encode(ENCODING)
+    )

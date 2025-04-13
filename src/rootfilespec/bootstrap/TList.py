@@ -2,7 +2,7 @@ from rootfilespec.bootstrap.streamedobject import read_streamed_item
 from rootfilespec.bootstrap.TObject import StreamHeader, TObject, TObjectBits
 from rootfilespec.bootstrap.TString import TString
 from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.structutil import ReadBuffer, serializable
+from rootfilespec.structutil import ReadBuffer, ROOTSerializable, serializable
 
 
 @serializable
@@ -61,21 +61,21 @@ class TObjArray(TObject):
     fName: TString
     nObjects: int
     fLowerBound: int
-    objects: tuple[TObject, ...]
+    objects: tuple[ROOTSerializable, ...]
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer):
         fName, buffer = TString.read(buffer)
         (nObjects, fLowerBound), buffer = buffer.unpack(">ii")
-        objects: list[TObject] = []
+        objects: list[ROOTSerializable] = []
         for _ in range(nObjects):
             item, buffer = read_streamed_item(buffer)
             if isinstance(item, StreamHeader):
                 # TODO: Resolve or build pointer to TObject
                 continue
-            if not isinstance(item, TObject):
-                msg = f"Expected TObject but got {item!r}"
-                raise ValueError(msg)
+            # if not isinstance(item, TObject):
+            #     msg = f"Expected TObject but got {item!r}"
+            #     raise ValueError(msg)
             objects.append(item)
         return (fName, nObjects, fLowerBound, tuple(objects)), buffer
 

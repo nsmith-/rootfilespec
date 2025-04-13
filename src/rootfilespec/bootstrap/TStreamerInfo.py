@@ -418,8 +418,10 @@ class TStreamerObjectPointer(TStreamerElement):
             raise NotImplementedError(msg)
         typename = self.type_name()
         dependencies = []
-        assert typename.endswith("*")
-        typename = typename[:-1]
+        assert typename.endswith("2a")
+        typename = typename[:-2]
+        # Remove const (if present)
+        typename = typename.removeprefix("const_")
         if typename == parent.class_name():
             typename = "Self"
         else:

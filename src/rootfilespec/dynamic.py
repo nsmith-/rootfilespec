@@ -71,9 +71,6 @@ def streamerinfo_to_classes(streamerinfo: TList) -> str:
             lines.append(f"# Class {clsname} already in dictionary, skipping\n")
             declared.add(clsname)
             continue
-        if "edm3a3a" in clsname:
-            lines.append(f"# Class {clsname} is an EDM class, skipping\n")
-            continue
         classdef = item.class_definition()
         classes[classdef.name] = classdef
 

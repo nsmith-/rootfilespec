@@ -165,6 +165,24 @@ class _BasicArrayReadMethod:
         return (*args, arg), buffer
 
 
+@dataclasses.dataclass
+class FixedSizeArray:
+    """A class to hold a fixed size array of a given type.
+
+    Attributes:
+        dtype (np.dtype): The format of the array.
+        size (int): The size of the array.
+    """
+
+    dtype: np.dtype[Any]
+    size: int
+
+    def read(self, buffer: ReadBuffer, args: Args) -> tuple[Args, ReadBuffer]:
+        data, buffer = buffer.consume(self.size * self.dtype.itemsize)
+        arg = np.frombuffer(data, dtype=self.dtype, count=self.size)
+        return (*args, arg), buffer
+
+
 T = TypeVar("T", bound="ROOTSerializable")
 
 
@@ -183,16 +201,20 @@ class ROOTSerializable:
 
 @dataclasses.dataclass
 class Pointer(ROOTSerializable, Generic[T]):
-    obj: Optional[int]
+    obj: Optional[T]
 
     @classmethod
     def read(cls, buffer: ReadBuffer):
         (addr,), buffer = buffer.unpack(">i")
         if not addr:
             return cls(None), buffer
-        # TODO: register all objects in something like local_refs so we can dereference them here
-        # obj, buffer = outtype.read(buffer)
-        return cls(addr), buffer
+        # TODO: use read_streamed_item to read the object
+        if addr & 0x40000000:
+            # this isn't actually an address but an object
+            addr &= ~0x40000000
+            # skip forward
+            buffer = buffer[addr:]
+        return cls(None), buffer
 
 
 @dataclasses.dataclass
@@ -277,6 +299,9 @@ def serializable(cls: type[T]) -> type[T]:
                     constructors.append(
                         _BasicArrayReadMethod(format.dtype, fieldindex).read
                     )
+                elif isinstance(format, FixedSizeArray):
+                    assert ftype is np.ndarray
+                    constructors.append(format.read)
                 else:
                     msg = f"Cannot read field {field} of type {ftype} with format {format}"
                     raise NotImplementedError(msg)

@@ -5,6 +5,7 @@ from rootfilespec.bootstrap.TString import TString
 from rootfilespec.bootstrap.util import fDatime_to_datetime
 from rootfilespec.dispatch import DICTIONARY, normalize
 from rootfilespec.structutil import (
+    Args,
     DataFetcher,
     Fmt,
     ReadBuffer,
@@ -37,6 +38,18 @@ class TKey_header(ROOTSerializable):
         """Date and time when record was written to file"""
         return fDatime_to_datetime(self.fDatime)
 
+    def is_short(self) -> bool:
+        """Return if the key is short (i.e. the seeks are 32 bit)"""
+        return self.fVersion < 1000
+
+    def is_compressed(self) -> bool:
+        """Return if the key is compressed"""
+        return self.fNbytes != self.fObjlen + self.fKeylen
+
+    def is_embedded(self) -> bool:
+        """Return if the key's payload is embedded"""
+        return self.fNbytes < self.fKeylen
+
 
 ObjType = TypeVar("ObjType", bound=ROOTSerializable)
 
@@ -64,8 +77,19 @@ class TKey(ROOTSerializable):
     fTitle: TString
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer):
+    def read(cls, buffer: ReadBuffer):
         start_position = buffer.relpos
+        members, buffer = cls.read_members(buffer)
+        keylen = buffer.relpos - start_position
+        header = members[0]
+        if keylen != header.fKeylen and keylen != header.fKeylen + 4:
+            # TODO: understand why we sometimes read 4 more bytes
+            msg = f"TKey.read: key length mismatch: read {keylen}, header expects {header.fKeylen}"
+            raise ValueError(msg)
+        return cls(*members), buffer
+
+    @classmethod
+    def read_members(cls, buffer: ReadBuffer) -> tuple[Args, ReadBuffer]:
         header, buffer = TKey_header.read(buffer)
         if header.fVersion < 1000:
             (fSeekKey, fSeekPdir), buffer = buffer.unpack(">ii")
@@ -77,20 +101,7 @@ class TKey(ROOTSerializable):
         if header.fVersion % 1000 not in (2, 4):
             msg = f"TKey.read_members: unexpected version {header.fVersion}"
             raise ValueError(msg)
-        keylen = buffer.relpos - start_position
-        if keylen != header.fKeylen and keylen != header.fKeylen + 4:
-            # TODO: understand why we sometimes read 4 more bytes
-            msg = f"TKey.read: key length mismatch: read {keylen}, header expects {header.fKeylen}"
-            raise ValueError(msg)
         return (header, fSeekKey, fSeekPdir, fClassName, fName, fTitle), buffer
-
-    def is_short(self) -> bool:
-        """Return if the key is short (i.e. the seeks are 32 bit)"""
-        return self.header.fVersion < 1000
-
-    def is_compressed(self) -> bool:
-        """Return if the key is compressed"""
-        return self.header.fNbytes != self.header.fObjlen + self.header.fKeylen
 
     @overload
     def read_object(self, fetch_data: DataFetcher) -> ROOTSerializable: ...
@@ -109,7 +120,7 @@ class TKey(ROOTSerializable):
         # TODO: should we compare the key in the buffer with ourself?
         buffer = buffer[self.header.fKeylen :]
         compressed = None
-        if self.is_compressed():
+        if self.header.is_compressed():
             compressed, buffer = RCompressed.read(buffer)
             if compressed.header.uncompressed_size() != self.header.fObjlen:
                 msg = "TKey.read_object: uncompressed size mismatch. "
@@ -129,14 +140,21 @@ class TKey(ROOTSerializable):
             )
         if objtype is not None:
             typename = objtype.__name__
-            # if self.fClassName.fString != typename:
-            #     msg = f"TKey.read_object: type mismatch: expected {typename!r} but got {self.fClassName.fString!r}"
-            #     raise ValueError(msg)
             obj, buffer = objtype.read(buffer)
         else:
             typename = normalize(self.fClassName.fString)
-            obj, buffer = DICTIONARY[typename].read(buffer)  # type: ignore[assignment]
-        if typename == "ROOT3a3aRNTuple":
+            dyntype = DICTIONARY.get(typename)
+            if dyntype is None:
+                msg = f"TKey.read_object: unknown type {typename}."
+                raise NotImplementedError(msg)
+            obj, buffer = dyntype.read(buffer)  # type: ignore[assignment]
+        # Some types we have to handle trailing bytes
+        if typename == "TKeyList":
+            # TODO: understand this padding
+            # if keys are deleted there is extra space?
+            remaining_bytes = self.header.fNbytes - buffer.relpos
+            buffer = buffer[remaining_bytes:]
+        elif typename == "ROOT3a3aRNTuple":
             # A checksum is added to the end of the buffer
             # TODO: implement checksum verification
             buffer = buffer[8:]
