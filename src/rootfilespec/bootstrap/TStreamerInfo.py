@@ -310,17 +310,16 @@ class _CppTypeAstTemplate(_CppTypeAstNode):
 
 def _template_args(stream: _TokenStream) -> tuple[_CppTypeAstNode, ...]:
     token = stream.next()
-    assert token == (b"", b"<")
     args: tuple[_CppTypeAstNode, ...] = ()
     while True:
         token = stream.peek()
         if not token:
             msg = "Unexpected end of stream"
             raise ValueError(msg)
-        if token == (b"", b">"):
+        if token[1] == b">":
             stream.next()
             break
-        if token == (b"", b","):
+        if token[1] == b",":
             stream.next()
             continue
         arg = _value(stream)
@@ -338,10 +337,10 @@ def _value(stream: _TokenStream) -> _CppTypeAstNode:
         raise ValueError(msg)
     name = token[0]
     token = stream.peek()
-    if not token or token in ((b"", b">"), (b"", b",")):
+    if not token or token[1] in (b">", b","):
         # we are in a simple type
         return _CppTypeAstNode(name)
-    if token == (b"", b"<"):
+    if token[1] == b"<":
         # we are in template rule
         return _CppTypeAstTemplate(name, _template_args(stream))
     if not token[1]:
