@@ -1,22 +1,17 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
-
 from rootfilespec.bootstrap.streamedobject import read_streamed_item
 from rootfilespec.bootstrap.TObject import StreamHeader, TObject, TObjectBits
 from rootfilespec.bootstrap.TString import TString
 from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.structutil import ReadBuffer, serializable
+from rootfilespec.structutil import ReadBuffer, ROOTSerializable, serializable
 
 
-@dataclass
+@serializable
 class TList(TObject):
     """TList container class.
 
     Reference: https://root.cern/doc/master/streamerinfo.html (TList section)
 
     Attributes:
-        b_TObject (TObject): TObject header.
         fName (TString): Name of the list.
         fN (int): Number of objects in the list.
         items (list[TObject]): List of objects.
@@ -24,7 +19,7 @@ class TList(TObject):
 
     fName: TString
     fN: int
-    items: list[TObject]
+    items: tuple[TObject, ...]
 
     @classmethod
     def read(cls, buffer: ReadBuffer):
@@ -35,7 +30,7 @@ class TList(TObject):
             # print(f"Suspicious TObject header: {header}")
             # print(f"Buffer: {buffer}")
             junk, buffer = buffer.consume(len(buffer) - 1)
-            return cls(fVersion, fUniqueID, fBits, pidf, TString(junk), 0, []), buffer
+            return cls(fVersion, fUniqueID, fBits, pidf, TString(junk), 0, ()), buffer
         (fName, fN, items), buffer = cls.read_members(buffer)
         return cls(fVersion, fUniqueID, fBits, pidf, fName, fN, items), buffer
 
@@ -55,7 +50,7 @@ class TList(TObject):
                 msg = f"Expected null pad byte but got {pad!r}"
                 raise ValueError(msg)
             items.append(item)
-        return (fName, fN, items), buffer
+        return (fName, fN, tuple(items)), buffer
 
 
 DICTIONARY["TList"] = TList
@@ -66,23 +61,23 @@ class TObjArray(TObject):
     fName: TString
     nObjects: int
     fLowerBound: int
-    objects: list[TObject]
+    objects: tuple[ROOTSerializable, ...]
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer):
         fName, buffer = TString.read(buffer)
         (nObjects, fLowerBound), buffer = buffer.unpack(">ii")
-        objects: list[TObject] = []
+        objects: list[ROOTSerializable] = []
         for _ in range(nObjects):
             item, buffer = read_streamed_item(buffer)
             if isinstance(item, StreamHeader):
                 # TODO: Resolve or build pointer to TObject
                 continue
-            if not isinstance(item, TObject):
-                msg = f"Expected TObject but got {item!r}"
-                raise ValueError(msg)
+            # if not isinstance(item, TObject):
+            #     msg = f"Expected TObject but got {item!r}"
+            #     raise ValueError(msg)
             objects.append(item)
-        return (fName, nObjects, fLowerBound, objects), buffer
+        return (fName, nObjects, fLowerBound, tuple(objects)), buffer
 
 
 DICTIONARY["TObjArray"] = TObjArray

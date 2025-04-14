@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Union
 
 from rootfilespec.bootstrap.TDirectory import TDirectory
 from rootfilespec.bootstrap.TKey import TKey
@@ -125,9 +123,9 @@ class ROOTFile_header_v622_large(ROOTSerializable):
 class ROOTFile(ROOTSerializable):
     magic: bytes
     fVersion: VersionInfo
-    header: (
-        ROOTFile_header_v302 | ROOTFile_header_v622_small | ROOTFile_header_v622_large
-    )
+    header: Union[
+        ROOTFile_header_v302, ROOTFile_header_v622_small, ROOTFile_header_v622_large
+    ]
     padding: bytes
 
     @classmethod
@@ -159,6 +157,8 @@ class ROOTFile(ROOTSerializable):
         return key.read_object(fetch_data, objtype=TFile)
 
     def get_StreamerInfo(self, fetch_data: DataFetcher):
+        if self.header.fNbytesInfo == 0:
+            return None
         buffer = fetch_data(self.header.fSeekInfo, self.header.fNbytesInfo)
         key, _ = TKey.read(buffer)
         if key.fSeekKey != self.header.fSeekInfo:

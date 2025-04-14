@@ -1,15 +1,15 @@
-from __future__ import annotations
-
 import dataclasses
 import struct
+import sys
 from functools import partial
-from inspect import get_annotations  # type: ignore[attr-defined]
 from typing import (
     Annotated,
     Any,
     Callable,
     Generic,
+    Optional,
     TypeVar,
+    Union,
     get_args,
     get_origin,
     get_type_hints,
@@ -17,6 +17,22 @@ from typing import (
 
 import numpy as np
 from typing_extensions import dataclass_transform  # in typing for Python 3.11+
+
+
+def _get_annotations(cls: type) -> dict[str, Any]:
+    """Get the annotations of a class, including private attributes."""
+    if sys.version_info >= (3, 10):
+        from inspect import get_annotations
+
+        return get_annotations(cls)
+    return {
+        field: ann
+        for field, ann in cls.__dict__.get("__annotations__", {}).items()
+        if not field.startswith("_") and field != "self"
+    }
+
+
+Args = tuple[Any, ...]
 
 
 @dataclasses.dataclass
@@ -34,11 +50,11 @@ class ReadBuffer:
     """
 
     data: memoryview
-    abspos: int | None
+    abspos: Optional[int]
     relpos: int
     local_refs: dict[int, bytes] = dataclasses.field(default_factory=dict)
 
-    def __getitem__(self, key: slice) -> ReadBuffer:
+    def __getitem__(self, key: slice):
         """Get a slice of the buffer."""
         start: int = key.start or 0
         if start > len(self.data):
@@ -76,25 +92,27 @@ class ReadBuffer:
     def __bool__(self) -> bool:
         return bool(self.data)
 
-    def unpack(self, fmt: str | struct.Struct) -> tuple[tuple[Any, ...], ReadBuffer]:
+    def unpack(self, fmt: Union[str, struct.Struct]) -> tuple[Args, "ReadBuffer"]:
         """Unpack the buffer according to the given format."""
         if isinstance(fmt, struct.Struct):
             return fmt.unpack(self.data[: fmt.size]), self[fmt.size :]
         size = struct.calcsize(fmt)
-        return struct.unpack(fmt, self.data[:size]), self[size:]
+        out = struct.unpack(fmt, self.data[:size])
+        return out, self[size:]
 
-    def consume(self, size: int) -> tuple[bytes, ReadBuffer]:
+    def consume(self, size: int) -> tuple[bytes, "ReadBuffer"]:
         """Consume the given number of bytes from the buffer."""
-        return bytes(self.data[:size]), self[size:]
+        out = self.data[:size].tobytes()
+        return out, self[size:]
 
 
 DataFetcher = Callable[[int, int], ReadBuffer]
-Args = tuple[Any, ...]
+Members = dict[str, Any]
 ReadMethod = Callable[[ReadBuffer, Args], tuple[Args, ReadBuffer]]
 OutType = TypeVar("OutType")
 
 
-def _read_wrapper(cls: type[ROOTSerializable]) -> ReadMethod:
+def _read_wrapper(cls: type["ROOTSerializable"]) -> ReadMethod:
     """A wrapper to call the read method of a ROOTSerializable class."""
 
     def read(buffer: ReadBuffer, args: Args) -> tuple[Args, ReadBuffer]:
@@ -140,10 +158,28 @@ class _BasicArrayReadMethod:
         n = args[self.sizeidx]
         pad, buffer = buffer.consume(1)
         if not ((n == 0 and pad == b"\x00") or (n > 0 and pad == b"\x01")):
-            msg = f"Expected null or 0x01 pad byte but got {pad!r}"
+            msg = f"Expected null or 0x01 pad byte but got {pad!r} for size {n}"
             raise ValueError(msg)
         data, buffer = buffer.consume(n * self.dtype.itemsize)
         arg = np.frombuffer(data, dtype=self.dtype, count=n)
+        return (*args, arg), buffer
+
+
+@dataclasses.dataclass
+class FixedSizeArray:
+    """A class to hold a fixed size array of a given type.
+
+    Attributes:
+        dtype (np.dtype): The format of the array.
+        size (int): The size of the array.
+    """
+
+    dtype: np.dtype[Any]
+    size: int
+
+    def read(self, buffer: ReadBuffer, args: Args) -> tuple[Args, ReadBuffer]:
+        data, buffer = buffer.consume(self.size * self.dtype.itemsize)
+        arg = np.frombuffer(data, dtype=self.dtype, count=self.size)
         return (*args, arg), buffer
 
 
@@ -158,23 +194,27 @@ class ROOTSerializable:
         return cls(*members), buffer
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer) -> tuple[tuple[Any, ...], ReadBuffer]:
+    def read_members(cls, buffer: ReadBuffer) -> tuple[Args, ReadBuffer]:
         msg = "Unimplemented method: {cls.__name__}.read_members"
         raise NotImplementedError(msg)
 
 
 @dataclasses.dataclass
 class Pointer(ROOTSerializable, Generic[T]):
-    obj: int | None
+    obj: Optional[T]
 
     @classmethod
     def read(cls, buffer: ReadBuffer):
         (addr,), buffer = buffer.unpack(">i")
         if not addr:
             return cls(None), buffer
-        # TODO: register all objects in something like local_refs so we can dereference them here
-        # obj, buffer = outtype.read(buffer)
-        return cls(addr), buffer
+        # TODO: use read_streamed_item to read the object
+        if addr & 0x40000000:
+            # this isn't actually an address but an object
+            addr &= ~0x40000000
+            # skip forward
+            buffer = buffer[addr:]
+        return cls(None), buffer
 
 
 @dataclasses.dataclass
@@ -185,19 +225,32 @@ class StdVector(ROOTSerializable, Generic[T]):
         items (list[T]): The list of objects in the vector.
     """
 
-    items: list[T]
+    items: tuple[T, ...]
 
     @classmethod
     def read_as(
         cls, outtype: type[T], buffer: ReadBuffer, args: Args
     ) -> tuple[Args, ReadBuffer]:
-        raise NotImplementedError
-        # (n,), buffer = buffer.unpack(">i")
-        # out: list[T] = []
-        # for _ in range(n):
-        #     obj, buffer = outtype.read(buffer)
-        #     out.append(obj)
-        # return (*args, cls(out)), buffer
+        (n,), buffer = buffer.unpack(">i")
+        out: tuple[T, ...] = ()
+        if outtype is StdVector:
+            (interior_type,) = get_args(outtype)
+            for _ in range(n):
+                out, buffer = StdVector.read_as(interior_type, buffer, out)
+        elif getattr(outtype, "_name", None) == "Annotated":
+            # TODO: this should be handled in the serializable decorator
+            (ftype, fmt) = get_args(outtype)
+            if isinstance(fmt, Fmt):
+                for _ in range(n):
+                    out, buffer = fmt.read_as(ftype, buffer, out)
+            else:
+                msg = f"Cannot read field of type {outtype} with format {fmt}"
+                raise NotImplementedError(msg)
+        else:
+            for _ in range(n):
+                obj, buffer = outtype.read(buffer)
+                out += (obj,)
+        return (*args, cls(out)), buffer
 
 
 @dataclass_transform()
@@ -221,7 +274,7 @@ def serializable(cls: type[T]) -> type[T]:
     names: list[str] = []
     constructors: list[ReadMethod] = []
     namespace = get_type_hints(cls, include_extras=True)
-    for field in get_annotations(cls):
+    for field in _get_annotations(cls):
         names.append(field)
         ftype = namespace[field]
         if isinstance(ftype, type) and issubclass(ftype, ROOTSerializable):
@@ -238,10 +291,17 @@ def serializable(cls: type[T]) -> type[T]:
                     constructors.append(partial(format.read_as, ftype))
                 elif isinstance(format, BasicArray):
                     assert ftype is np.ndarray
+                    if format.shapefield not in names:
+                        # TODO: to implement this we need to migrate read_members to return Members rather than Args
+                        msg = f"Cannot yet read {field} because shape field {format.shapefield} is in base class"
+                        raise NotImplementedError(msg)
                     fieldindex = names.index(format.shapefield)
                     constructors.append(
                         _BasicArrayReadMethod(format.dtype, fieldindex).read
                     )
+                elif isinstance(format, FixedSizeArray):
+                    assert ftype is np.ndarray
+                    constructors.append(format.read)
                 else:
                     msg = f"Cannot read field {field} of type {ftype} with format {format}"
                     raise NotImplementedError(msg)
@@ -249,6 +309,7 @@ def serializable(cls: type[T]) -> type[T]:
                 constructors.append(_read_wrapper(origin))
             elif origin is StdVector:
                 (ftype,) = get_args(ftype)
+                # TODO: nested std::vectors here instead of in StdVector.read_as
                 constructors.append(partial(StdVector.read_as, ftype))
             else:
                 msg = f"Cannot read field {field} of subscripted type {ftype} with origin {origin}"

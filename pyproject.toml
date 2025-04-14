@@ -29,7 +29,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dynamic = ["version"]
-dependencies = ["cramjam", "xxhash", "numpy"]
+dependencies = ["cramjam", "xxhash", "numpy", "typing_extensions"]
 
 [project.optional-dependencies]
 test = [
@@ -107,7 +107,6 @@ disallow_untyped_defs = false
 disallow_incomplete_defs = false
 
 
-[tool.ruff]
 
 [tool.ruff.lint]
 extend-select = [
@@ -139,7 +138,8 @@ ignore = [
   "ISC001",   # Conflicts with formatter
   "RUF009",   # sfield() function call
 ]
-isort.required-imports = ["from __future__ import annotations"]
+# We use annotations at runtime so we do not want this required import
+# isort.required-imports = ["from __future__ import annotations"]
 # Uncomment if using a _compat.typing backport
 # typing-modules = ["rootfilespec._compat.typing"]
 
