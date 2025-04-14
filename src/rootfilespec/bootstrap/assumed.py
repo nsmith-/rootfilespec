@@ -163,7 +163,7 @@ class TBasket(TKey):
             raise ValueError(msg)
         if bheader.flag % 10 != 2:
             # TODO: refactor this to use BasicArray
-            dtype = np.dtype(">i")
+            dtype = np.dtype(">i")  # type: ignore[var-annotated]
             (n,), buffer = buffer.unpack(">i")
             assert n == bheader.fNevBuf
             data, buffer = buffer.consume(n * dtype.itemsize)
