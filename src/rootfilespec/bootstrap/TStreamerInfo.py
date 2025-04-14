@@ -513,20 +513,12 @@ class TStreamerObjectPointer(TStreamerElement):
         if self.fArrayLength > 0:
             msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
-        typename = self.type_name()
-        dependencies = []
-        assert typename.endswith("2a")
-        typename = typename[:-2]
-        # Remove const (if present)
-        typename = typename.removeprefix("const_")
+        typename, dependencies = _cpptype_to_pytype(self.fTypeName.fString)
         if typename == parent.class_name():
+            dependencies.remove(typename)
             typename = "Self"
-        else:
-            dependencies = [typename]
-        if self.fType == ElementType.kObjectP:
-            typename = f"Pointer[{typename}]"
-        mdef = f"{self.member_name()}: {typename}"
-        return mdef, dependencies
+        mdef = f"{self.member_name()}: Pointer[{typename}]"
+        return mdef, list(dependencies)
 
 
 DICTIONARY["TStreamerObjectPointer"] = TStreamerObjectPointer
@@ -569,7 +561,16 @@ DICTIONARY["TStreamerObjectAny"] = TStreamerObjectAny
 
 @serializable
 class TStreamerObjectAnyPointer(TStreamerElement):
-    pass
+    def member_definition(self, parent: TStreamerInfo):
+        if self.fArrayLength > 0:
+            msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
+            raise NotImplementedError(msg)
+        typename, dependencies = _cpptype_to_pytype(self.fTypeName.fString)
+        if typename == parent.class_name():
+            dependencies.remove(typename)
+            typename = "Self"
+        mdef = f"{self.member_name()}: Pointer[{typename}]"
+        return mdef, list(dependencies)
 
 
 DICTIONARY["TStreamerObjectAnyPointer"] = TStreamerObjectAnyPointer
@@ -622,6 +623,8 @@ class TStreamerSTL(TStreamerElement):
         if self.fSTLtype == STLType.string:
             assert typename == "string"
             return f"{self.member_name()}: {typename}", list(dependencies)
+        if self.fSTLtype == STLType.vectorPointer:
+            return f"{self.member_name()}: Pointer[{typename}]", list(dependencies)
         msg = f"STL type {self.type_name()} not implemented yet"
         raise NotImplementedError(msg)
 
