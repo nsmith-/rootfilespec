@@ -575,6 +575,30 @@ class TStreamerObjectAnyPointer(TStreamerElement):
 DICTIONARY["TStreamerObjectAnyPointer"] = TStreamerObjectAnyPointer
 
 
+class STLType(IntEnum):
+    kOffsetP = 40
+    vector = 1
+    list = 2
+    deque = 3
+    map = 4
+    set = 5
+    multimap = 6
+    multiset = 7
+    bitset = 8
+    unordered_map = 12
+    RVec = 14
+    "ROOT::VecOps::RVec<T>"
+    vectorPointer = kOffsetP + 1
+    listPointer = kOffsetP + 2
+    dequePointer = kOffsetP + 3
+    mapPointer = kOffsetP + 4
+    setPointer = kOffsetP + 5
+    multimapPointer = kOffsetP + 6
+    multisetPointer = kOffsetP + 7
+    bitsetPointer = kOffsetP + 8
+    string = 365
+
+
 @serializable
 class TStreamerSTL(TStreamerElement):
     """STL container streamer element.
@@ -587,13 +611,16 @@ class TStreamerSTL(TStreamerElement):
 
     """
 
-    fSTLtype: Annotated[int, Fmt(">i")]
+    fSTLtype: Annotated[STLType, Fmt(">i")]
     fCType: Annotated[ElementType, Fmt(">i")]
 
     def member_definition(self, parent: TStreamerInfo):  # noqa: ARG002
-        if self.fSTLtype == 1:
-            typename, dependencies = _cpptype_to_pytype(self.cpp_typename())
+        typename, dependencies = _cpptype_to_pytype(self.cpp_typename())
+        if self.fSTLtype == STLType.vector:
             assert typename.startswith("StdVector[")
+            return f"{self.member_name()}: {typename}", list(dependencies)
+        if self.fSTLtype == STLType.string:
+            assert typename == "string"
             return f"{self.member_name()}: {typename}", list(dependencies)
         msg = f"STL type {self.type_name()} not implemented yet"
         raise NotImplementedError(msg)
