@@ -2,7 +2,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Annotated
+from typing import Annotated, Optional
 
 from rootfilespec.bootstrap.TList import TObjArray
 from rootfilespec.bootstrap.TObject import TNamed
@@ -268,10 +268,10 @@ class _TokenStream:
         self._tokens = iter(tokens)
         self._current = next(self._tokens, None)
 
-    def peek(self) -> _Token | None:
+    def peek(self) -> Optional[_Token]:
         return self._current
 
-    def next(self) -> _Token | None:
+    def next(self) -> Optional[_Token]:
         token, self._current = self._current, next(self._tokens, None)
         return token
 
@@ -292,12 +292,12 @@ class _CppTypeAstNode:
 class _CppTypeAstTemplate(_CppTypeAstNode):
     args: tuple[_CppTypeAstNode, ...]
 
-    def to_pytype(self) -> tuple[str, set[str]]:
+    def to_pytype(self):
         """Convert C++ type name to Python type name."""
         if self.name in _cpp_templates:
             pyname = _cpp_templates[self.name]
         else:
-            msg = f"STL template type {self.name} not implemented"
+            msg = f"STL template type {self.name!r} not implemented"
             raise NotImplementedError(msg)
         args = []
         deps: set[str] = set()
@@ -328,7 +328,7 @@ def _template_args(stream: _TokenStream) -> tuple[_CppTypeAstNode, ...]:
     return args
 
 
-def _value(stream: _TokenStream):
+def _value(stream: _TokenStream) -> _CppTypeAstNode:
     token = stream.next()
     if not token:
         msg = "Unexpected end of stream"
