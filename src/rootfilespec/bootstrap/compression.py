@@ -84,7 +84,7 @@ class RCompressed(ROOTSerializable):
             checksum = None
         # Not using .consume() to avoid copying the payload
         nbytes = header.compressed_size()
-        payload, buffer = buffer.data[:nbytes], buffer[nbytes:]
+        payload, buffer = buffer.consume_view(nbytes)
         return (header, checksum, payload), buffer
 
     def decompress(self) -> memoryview:

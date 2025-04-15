@@ -9,7 +9,6 @@ from typing import (
     Generic,
     Optional,
     TypeVar,
-    Union,
     get_args,
     get_origin,
     get_type_hints,
@@ -35,7 +34,6 @@ def _get_annotations(cls: type) -> dict[str, Any]:
 Args = tuple[Any, ...]
 
 
-@dataclasses.dataclass
 class ReadBuffer:
     """A ReadBuffer is a memoryview that keeps track of the absolute and relative
     positions of the data it contains.
@@ -52,7 +50,19 @@ class ReadBuffer:
     data: memoryview
     abspos: Optional[int]
     relpos: int
-    local_refs: dict[int, bytes] = dataclasses.field(default_factory=dict)
+    local_refs: dict[int, bytes]
+
+    def __init__(
+        self,
+        data: memoryview,
+        abspos: Optional[int],
+        relpos: int,
+        local_refs: Optional[dict[int, bytes]] = None,
+    ):
+        self.data = data
+        self.abspos = abspos
+        self.relpos = relpos
+        self.local_refs = local_refs or {}
 
     def __getitem__(self, key: slice):
         """Get a slice of the buffer."""
@@ -92,18 +102,26 @@ class ReadBuffer:
     def __bool__(self) -> bool:
         return bool(self.data)
 
-    def unpack(self, fmt: Union[str, struct.Struct]) -> tuple[Args, "ReadBuffer"]:
+    def unpack(self, fmt: str) -> tuple[Args, "ReadBuffer"]:
         """Unpack the buffer according to the given format."""
-        if isinstance(fmt, struct.Struct):
-            return fmt.unpack(self.data[: fmt.size]), self[fmt.size :]
         size = struct.calcsize(fmt)
         out = struct.unpack(fmt, self.data[:size])
         return out, self[size:]
 
     def consume(self, size: int) -> tuple[bytes, "ReadBuffer"]:
-        """Consume the given number of bytes from the buffer."""
+        """Consume the given number of bytes from the buffer.
+
+        Returns a copy of the data and the remaining buffer.
+        """
         out = self.data[:size].tobytes()
         return out, self[size:]
+
+    def consume_view(self, size: int) -> tuple[memoryview, "ReadBuffer"]:
+        """Consume the given number of bytes and return a view (not a copy).
+
+        Use consume() to get a copy.
+        """
+        return self.data[:size], self[size:]
 
 
 DataFetcher = Callable[[int, int], ReadBuffer]
@@ -260,7 +278,7 @@ def serializable(cls: type[T]) -> type[T]:
     The class must have type hints for its fields, and the fields must be of types that
     either have a read method or are subscripted with a Fmt object.
     """
-    cls = dataclasses.dataclass(cls)
+    cls = dataclasses.dataclass(eq=False)(cls)
 
     # if the class already has a read_members method, don't overwrite it
     readmethod = getattr(cls, "read_members", None)

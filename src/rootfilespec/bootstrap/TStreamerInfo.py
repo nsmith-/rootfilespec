@@ -297,7 +297,7 @@ class _CppTypeAstTemplate(_CppTypeAstNode):
         if self.name in _cpp_templates:
             pyname = _cpp_templates[self.name]
         else:
-            msg = f"STL template type {self.name!r} not implemented"
+            msg = f"Template type {self.name!r} not implemented"
             raise NotImplementedError(msg)
         args = []
         deps: set[str] = set()
