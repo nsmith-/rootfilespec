@@ -4,12 +4,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from rootfilespec.bootstrap import ROOTFile
+from rootfilespec.dynamic import streamerinfo_to_classes
 from rootfilespec.structutil import ReadBuffer
 
 if __name__ == "__main__":
     initial_read_size = 512
     # path = Path("../TTToSemiLeptonic_UL18JMENanoAOD-zstd.root")
-    path = Path("RNTuple.root")
+    path = Path("tests/RNTuple.root")
     print(f"\033[1;36mReading '{path}'...\n\033[0m")
     with path.open("rb") as filehandle:
 
@@ -34,7 +35,7 @@ if __name__ == "__main__":
 
         def fetch_cached(seek: int, size: int):
             # print(f"\033[3;33mfetch_cached {seek=} {size=}\033[0m")
-            if seek + size <= buffer.__len__():
+            if seek + size <= len(buffer):
                 return buffer[seek : seek + size]
             print("Didn't find data in initial read buffer, fetching from file")
             return fetch_data(seek, size)
@@ -54,12 +55,19 @@ if __name__ == "__main__":
 
         # Get TKeyList (List of all TKeys in the TDirectory)
         keylist = tfile.get_KeyList(fetch_data)
-        print("TKey List Summary:")
-        for name, key in keylist.items():
-            print(f"\t{name} ({key.fClassName.fString})")
-
+        
+        # Print TKeyList
+        msg = "\tTKey List Summary:\n"
+        for name, key in keylist.items(): 
+            msg += f"\t\tName: {name}; Class: {key.fClassName.fString}\n"
+        print(msg)
+        
         # Get TStreamerInfo (List of classes used in the file)
         streamerinfo = file.get_StreamerInfo(fetch_data)
+        classes = streamerinfo_to_classes(streamerinfo)
+        with Path("classes.py").open("w") as f:
+            f.write(classes)
+        # exec(classes, globals())
 
         ########################################################################################################################
         print(
@@ -81,33 +89,32 @@ if __name__ == "__main__":
                 anchor = tkey.read_object(fetch_data)
 
                 # Print attributes of the RNTuple Anchor
-                print(f"{anchor=}\n")
-                # anchor.print_info()
+                # print(f"{anchor=}\n")
+                anchor.print_info()
 
                 ### Get the RNTuple Header Envelope from the Anchor
                 # anchor.get_header(fetch_data)
 
                 ### Get the RNTuple Footer Envelope from the Anchor
-                footer = anchor.footerLink.read_envelope(fetch_data)
+                footer = anchor.get_footer(fetch_data)
 
                 # Print attributes of the RNTuple Footer
-                print(f"{footer=}\n")
-                # footer.print_info()
+                # print(f"{footer=}\n")
+                footer.print_info()
 
                 ### Get the RNTuple Page List Envelopes from the Footer Envelope
-                page_location_lists = footer.payload.get_pagelist(fetch_data)
+                page_location_lists = footer.get_pagelist(fetch_data)
 
                 # Print attributes of the RNTuple Page List Envelopes
                 for i, page_location_list in enumerate(page_location_lists):
                     print(f"Page List Envelope {i}:")
-                    print(f"\t{page_location_list=}\n")
-                    # page_location_list.print_info()
-
+                    # print(f"\t{page_location_list=}\n")
+                    page_location_list.print_info()
                 ### Get the RNTuple Pages from the Page List Envelopes
 
                 cluster_column_page_lists = []
                 for page_location_list in page_location_lists:
-                    pages = page_location_list.payload.get_pages(fetch_data)
+                    pages = page_location_list.get_pages(fetch_data)
                     # print(f"\n{pages=}\n")
                     cluster_column_page_lists.append(pages)
 
