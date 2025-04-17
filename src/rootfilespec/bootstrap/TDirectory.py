@@ -159,6 +159,6 @@ class TKeyList(ROOTSerializable, Mapping[str, TKey]):
     def __getitem__(self, key: str):
         bkey = key.encode("ascii")
         matches = [k for k in self.fKeys if k.fName.fString == bkey]
-        if not len(matches):
+        if not matches:
             raise KeyError(key)
         return max(matches, key=lambda k: k.header.fCycle)
