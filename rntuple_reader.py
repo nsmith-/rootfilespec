@@ -89,8 +89,8 @@ if __name__ == "__main__":
                 anchor = tkey.read_object(fetch_data)
 
                 # Print attributes of the RNTuple Anchor
-                # print(f"{anchor=}\n")
-                anchor.print_info()
+                print(f"{anchor=}\n")
+                # anchor.print_info()
 
                 ### Get the RNTuple Header Envelope from the Anchor
                 # anchor.get_header(fetch_data)
@@ -99,8 +99,8 @@ if __name__ == "__main__":
                 footer = anchor.get_footer(fetch_data)
 
                 # Print attributes of the RNTuple Footer
-                # print(f"{footer=}\n")
-                footer.print_info()
+                print(f"{footer=}\n")
+                # footer.print_info()
 
                 ### Get the RNTuple Page List Envelopes from the Footer Envelope
                 page_location_lists = footer.get_pagelist(fetch_data)
@@ -108,8 +108,8 @@ if __name__ == "__main__":
                 # Print attributes of the RNTuple Page List Envelopes
                 for i, page_location_list in enumerate(page_location_lists):
                     print(f"Page List Envelope {i}:")
-                    # print(f"\t{page_location_list=}\n")
-                    page_location_list.print_info()
+                    print(f"\t{page_location_list=}\n")
+                    # page_location_list.print_info()
                 ### Get the RNTuple Pages from the Page List Envelopes
 
                 cluster_column_page_lists = []
