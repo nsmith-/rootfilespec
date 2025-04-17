@@ -85,7 +85,18 @@ class ReadBuffer:
 
     def consume(self, size: int) -> tuple[bytes, ReadBuffer]:
         """Consume the given number of bytes from the buffer."""
+        if size > len(self.data):
+            msg = f"Cannot consume {size} bytes from buffer of length {len(self.data)}"
+            raise IndexError(msg)
+        if size < 0:
+            msg = (
+                f"Cannot consume a negative number of bytes: {size=}, {self.__len__()=}"
+            )
+            raise ValueError(msg)
         return bytes(self.data[:size]), self[size:]
+
+    def info(self) -> str:
+        return f"buffer size={self.__len__()} at abspos={self.abspos}, relpos={self.relpos}"
 
 
 DataFetcher = Callable[[int, int], ReadBuffer]
@@ -152,6 +163,10 @@ T = TypeVar("T", bound="ROOTSerializable")
 
 @dataclasses.dataclass
 class ROOTSerializable:
+    """
+    A base class for objects that can be serialized and deserialized from a buffer.
+    """
+
     @classmethod
     def read(cls: type[T], buffer: ReadBuffer) -> tuple[T, ReadBuffer]:
         members, buffer = cls.read_members(buffer)

@@ -1,6 +1,12 @@
 from __future__ import annotations
 
 from rootfilespec.bootstrap.assumed import ROOT3a3aTIOFeatures
+from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
+from rootfilespec.bootstrap.REnvelope import REnvelope
+from rootfilespec.bootstrap.REnvelopeLink import (
+    REnvelopeLink,
+    RLocator,
+)
 from rootfilespec.bootstrap.TDirectory import TDirectory, TKeyList
 from rootfilespec.bootstrap.TFile import ROOTFile, TFile
 from rootfilespec.bootstrap.TKey import TKey
@@ -15,6 +21,10 @@ from rootfilespec.bootstrap.TStreamerInfo import (
 from rootfilespec.bootstrap.TString import TString
 
 __all__ = [
+    "REnvelope",
+    "REnvelopeLink",
+    "RLocator",
+    "ROOT3a3aRNTuple",
     "ROOT3a3aTIOFeatures",
     "ROOTFile",
     "StreamedObject",
