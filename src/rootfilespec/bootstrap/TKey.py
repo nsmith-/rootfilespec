@@ -135,6 +135,10 @@ class TKey(ROOTSerializable):
         else:
             typename = normalize(self.fClassName.fString)
             obj, buffer = DICTIONARY[typename].read(buffer)  # type: ignore[assignment]
+        if typename == "ROOT3a3aRNTuple":
+            # RNTuple is a special case, it has a 64 bit checksum
+            (checksum,), buffer = buffer.unpack(">Q")
+            # TODO: Check the checksum
         if buffer:
             msg = f"TKey.read_object: buffer not empty after reading object of type {typename}."
             msg += f"\n{self=}"

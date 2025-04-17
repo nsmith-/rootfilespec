@@ -1,24 +1,33 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Annotated, Any
 
-from ..structutil import DataFetcher, ReadBuffer, ROOTSerializable
-from .RNTupleEnvelopeLink import DICTIONARY_ENVELOPE
+from rootfilespec.bootstrap.REnvelopeLink import DICTIONARY_ENVELOPE
+from rootfilespec.bootstrap.RFrame import (
+    ClusterGroup,
+    ClusterSummary,
+    ListFrame,
+    PageLocations_Clusters,
+    RFrame,
+    SchemaExtension,
+)
 
-# DICIONARY_ENVELOPE is to avoid circular imports (see RNTupleEnvelopeLink.py)
-from .RNTupleFrame import (
-    RNTupleListFrame_ClusterGroups,
-    RNTupleListFrame_ClusterSummaries,
-    RNTupleListFrame_PageLocations_Clusters,
-    RNTupleRecordFrame_SchemaExtension,
+# DICTIONARY_ENVELOPE is to avoid circular imports (see REnvelopeLink.py)
+from rootfilespec.structutil import (
+    DataFetcher,
+    Fmt,
+    ReadBuffer,
+    ROOTSerializable,
+    serializable,
 )
 
 # Map of envelope type to string for printing
-ENVELOPE_TYPE_MAP = {0x01: "Header", 0x02: "Footer", 0x03: "Page List", 0x04: "Unknown"}
+ENVELOPE_TYPE_MAP = {0x00:"Reserved", 0x01:"Header", 0x02:"Footer", 0x03:"Page List"}
 
 
 @dataclass
-class RNTupleFeatureFlags(ROOTSerializable):
+class RFeatureFlags(ROOTSerializable):
     """A class representing the RNTuple Feature Flags.
     RNTuple Feature Flags appear in the Header and Footer Envelopes.
     This class reads the RNTuple Feature Flags from the buffer.
@@ -32,14 +41,8 @@ class RNTupleFeatureFlags(ROOTSerializable):
     flags: int
 
     @classmethod
-    def read(cls, buffer: ReadBuffer):
+    def read_members(cls, buffer: ReadBuffer):
         """Reads the RNTuple Feature Flags from the given buffer.
-
-        Args:
-            buffer (ReadBuffer): The buffer to read the RNTuple Feature Flags from.
-
-        Returns:
-            RNTupleFeatureFlags: The RNTuple Feature Flags instance.
         """
 
         # Read the flags from the buffer
@@ -51,33 +54,31 @@ class RNTupleFeatureFlags(ROOTSerializable):
             msg = f"Unknown feature flags encountered. int:{flags}; binary:{bin(flags)}"
             raise NotImplementedError(msg)
 
-        return cls(flags), buffer
+        return (flags,), buffer
 
 
 @dataclass
-class RNTupleEnvelope(ROOTSerializable):
-    """A class representing the RNTuple envelope structure
+class REnvelope(ROOTSerializable):
+    """ A class representing the RNTuple Envelope.
+    An RNTuple Envelope is a data block that contains information about the RNTuple data.
+    The following envelope types exist
+    - Header Envelope (0x01): RNTuple schema information (field and column types)
+    - Footer Envelope (0x02): Description of clusters
+    - Page List Envelope (0x03): Location of data pages
+    - Reserved (0x00): Unused and Reserved
 
-    Attributes:
-        typeID (int): Envelope type (Header, Footer, Page List, or Unknown)
-        length (int): Uncompressed size of the entire envelope (header, payload, unknown, checksum)
-        payload (bytes): Envelope payload
-        checksum (int): Checksum of the envelope
     """
-
     typeID: int
     length: int
-    payload: (
-        RNTupleHeaderEnvelope_payload
-        | RNTupleFooterEnvelope_payload
-        | RNTuplePageListEnvelope_payload
-    )
-    unknown: bytes | None
     checksum: int
+    _unknown: bytes = field(init=False, repr=False)
 
     @classmethod
     def read(cls, buffer: ReadBuffer):
-        """Reads an RNTupleEnvelope from the given buffer."""
+        """Reads an REnvelope from the given buffer."""
+        #### Save initial buffer position (for checking unknown bytes)
+        payload_start_pos = buffer.relpos
+
         #### Get the first 64bit integer (lengthType) which contains the length and type of the envelope
         # lengthType, buffer = buffer.consume(8)
         (lengthType,), buffer = buffer.unpack("<Q")
@@ -86,36 +87,24 @@ class RNTupleEnvelope(ROOTSerializable):
         # Envelope size (uncompressed), encoded in the 48 most significant bits
         length = lengthType >> 16
         # Ensure that the length of the envelope matches the buffer length
-        if length - 8 != buffer.__len__():
-            msg = f"Length of envelope ({length} minus 8) of type {typeID} does not match buffer length ({buffer.__len__()})"
+        if length - 8 != len(buffer):
+            msg = f"Length of envelope ({length} minus 8) of type {typeID} does not match buffer length ({len(buffer)})"
             raise ValueError(msg)
 
         #### Get the payload
-        # relpos is guaranteed to exist (consider compressed data, abspos doesn't exist)
-        payload_start_pos = buffer.relpos
-
-        if typeID == 0x01:  # Header
-            payload, buffer = RNTupleHeaderEnvelope_payload.read(buffer)
-        elif typeID == 0x02:  # Footer
-            payload, buffer = RNTupleFooterEnvelope_payload.read(buffer)
-        elif typeID == 0x03:  # Page List
-            payload, buffer = RNTuplePageListEnvelope_payload.read(buffer)
-        else:
-            msg = f"Unknown envelope type: {typeID}"
-            raise ValueError(msg)
+        cls_args, buffer = cls.read_members(buffer)
 
         #### Consume any unknown trailing information in the envelope
-        unknown, buffer = buffer.consume(
-            length - 8 - 8 - buffer.relpos + payload_start_pos
-        )
-        # Unknown Bytes = Payload Size - Payload Bytes Read
-        #   Payload Size        = Envelope Size - 8 (for lengthType) - 8 (for checksum)
-        #   Payload Bytes Read  = buffer.relpos - payload_start_pos
+        _unknown, buffer = buffer.consume(length - (buffer.relpos - payload_start_pos) - 8)
+        # Unknown Bytes = Envelope Size - Envelope Bytes Read - Checksum (8 bytes)
+        #   Envelope Bytes Read  = buffer.relpos - payload_start_pos
 
         #### Get the checksum (appended to envelope when writing to disk)
         (checksum,), buffer = buffer.unpack("<Q")  # Last 8 bytes of the envelope
 
-        return cls(typeID, length, payload, unknown, checksum), buffer
+        envelope = cls(typeID, length, checksum, *cls_args)
+        envelope._unknown = _unknown
+        return envelope, buffer
 
     def get_type(self) -> str:
         """Get the envelope type as a string"""
@@ -126,66 +115,47 @@ class RNTupleEnvelope(ROOTSerializable):
         return ENVELOPE_TYPE_MAP[self.typeID]
 
 
-DICTIONARY_ENVELOPE[b"RNTupleEnvelope"] = RNTupleEnvelope
-
-
-@dataclass
-class RNTupleHeaderEnvelope_payload(ROOTSerializable):
+@serializable
+class HeaderEnvelope(REnvelope):
     """A class representing the RNTuple Header Envelope payload structure"""
+    pass
 
+DICTIONARY_ENVELOPE[0x01] = HeaderEnvelope
 
-@dataclass
-class RNTupleFooterEnvelope_payload(ROOTSerializable):
+@serializable
+class FooterEnvelope(REnvelope):
     """A class representing the RNTuple Footer Envelope payload structure.
 
     Attributes:
-        featureFlags (RNTupleFeatureFlags): The RNTuple Feature Flags (verify this file can be read)
-        headerChecksum (int): The checksum of the Header Envelope
-        schemaExtensionRecordFrame (RNTupleFrame): The Schema Extension Record Frame
-        clusterGroupListFrames (RNTupleListFrame_ClusterGroups): The List Frame of Cluster Group Record Frames
+        featureFlags (RFeatureFlags): The RNTuple Feature Flags (verify this file can be read)
+        headerChecksum (int): Checksum of the Header Envelope
+        schemaExtension (SchemaExtension): The Schema Extension Record Frame
+        clusterGroups (ListFrame[ClusterGroup]): The List Frame of Cluster Group Record Frames
     """
 
-    featureFlags: RNTupleFeatureFlags
-    headerChecksum: int
-    schemaExtensionRecordFrame: RNTupleRecordFrame_SchemaExtension
-    clusterGroupListFrame: RNTupleListFrame_ClusterGroups
+    featureFlags: RFeatureFlags
+    headerChecksum: Annotated[int, Fmt("<Q")]
+    schemaExtension: SchemaExtension
+    clusterGroups: ListFrame[ClusterGroup]
 
     @classmethod
-    def read(cls, buffer: ReadBuffer):
-        """Reads the RNTuple Footer Envelope Payload from the given buffer."""
+    def read_members(cls, buffer: ReadBuffer):
 
-        #### Read the feature flags
-        featureFlags, buffer = RNTupleFeatureFlags.read(buffer)
+        # Read the feature flags
+        featureFlags, buffer = RFeatureFlags.read(buffer)
 
-        #### Read the header envelope checksum (verify later in RNTuple class read method)
+        # Read the header checksum
         (headerChecksum,), buffer = buffer.unpack("<Q")
 
-        #### Read the Schema Extension Record Frame
+        # Read the schema extension record frame
+        schemaExtension, buffer = SchemaExtension.read(buffer)
 
-        schemaExtensionRecordFrame, buffer = RNTupleRecordFrame_SchemaExtension.read(
-            buffer
-        )
-        # Verify that we read a record frame
-        if schemaExtensionRecordFrame.fheader.fType != 0:
-            msg = f"Expected a (schema extension) record frame, but got a frame of type {schemaExtensionRecordFrame.fheader.fType=}"
-            raise ValueError(msg)
+        # Read the cluster group list frame
+        clusterGroups, buffer = ListFrame.read_as(ClusterGroup, buffer)
 
-        #### Read the List Frame of Cluster Group Record Frames
+        return (featureFlags, headerChecksum, schemaExtension, clusterGroups), buffer
 
-        clusterGroupListFrame, buffer = RNTupleListFrame_ClusterGroups.read(buffer)
-        # Verify that we read a list frame
-        if clusterGroupListFrame.fheader.fType != 1:
-            msg = f"Expected a (cluster group) list frame, but got a frame of type {clusterGroupListFrame.fheader.fType=}"
-            raise ValueError(msg)
-
-        return cls(
-            featureFlags,
-            headerChecksum,
-            schemaExtensionRecordFrame,
-            clusterGroupListFrame,
-        ), buffer
-
-    def get_pagelist(self, fetch_data: DataFetcher) -> list[RNTupleEnvelope]:
+    def get_pagelist(self, fetch_data: DataFetcher) -> list[REnvelope]:
         """Get the RNTuple Page List Envelopes from the Footer Envelope.
 
         Page List Envelope Links are stored in the Cluster Group Record Frames in the Footer Envelope Payload.
@@ -195,69 +165,63 @@ class RNTupleFooterEnvelope_payload(ROOTSerializable):
         pagelist_envelopes = []  # List of RNTuple Page List Envelopes
 
         ### Iterate through the Cluster Group Record Frames
-        for (
-            clusterGroupListFrame
-        ) in self.clusterGroupListFrame.clusterGroupRecordFrames:
+        for i, clusterGroup in enumerate(self.clusterGroups):
             ## The cluster group record frame contains other info will be useful later.
             #       i.e. Minimum Entry Number, Entry Span, and Number of Clusters.
             # For now, we only need the Page List Envelope Link.
 
             # Read the page list envelope
-            pagelist_envelope = clusterGroupListFrame.pagelistLink.read_envelope(
+            pagelist_envelope = clusterGroup.pagelistLink.read_envelope(
                 fetch_data
             )
             pagelist_envelopes.append(pagelist_envelope)
         return pagelist_envelopes
 
+DICTIONARY_ENVELOPE[0x02] = FooterEnvelope
 
-@dataclass
-class RNTuplePageInfo(ROOTSerializable):
-    """A class representing the RNTuple Page Info structure."""
-
-
-@dataclass
-class RNTuplePageListEnvelope_payload(ROOTSerializable):
+@serializable
+class PageListEnvelope(REnvelope):
     """A class representing the RNTuple Page List Envelope payload structure.
 
     Attributes:
-    headerChecksum (int): The checksum of the Header Envelope
-    clusterSummaryListFrame (list[RNTupleFrame]): The list of Cluster Summary Record Frames
-    page_locations (RNTupleListFrame_PageLocations_Clusters): The triple nested list of page locations
+    headerChecksum (int): Checksum of the Header Envelope
+    clusterSummaries (ListFrame[ClusterSummary]): List Frame of Cluster Summary Record Frames
+    pageLocations (PageLocations_Clusters): The Page Locations Triple Nested List Frame
     """
 
-    headerChecksum: int
-    clusterSummaryListFrame: RNTupleListFrame_ClusterSummaries
-    pageLocationsNestedListFrame: RNTupleListFrame_PageLocations_Clusters
+    headerChecksum: Annotated[int, Fmt("<Q")]
+    clusterSummaries: ListFrame[ClusterSummary]
+    pageLocations: PageLocations_Clusters
 
     @classmethod
-    def read(cls, buffer: ReadBuffer):
-        """Reads the RNTuple Page List Envelope Payload from the given buffer."""
-        #### Read the header envelope checksum (verify later in RNTuple class read method)
+    def read_members(cls, buffer: ReadBuffer):
+        """Reads the RNTuple Page List Envelope payload from the given buffer."""
+        # Read the header checksum
         (headerChecksum,), buffer = buffer.unpack("<Q")
 
-        #### Read the List Frame of Cluster Summary Record Frames
-        clusterSummaryListFrame, buffer = RNTupleListFrame_ClusterSummaries.read(buffer)
-        # Verify that we read a list frame
-        if clusterSummaryListFrame.fheader.fType != 1:
-            msg = f"Expected a (cluster summary) list frame, but got a frame of type {clusterSummaryListFrame.fheader.fType=}"
-            raise ValueError(msg)
+        # Read the cluster summary list frame
+        clusterSummaries, buffer = ListFrame.read_as(ClusterSummary, buffer)
 
-        #### Read the Nested List Frame of Page Locations
-        pageLocationsNestedListFrame, buffer = (
-            RNTupleListFrame_PageLocations_Clusters.read(buffer)
-        )
-        # Verify that we read a list frame
-        if pageLocationsNestedListFrame.fheader.fType != 1:
-            msg = f"Expected a (page locations) list frame, but got a frame of type {pageLocationsNestedListFrame.fheader.fType=}"
-            raise ValueError(msg)
+        # Read the page locations
+        pageLocations, buffer = PageLocations_Clusters.read(buffer)
 
-        return cls(
-            headerChecksum, clusterSummaryListFrame, pageLocationsNestedListFrame
-        ), buffer
+        return (headerChecksum, clusterSummaries, pageLocations), buffer
 
-    def get_pages(self, fetch_data: DataFetcher) -> list[list[list[RNTuplePageInfo]]]:
+    def get_pages(self, fetch_data: DataFetcher) -> list[list[list[bytes]]]:
         """Get the RNTuple Pages from the Page Locations Nested List Frame."""
+        #### Get the Page Locations
+        page_locations = []
+        
+        for i_column, columnlist in enumerate(self.pageLocations):
+            page_locations.append([])
+            for i_page, pagelist in enumerate(columnlist):
+                page_locations[i_column].append([])
+                for page_description in pagelist:
+                    # Read the page from the buffer
+                    page = page_description.get_page(fetch_data)
+                    # Append the page to the list
+                    page_locations[i_column][i_page].append(page)
+                    
+        return page_locations
 
-        #### Get the Pages
-
-        return self.pageLocationsNestedListFrame.read_list(fetch_data)
+DICTIONARY_ENVELOPE[0x03] = PageListEnvelope
