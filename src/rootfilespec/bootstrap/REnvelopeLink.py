@@ -9,7 +9,7 @@ from rootfilespec.structutil import (
 )
 
 # Use map to avoid circular imports
-DICTIONARY_ENVELOPE: dict[bytes, type[ROOTSerializable]] = {}
+DICTIONARY_ENVELOPE: dict[int, type[ROOTSerializable]] = {}
 
 
 @dataclass
@@ -59,7 +59,7 @@ class REnvelopeLink(ROOTSerializable):
         # compressed = None
 
         if self.locator.size != self.length:
-            msg = f"Compressed envelopes are not yet supported: {self.locator.locatorSubclass.locatorType=}"
+            msg = f"Compressed envelopes are not yet supported: {self.locator}"
             raise NotImplementedError(msg)
             # TODO: Implement compressed envelopes
 
@@ -86,13 +86,16 @@ class REnvelopeLink(ROOTSerializable):
 
         # check that buffer is empty
         if buffer:
-            msg = "REnvelopeLink.read_envelope: buffer not empty after reading envelope."
+            msg = (
+                "REnvelopeLink.read_envelope: buffer not empty after reading envelope."
+            )
             msg += f"\n{self=}"
             msg += f"\n{envelope=}"
             msg += f"\nBuffer: {buffer}"
             raise ValueError(msg)
 
         return envelope
+
 
 @dataclass
 class RLocator(ROOTSerializable):
@@ -124,7 +127,7 @@ class RLocator(ROOTSerializable):
     @classmethod
     def read(cls, buffer: ReadBuffer):
         """Reads a RNTuple locator from the given buffer."""
-        
+
         #### Peek (don't update buffer) at the first 32 bit integer in the buffer to determine the locator type
         # We don't want to consume the buffer yet, because RLocator_Standard will need to consume it
         (sizeType,), _ = buffer.unpack("<i")
@@ -135,7 +138,7 @@ class RLocator(ROOTSerializable):
         # Thus the derived class StandardLocator will need to consume it
         if sizeType >= 0:
             return StandardLocator.read(buffer)
-        
+
         #### Non-standard locator
         # The first 32 bit signed integer contains the locator size, reserved, and locator type
         # For non-standard locators, the first 32 bits contain metadata about the locator itself
@@ -143,13 +146,13 @@ class RLocator(ROOTSerializable):
         # Thus any derived classes will not need to consume it
         (locatorSizeReservedType,), buffer = buffer.unpack("<i")
 
-        # The locator size is the 16 least significant bits
-        locatorSize = locatorSizeReservedType & 0xFFFF  # Size of locator itself
+        # # The locator size is the 16 least significant bits
+        # locatorSize = locatorSizeReservedType & 0xFFFF  # Size of locator itself
 
-        # The reserved field is the next 8 least significant bits
-        reserved = (
-            locatorSizeReservedType >> 16
-        ) & 0xFF  # Reserved by ROOT developers for future use
+        # # The reserved field is the next 8 least significant bits
+        # reserved = (
+        #     locatorSizeReservedType >> 16
+        # ) & 0xFF  # Reserved by ROOT developers for future use
 
         # The locator type is the 8 most significant bits (the final 8 bits)
         locatorType = (
@@ -167,6 +170,7 @@ class RLocator(ROOTSerializable):
         """This should be overridden by subclasses"""
         msg = "get_buffer() not implemented for this locator type"
         raise NotImplementedError(msg)
+
 
 @dataclass
 class StandardLocator(RLocator):
@@ -196,6 +200,7 @@ class StandardLocator(RLocator):
     def get_buffer(self, fetch_data: DataFetcher):
         """Returns the buffer for the byte range specified by the standard locator."""
         return fetch_data(self.offset, self.size)
+
 
 @dataclass
 class LargeLocator(RLocator):

@@ -55,13 +55,13 @@ if __name__ == "__main__":
 
         # Get TKeyList (List of all TKeys in the TDirectory)
         keylist = tfile.get_KeyList(fetch_data)
-        
+
         # Print TKeyList
         msg = "\tTKey List Summary:\n"
-        for name, key in keylist.items(): 
+        for name, key in keylist.items():
             msg += f"\t\tName: {name}; Class: {key.fClassName.fString}\n"
         print(msg)
-        
+
         # Get TStreamerInfo (List of classes used in the file)
         streamerinfo = file.get_StreamerInfo(fetch_data)
         classes = streamerinfo_to_classes(streamerinfo)
@@ -70,9 +70,7 @@ if __name__ == "__main__":
         # exec(classes, globals())
 
         ########################################################################################################################
-        print(
-            f"\033[1;31m\n/-------------------------------------------- Begin Reading RNTuples --------------------------------------------/ \033[0m"
-        )
+        print(f"\033[1;31m\n/{'-' * 44} Begin Reading RNTuples {'-' * 44}/ \033[0m")
 
         #### Get RNTuple Info
         # Only RNTuple Anchor TKeys are visible (i.e. in TKeyList); ClassName = ROOT::RNTuple
@@ -81,7 +79,7 @@ if __name__ == "__main__":
             # Check for RNTuple Anchors
             if tkey.fClassName.fString == b"ROOT::RNTuple":
                 print(
-                    f"\033[1;33m\n---------------------------------- Begin Reading RNTuple: '{name}' ----------------------------------\033[0m"
+                    f"\033[1;33m\n{'-' * 34} Begin Reading RNTuple: '{name}' {'-' * 34}\033[0m"
                 )
                 # print(f"\t{tkey}")
 
@@ -131,7 +129,7 @@ if __name__ == "__main__":
                             # page.print_info()
 
                 print(
-                    f"\033[1;33m---------------------------------- Done Reading RNTuple: '{name}' ----------------------------------\033[0m"
+                    f"\033[1;33m{'-' * 34} Done Reading RNTuple: '{name}' {'-' * 34}\033[0m"
                 )
 
     print(f"\n\033[1;32mClosing '{path}'\n\033[0m")

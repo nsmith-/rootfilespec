@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Annotated, Any, Generic, TypeVar, get_args
+from typing import Annotated, Any, Generic, TypeVar
+
+from typing_extensions import Self
 
 from rootfilespec.bootstrap.REnvelopeLink import (
     REnvelopeLink,
@@ -18,58 +20,59 @@ from rootfilespec.structutil import (
 
 Item = TypeVar("Item", bound=ROOTSerializable)
 
+
 @dataclass
 class RFrame(ROOTSerializable):
-    fSize: int # abbott Q: do we need to save fSize?
+    fSize: int  # abbott Q: do we need to save fSize?
     _unknown: bytes = field(init=False, repr=False)
-    
+
     @classmethod
     def read_as(
         cls, itemtype: type[Item], buffer: ReadBuffer
-    ) -> tuple[ListFrame[Item] | RecordFrame[Item], ReadBuffer]:
+    ) -> tuple[Any, ReadBuffer]:
         # Peek at the metadata to determine the type of frame but don't consume it
-        fSize, _ = buffer.unpack("<q")
+        (fSize,), _ = buffer.unpack("<q")
 
-         # If the size is positive, it's a Record Frame
+        # If the size is positive, it's a Record Frame
         if fSize > 0:
             return RecordFrame.read_as(itemtype, buffer)
         # If the size is negative, it's a List Frame
-        if fSize < 0: 
+        if fSize < 0:
             return ListFrame.read_as(itemtype, buffer)
         # If the size is zero, something is wrong
-        msg = f"Expected metadata to be non-zero, but got {fSize}"
+        msg = f"Expected metadata to be non-zero, but got {fSize=}"
         raise ValueError(msg)
+
 
 @dataclass
 class ListFrame(RFrame, Generic[Item]):
     items: list[Item]
 
     @classmethod
-    def read_as(cls, itemtype: type[Item], buffer: ReadBuffer):
-        
+    def read_as(
+        cls,
+        itemtype: type[Item],  # type: ignore[override]
+        buffer: ReadBuffer,
+    ) -> tuple[Self, ReadBuffer]:
         # Save initial buffer position (for checking unknown bytes)
-        start_position = buffer.relpos        
-        
+        start_position = buffer.relpos
+
         #### Read the frame Size and Type
         (fSize,), buffer = buffer.unpack("<q")
         if fSize >= 0:
             msg = f"Expected fSize to be negative, but got {fSize}"
             raise ValueError(msg)
-        fSize = abs(fSize) # abs(fSize) is the uncompressed byte size of frame (including payload)
-        
+        # abs(fSize) is the uncompressed byte size of frame (including payload)
+        fSize = abs(fSize)
+
         #### Read the List Frame Items
         (nItems,), buffer = buffer.unpack("<I")
         items: list[Item] = []
         while len(items) < nItems:
-            if itemtype is ListFrame:
-                # Read a List Frame recursively
-                contenttype, = get_args(itemtype)
-                item, buffer = itemtype.read_as(contenttype, buffer)
-            else:
-                # Read a regular item
-                item, buffer = itemtype.read(buffer)
+            # Read a regular item
+            item, buffer = itemtype.read(buffer)
             items.append(item)
-        
+
         cls_args, buffer = cls.read_members(buffer)
 
         #### Consume any unknown trailing information in the frame
@@ -92,16 +95,15 @@ class ListFrame(RFrame, Generic[Item]):
 
     def __iter__(self):
         return iter(self.items)
-    
-    def __getitem__(self, index) -> Item:
+
+    def __getitem__(self, index: int) -> Item:
         return self.items[index]
+
 
 @dataclass
 class RecordFrame(RFrame):
-   
     @classmethod
     def read(cls, buffer: ReadBuffer):
-        
         #### Save initial buffer position (for checking unknown bytes)
         start_position = buffer.relpos
 
@@ -125,11 +127,13 @@ class RecordFrame(RFrame):
         frame._unknown = _unknown
         return frame, buffer
 
+
 ########################################################################################################################
 # Header Envelope Frames
 
 ########################################################################################################################
 # Footer Envelope Frames
+
 
 @serializable
 class ClusterGroup(RecordFrame):
@@ -148,6 +152,7 @@ class ClusterGroup(RecordFrame):
     fEntrySpan: Annotated[int, Fmt("<Q")]
     fNClusters: Annotated[int, Fmt("<I")]
     pagelistLink: REnvelopeLink
+
 
 @serializable
 class SchemaExtension(RecordFrame):
@@ -180,9 +185,9 @@ class SchemaExtension(RecordFrame):
     """
 
 
-
 ########################################################################################################################
 # Page List Envelope Frames
+
 
 @serializable
 class ClusterSummary(RecordFrame):
@@ -224,18 +229,18 @@ class ClusterSummary(RecordFrame):
 
 @serializable
 class RPageDescription(ROOTSerializable):
-    """ A class representing an RNTuple Page Description.
+    """A class representing an RNTuple Page Description.
     This class represents the location of a page for a column for a cluster.
-    
+
     Attributes:
         fNElements (int): The number of elements in the page.
         locator (RLocator): The locator for the page.
-    
+
     Notes:
     This class is the Inner Item in the triple nested List Frame of RNTuple page locations.
-     
+
     [top-most[outer[inner[*Page Description*]]]]:
-    
+
         Top-Most List Frame -> Outer List Frame -> Inner List Frame ->  Inner Item
             Clusters     ->      Columns     ->       Pages      ->  Page Description
 
@@ -260,33 +265,34 @@ class RPageDescription(ROOTSerializable):
         # check buffer is empty?
         return page
 
+
 @serializable
 class PageLocations_Pages(ListFrame[RPageDescription]):
-    """ A class representing the RNTuple Page Locations Pages (Inner) List Frame.
+    """A class representing the RNTuple Page Locations Pages (Inner) List Frame.
     This class represents the locations of pages for a column for a cluster.
     This class is a specialized `ListFrame` that holds `PageDescription` objects,
         where each object corresponds to a page, and each object represents
         the location of that page.
-    This is a unique `ListFrame`, as it stores extra column information that 
+    This is a unique `ListFrame`, as it stores extra column information that
         is located after the list of `PageDescription` objects.
     The order of the pages matches the order of the pages in the ROOT file.
     The element offset is negative if the column is suppressed.
-    
+
     Attributes:
-        elementoffset (int): The offset for the first element for this column. 
+        elementoffset (int): The offset for the first element for this column.
         compressionsettings (int | None): The compression settings for the pages in this column.
-    
+
     Notes:
     This class is the Inner List Frame in the triple nested List Frame of RNTuple page locations.
-     
+
     [top-most[outer[*inner*[Page Description]]]]:
-    
+
         Top-Most List Frame -> Outer List Frame -> Inner List Frame ->  Inner Item
             Clusters     ->      Columns     ->       Pages      ->  Page Description
 
     Note that Page Description is not a record frame.
     """
-    
+
     elementoffset: int
     compressionsettings: int | None
 
@@ -298,17 +304,18 @@ class PageLocations_Pages(ListFrame[RPageDescription]):
         return pagelist, buffer
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer) -> tuple[tuple[int], ReadBuffer]:
+    def read_members(cls, buffer: ReadBuffer) -> tuple[tuple[Any, ...], ReadBuffer]:
         """Reads the extra members of the Page List Frame from the buffer."""
         # Read the element offset for this column
         (elementoffset,), buffer = buffer.unpack("<q")
 
         compressionsettings = None
-        if elementoffset >= 0: # If the column is not suppressed
+        if elementoffset >= 0:  # If the column is not suppressed
             # Read the compression settings
             (compressionsettings,), buffer = buffer.unpack("<I")
 
         return (elementoffset, compressionsettings), buffer
+
 
 @serializable
 class PageLocations_Columns(ListFrame[PageLocations_Pages]):
@@ -322,8 +329,8 @@ class PageLocations_Columns(ListFrame[PageLocations_Pages]):
     This List Frame is found in the Page List Envelope of an RNTuple.
 
     Notes:
-    This class is the Outer List Frame in the triple nested List Frame of RNTuple page locations. 
-    
+    This class is the Outer List Frame in the triple nested List Frame of RNTuple page locations.
+
     [top-most[*outer*[inner[Page Description]]]]:
 
         Top-Most List Frame -> Outer List Frame -> Inner List Frame ->  Inner Item
@@ -339,20 +346,21 @@ class PageLocations_Columns(ListFrame[PageLocations_Pages]):
         columnlist, buffer = cls.read_as(PageLocations_Pages, buffer)
         return columnlist, buffer
 
+
 @serializable
 class PageLocations_Clusters(ListFrame[PageLocations_Columns]):
-    """ A class representing the RNTuple Page Locations Cluster (Top-Most) List Frame.
+    """A class representing the RNTuple Page Locations Cluster (Top-Most) List Frame.
     This class represents the locations of pages within columns for each cluster.
     This class is a specialized `ListFrame` that holds `PageLocations_Columns` objects,
-        where each object corresponds to a cluster, and each object represents 
+        where each object corresponds to a cluster, and each object represents
         the locations of pages for each column in that cluster.
-    The order of the clusters corresponds to the cluster IDs as defined 
+    The order of the clusters corresponds to the cluster IDs as defined
         by the cluster groups and cluster summaries.
     This List Frame is found in the Page List Envelope of an RNTuple.
 
     Notes:
-    This class is the Top-Most List Frame in the triple nested List Frame of RNTuple page locations. 
-    
+    This class is the Top-Most List Frame in the triple nested List Frame of RNTuple page locations.
+
     [*top-most*[outer[inner[Page Description]]]]:
 
         Top-Most List Frame -> Outer List Frame -> Inner List Frame ->  Inner Item
@@ -378,5 +386,5 @@ class PageLocations_Clusters(ListFrame[PageLocations_Columns]):
                 for page in column:
                     offset += page.fNElements
                     if offset > cluster_local_offset:
-                        return page
+                        return page  # type: ignore[no-any-return]
         return None

@@ -12,13 +12,14 @@ class RPage(ROOTSerializable):
     Attributes:
         page (bytes): The page raw data.
     """
+
     page: bytes
 
     # TODO: Flush out RPage class
     @classmethod
-    def read(cls, buffer: ReadBuffer):
+    def read(cls, buffer: ReadBuffer) -> tuple[RPage, ReadBuffer]:
         """Reads an RPage from the buffer."""
-        
+
         # For now, just return the entire buffer
         page, buffer = buffer.consume(len(buffer))
 

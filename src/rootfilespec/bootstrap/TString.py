@@ -6,8 +6,7 @@ from rootfilespec.structutil import ReadBuffer, ROOTSerializable, serializable
 
 @serializable
 class TString(ROOTSerializable):
-    """A class representing a TString.
-    """
+    """A class representing a TString."""
 
     fString: bytes
 

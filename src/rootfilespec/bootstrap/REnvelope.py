@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Annotated, Any
+from typing import Annotated
 
 from rootfilespec.bootstrap.REnvelopeLink import DICTIONARY_ENVELOPE
 from rootfilespec.bootstrap.RFrame import (
@@ -9,7 +9,6 @@ from rootfilespec.bootstrap.RFrame import (
     ClusterSummary,
     ListFrame,
     PageLocations_Clusters,
-    RFrame,
     SchemaExtension,
 )
 
@@ -23,7 +22,12 @@ from rootfilespec.structutil import (
 )
 
 # Map of envelope type to string for printing
-ENVELOPE_TYPE_MAP = {0x00:"Reserved", 0x01:"Header", 0x02:"Footer", 0x03:"Page List"}
+ENVELOPE_TYPE_MAP = {
+    0x00: "Reserved",
+    0x01: "Header",
+    0x02: "Footer",
+    0x03: "Page List",
+}
 
 
 @dataclass
@@ -42,8 +46,7 @@ class RFeatureFlags(ROOTSerializable):
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer):
-        """Reads the RNTuple Feature Flags from the given buffer.
-        """
+        """Reads the RNTuple Feature Flags from the given buffer."""
 
         # Read the flags from the buffer
         (flags,), buffer = buffer.unpack("<q")  # Signed 64-bit integer
@@ -59,7 +62,7 @@ class RFeatureFlags(ROOTSerializable):
 
 @dataclass
 class REnvelope(ROOTSerializable):
-    """ A class representing the RNTuple Envelope.
+    """A class representing the RNTuple Envelope.
     An RNTuple Envelope is a data block that contains information about the RNTuple data.
     The following envelope types exist
     - Header Envelope (0x01): RNTuple schema information (field and column types)
@@ -68,6 +71,7 @@ class REnvelope(ROOTSerializable):
     - Reserved (0x00): Unused and Reserved
 
     """
+
     typeID: int
     length: int
     checksum: int
@@ -95,7 +99,9 @@ class REnvelope(ROOTSerializable):
         cls_args, buffer = cls.read_members(buffer)
 
         #### Consume any unknown trailing information in the envelope
-        _unknown, buffer = buffer.consume(length - (buffer.relpos - payload_start_pos) - 8)
+        _unknown, buffer = buffer.consume(
+            length - (buffer.relpos - payload_start_pos) - 8
+        )
         # Unknown Bytes = Envelope Size - Envelope Bytes Read - Checksum (8 bytes)
         #   Envelope Bytes Read  = buffer.relpos - payload_start_pos
 
@@ -118,9 +124,10 @@ class REnvelope(ROOTSerializable):
 @serializable
 class HeaderEnvelope(REnvelope):
     """A class representing the RNTuple Header Envelope payload structure"""
-    pass
+
 
 DICTIONARY_ENVELOPE[0x01] = HeaderEnvelope
+
 
 @serializable
 class FooterEnvelope(REnvelope):
@@ -140,7 +147,6 @@ class FooterEnvelope(REnvelope):
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer):
-
         # Read the feature flags
         featureFlags, buffer = RFeatureFlags.read(buffer)
 
@@ -165,19 +171,19 @@ class FooterEnvelope(REnvelope):
         pagelist_envelopes = []  # List of RNTuple Page List Envelopes
 
         ### Iterate through the Cluster Group Record Frames
-        for i, clusterGroup in enumerate(self.clusterGroups):
+        for _i, clusterGroup in enumerate(self.clusterGroups):
             ## The cluster group record frame contains other info will be useful later.
             #       i.e. Minimum Entry Number, Entry Span, and Number of Clusters.
             # For now, we only need the Page List Envelope Link.
 
             # Read the page list envelope
-            pagelist_envelope = clusterGroup.pagelistLink.read_envelope(
-                fetch_data
-            )
+            pagelist_envelope = clusterGroup.pagelistLink.read_envelope(fetch_data)
             pagelist_envelopes.append(pagelist_envelope)
         return pagelist_envelopes
 
+
 DICTIONARY_ENVELOPE[0x02] = FooterEnvelope
+
 
 @serializable
 class PageListEnvelope(REnvelope):
@@ -207,11 +213,11 @@ class PageListEnvelope(REnvelope):
 
         return (headerChecksum, clusterSummaries, pageLocations), buffer
 
-    def get_pages(self, fetch_data: DataFetcher) -> list[list[list[bytes]]]:
+    def get_pages(self, fetch_data: DataFetcher):
         """Get the RNTuple Pages from the Page Locations Nested List Frame."""
         #### Get the Page Locations
-        page_locations = []
-        
+        page_locations: list[list[list[bytes]]] = []
+
         for i_column, columnlist in enumerate(self.pageLocations):
             page_locations.append([])
             for i_page, pagelist in enumerate(columnlist):
@@ -221,7 +227,8 @@ class PageListEnvelope(REnvelope):
                     page = page_description.get_page(fetch_data)
                     # Append the page to the list
                     page_locations[i_column][i_page].append(page)
-                    
+
         return page_locations
+
 
 DICTIONARY_ENVELOPE[0x03] = PageListEnvelope
