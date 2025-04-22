@@ -31,7 +31,7 @@ class ROOT3a3aRNTuple(StreamedObject):
     fMaxKeySize: Annotated[int, Fmt(">Q")]
 
     def get_header(self, fetch_data: DataFetcher) -> HeaderEnvelope:  # type: ignore[empty-body]
-        pass
+        raise NotImplementedError
 
     def get_footer(self, fetch_data: DataFetcher) -> FooterEnvelope:
         """Reads the RNTuple Footer Envelope from the given buffer."""
