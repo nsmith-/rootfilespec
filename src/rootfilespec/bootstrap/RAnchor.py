@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from rootfilespec.bootstrap.REnvelope import FooterEnvelope
+from rootfilespec.bootstrap.REnvelope import FooterEnvelope, HeaderEnvelope
 from rootfilespec.bootstrap.REnvelopeLink import (
-    LargeLocator,
     REnvelopeLink,
 )
+from rootfilespec.bootstrap.RLocator import LargeLocator
 from rootfilespec.bootstrap.TObject import StreamedObject
 from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.structutil import (
@@ -30,8 +30,8 @@ class ROOT3a3aRNTuple(StreamedObject):
     fLenFooter: Annotated[int, Fmt(">Q")]
     fMaxKeySize: Annotated[int, Fmt(">Q")]
 
-    # def get_header():
-    #     ...
+    def get_header(self, fetch_data: DataFetcher) -> HeaderEnvelope:  # type: ignore[empty-body]
+        pass
 
     def get_footer(self, fetch_data: DataFetcher) -> FooterEnvelope:
         """Reads the RNTuple Footer Envelope from the given buffer."""
@@ -39,7 +39,7 @@ class ROOT3a3aRNTuple(StreamedObject):
             self.fLenFooter, LargeLocator(self.fNBytesFooter, self.fSeekFooter)
         )
 
-        return footerLink.read_envelope(fetch_data)  # type: ignore[return-value]
+        return footerLink.read_envelope(fetch_data, FooterEnvelope)
 
 
 DICTIONARY["ROOT3a3aRNTuple"] = ROOT3a3aRNTuple

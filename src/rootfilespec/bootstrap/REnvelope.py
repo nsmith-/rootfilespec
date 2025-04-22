@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Annotated
 
-from rootfilespec.bootstrap.REnvelopeLink import DICTIONARY_ENVELOPE
+from typing_extensions import Self
+
 from rootfilespec.bootstrap.RFrame import (
     ClusterGroup,
     ClusterSummary,
@@ -11,8 +12,7 @@ from rootfilespec.bootstrap.RFrame import (
     PageLocations_Clusters,
     SchemaExtension,
 )
-
-# DICTIONARY_ENVELOPE is to avoid circular imports (see REnvelopeLink.py)
+from rootfilespec.bootstrap.RPage import RPage
 from rootfilespec.structutil import (
     DataFetcher,
     Fmt,
@@ -78,7 +78,7 @@ class REnvelope(ROOTSerializable):
     _unknown: bytes = field(init=False, repr=False)
 
     @classmethod
-    def read(cls, buffer: ReadBuffer):
+    def read(cls, buffer: ReadBuffer) -> tuple[Self, ReadBuffer]:
         """Reads an REnvelope from the given buffer."""
         #### Save initial buffer position (for checking unknown bytes)
         payload_start_pos = buffer.relpos
@@ -126,9 +126,6 @@ class HeaderEnvelope(REnvelope):
     """A class representing the RNTuple Header Envelope payload structure"""
 
 
-DICTIONARY_ENVELOPE[0x01] = HeaderEnvelope
-
-
 @serializable
 class FooterEnvelope(REnvelope):
     """A class representing the RNTuple Footer Envelope payload structure.
@@ -161,7 +158,7 @@ class FooterEnvelope(REnvelope):
 
         return (featureFlags, headerChecksum, schemaExtension, clusterGroups), buffer
 
-    def get_pagelist(self, fetch_data: DataFetcher) -> list[REnvelope]:
+    def get_pagelist(self, fetch_data: DataFetcher) -> list[PageListEnvelope]:
         """Get the RNTuple Page List Envelopes from the Footer Envelope.
 
         Page List Envelope Links are stored in the Cluster Group Record Frames in the Footer Envelope Payload.
@@ -177,12 +174,11 @@ class FooterEnvelope(REnvelope):
             # For now, we only need the Page List Envelope Link.
 
             # Read the page list envelope
-            pagelist_envelope = clusterGroup.pagelistLink.read_envelope(fetch_data)
+            pagelist_envelope = clusterGroup.pagelistLink.read_envelope(
+                fetch_data, PageListEnvelope
+            )
             pagelist_envelopes.append(pagelist_envelope)
         return pagelist_envelopes
-
-
-DICTIONARY_ENVELOPE[0x02] = FooterEnvelope
 
 
 @serializable
@@ -216,7 +212,7 @@ class PageListEnvelope(REnvelope):
     def get_pages(self, fetch_data: DataFetcher):
         """Get the RNTuple Pages from the Page Locations Nested List Frame."""
         #### Get the Page Locations
-        page_locations: list[list[list[bytes]]] = []
+        page_locations: list[list[list[RPage]]] = []
 
         for i_column, columnlist in enumerate(self.pageLocations):
             page_locations.append([])
@@ -229,6 +225,3 @@ class PageListEnvelope(REnvelope):
                     page_locations[i_column][i_page].append(page)
 
         return page_locations
-
-
-DICTIONARY_ENVELOPE[0x03] = PageListEnvelope

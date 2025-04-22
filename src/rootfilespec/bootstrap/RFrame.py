@@ -7,8 +7,8 @@ from typing_extensions import Self
 
 from rootfilespec.bootstrap.REnvelopeLink import (
     REnvelopeLink,
-    RLocator,
 )
+from rootfilespec.bootstrap.RLocator import RLocator
 from rootfilespec.bootstrap.RPage import RPage
 from rootfilespec.structutil import (
     DataFetcher,

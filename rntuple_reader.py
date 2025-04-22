@@ -4,6 +4,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from rootfilespec.bootstrap import ROOTFile
+from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
+from rootfilespec.bootstrap.RPage import RPage
 from rootfilespec.dynamic import streamerinfo_to_classes
 from rootfilespec.structutil import ReadBuffer
 
@@ -84,7 +86,7 @@ if __name__ == "__main__":
                 # print(f"\t{tkey}")
 
                 ### Get RNTuple Anchor Object
-                anchor = tkey.read_object(fetch_data)
+                anchor = tkey.read_object(fetch_data, ROOT3a3aRNTuple)
 
                 # Print attributes of the RNTuple Anchor
                 print(f"{anchor=}\n")
@@ -110,7 +112,7 @@ if __name__ == "__main__":
                     # page_location_list.print_info()
                 ### Get the RNTuple Pages from the Page List Envelopes
 
-                cluster_column_page_lists = []
+                cluster_column_page_lists: list[list[list[RPage]]] = []
                 for page_location_list in page_location_lists:
                     pages = page_location_list.get_pages(fetch_data)
                     # print(f"\n{pages=}\n")
