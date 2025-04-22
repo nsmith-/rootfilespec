@@ -1,12 +1,11 @@
-import re
-from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Annotated, Optional
+from typing import Annotated
 
 from rootfilespec.bootstrap.TList import TObjArray
 from rootfilespec.bootstrap.TObject import TNamed
 from rootfilespec.bootstrap.TString import TString
+from rootfilespec.cpptype import cpptype_to_pytype
 from rootfilespec.dispatch import DICTIONARY, normalize
 from rootfilespec.structutil import Fmt, serializable
 
@@ -234,136 +233,6 @@ class ArrayDim:
     dim4: int
 
 
-_tpl = re.compile(rb"^(?:std::)?(\w*)<(.*) *>$")
-_cpp_primitives = {
-    b"bool": "Annotated[bool, Fmt('>?')]",
-    b"char": "Annotated[int, Fmt('>b')]",
-    b"unsigned char": "Annotated[int, Fmt('>B')]",
-    b"short": "Annotated[int, Fmt('>h')]",
-    b"unsigned short": "Annotated[int, Fmt('>H')]",
-    b"int": "Annotated[int, Fmt('>i')]",
-    b"unsigned int": "Annotated[int, Fmt('>I')]",
-    b"Long64_t": "Annotated[int, Fmt('>q')]",
-    b"long": "Annotated[int, Fmt('>q')]",
-    b"unsigned long": "Annotated[int, Fmt('>Q')]",
-    b"float": "Annotated[float, Fmt('>f')]",
-    b"double": "Annotated[float, Fmt('>d')]",
-}
-_cpp_templates = {
-    b"vector": "StdVector",
-}
-
-
-_tokenize = re.compile(rb"([\w:]+)|([<>,\*])|(?:\s+)")
-_Token = tuple[bytes, bytes]
-_ignored_terminals: set[_Token] = {
-    (b"", b""),
-    (b"const", b""),
-    (b"", b"*"),
-}
-
-
-class _TokenStream:
-    def __init__(self, tokens: Iterable[_Token]):
-        self._tokens = iter(tokens)
-        self._current = next(self._tokens, None)
-
-    def peek(self) -> Optional[_Token]:
-        return self._current
-
-    def next(self) -> Optional[_Token]:
-        token, self._current = self._current, next(self._tokens, None)
-        return token
-
-
-@dataclass
-class _CppTypeAstNode:
-    name: bytes
-
-    def to_pytype(self) -> tuple[str, set[str]]:
-        """Convert C++ type name to Python type name."""
-        if self.name in _cpp_primitives:
-            return _cpp_primitives[self.name], set()
-        pyname = normalize(self.name)
-        return pyname, {pyname}
-
-
-@dataclass
-class _CppTypeAstTemplate(_CppTypeAstNode):
-    args: tuple[_CppTypeAstNode, ...]
-
-    def to_pytype(self):
-        """Convert C++ type name to Python type name."""
-        if self.name in _cpp_templates:
-            pyname = _cpp_templates[self.name]
-        else:
-            msg = f"Template type {self.name!r} not implemented"
-            raise NotImplementedError(msg)
-        args = []
-        deps: set[str] = set()
-        for arg in self.args:
-            argname, argdeps = arg.to_pytype()
-            args.append(argname)
-            deps = deps.union(argdeps)
-        return f"{pyname}[{', '.join(args)}]", deps
-
-
-def _template_args(stream: _TokenStream) -> tuple[_CppTypeAstNode, ...]:
-    token = stream.next()
-    args: tuple[_CppTypeAstNode, ...] = ()
-    while True:
-        token = stream.peek()
-        if not token:
-            msg = "Unexpected end of stream"
-            raise ValueError(msg)
-        if token[1] == b">":
-            stream.next()
-            break
-        if token[1] == b",":
-            stream.next()
-            continue
-        arg = _value(stream)
-        args = (*args, arg)
-    return args
-
-
-def _value(stream: _TokenStream) -> _CppTypeAstNode:
-    token = stream.next()
-    if not token:
-        msg = "Unexpected end of stream"
-        raise ValueError(msg)
-    if token[1]:
-        msg = f"Unexpected token {token}"
-        raise ValueError(msg)
-    name = token[0]
-    token = stream.peek()
-    if not token or token[1] in (b">", b","):
-        # we are in a simple type
-        return _CppTypeAstNode(name)
-    if token[1] == b"<":
-        # we are in template rule
-        return _CppTypeAstTemplate(name, _template_args(stream))
-    if not token[1]:
-        # we are in typeid
-        while (token := stream.peek()) and not token[1]:
-            name += b" " + token[0]
-            stream.next()
-        return _CppTypeAstNode(name)
-    msg = f"Unexpected token {token}"
-    raise ValueError(msg)
-
-
-def _cpptype_to_pytype(cppname: bytes) -> tuple[str, set[str]]:
-    """Convert C++ type name to Python type name.
-
-    This uses a very simple parser that only handles the types we need.
-    """
-    alltokens: list[_Token] = _tokenize.findall(cppname)
-    stream = _TokenStream(t for t in alltokens if t not in _ignored_terminals)
-    ast = _value(stream)
-    return ast.to_pytype()
-
-
 @serializable
 class TStreamerElement(TNamed):
     """TStreamerElement class.
@@ -513,7 +382,7 @@ class TStreamerObjectPointer(TStreamerElement):
         if self.fArrayLength > 0:
             msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
-        typename, dependencies = _cpptype_to_pytype(self.fTypeName.fString)
+        typename, dependencies = cpptype_to_pytype(self.fTypeName.fString)
         if typename == parent.class_name():
             dependencies.remove(typename)
             typename = "Self"
@@ -552,7 +421,7 @@ class TStreamerObjectAny(TStreamerElement):
             return f"{self.member_name()}: Self", []
         # This may be a non-trivial type, e.g. vector<double>
         # or vector<TLorentzVector>
-        typename, dependencies = _cpptype_to_pytype(self.cpp_typename())
+        typename, dependencies = cpptype_to_pytype(self.cpp_typename())
         return f"{self.member_name()}: {typename}", list(dependencies)
 
 
@@ -565,7 +434,7 @@ class TStreamerObjectAnyPointer(TStreamerElement):
         if self.fArrayLength > 0:
             msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
-        typename, dependencies = _cpptype_to_pytype(self.fTypeName.fString)
+        typename, dependencies = cpptype_to_pytype(self.fTypeName.fString)
         if typename == parent.class_name():
             dependencies.remove(typename)
             typename = "Self"
@@ -616,7 +485,7 @@ class TStreamerSTL(TStreamerElement):
     fCType: Annotated[ElementType, Fmt(">i")]
 
     def member_definition(self, parent: TStreamerInfo):  # noqa: ARG002
-        typename, dependencies = _cpptype_to_pytype(self.cpp_typename())
+        typename, dependencies = cpptype_to_pytype(self.cpp_typename())
         if self.fSTLtype == STLType.vector:
             assert typename.startswith("StdVector[")
             return f"{self.member_name()}: {typename}", list(dependencies)
