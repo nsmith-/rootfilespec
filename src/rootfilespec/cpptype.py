@@ -29,7 +29,6 @@ from typing import Optional
 
 from rootfilespec.dispatch import normalize
 
-_tpl = re.compile(rb"^(?:std::)?(\w*)<(.*) *>$")
 _cpp_primitives = {
     b"bool": "Annotated[bool, Fmt('>?')]",
     b"char": "Annotated[int, Fmt('>b')]",
@@ -55,6 +54,10 @@ _ignored_terminals: set[_Token] = {
     (b"", b""),
     (b"const", b""),
     (b"", b"*"),
+    # Workaround for Pypy bug https://github.com/pypy/pypy/issues/5265
+    ("", ""),  # type: ignore[arg-type]
+    (b"const", ""),  # type: ignore[arg-type]
+    ("", b"*"),  # type: ignore[arg-type]
 }
 
 
