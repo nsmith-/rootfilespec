@@ -127,9 +127,10 @@ DICTIONARY["TDirectory"] = TDirectory
 
 @serializable
 class TKeyList(ROOTSerializable, Mapping[str, TKey]):
-    # The TKeyList for a TDirectory contains all the (visible) TKeys
-    #   For RNTuples, it will only contain the RNTuple Anchor TKey(s)
-    # Binary Spec: https://root.cern.ch/doc/master/keyslist.html
+    """The TKeyList for a TDirectory contains all the (visible) TKeys
+    For RNTuples, it will only contain the RNTuple Anchor TKey(s)
+    Binary Spec: https://root.cern.ch/doc/master/keyslist.html
+    """
 
     # Fields for a TKeyList
     fKeys: list[TKey]
