@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TypeVar
+from typing import Annotated, TypeVar
 
 from typing_extensions import Self
 
 from rootfilespec.bootstrap.RLocator import RLocator
 from rootfilespec.structutil import (
     DataFetcher,
+    Fmt,
     ReadBuffer,
     ROOTSerializable,
 )
@@ -94,20 +95,8 @@ class REnvelopeLink(ROOTSerializable):
         locator (RLocator): Locator for the envelope
     """
 
-    length: int  # Uncompressed size of the envelope
+    length: Annotated[int, Fmt("<Q")]  # Uncompressed size of the envelope
     locator: RLocator  # Locator base class
-
-    @classmethod
-    def read(cls, buffer: ReadBuffer):
-        """Reads a RNTuple Envelope Link from the given buffer."""
-
-        # All envelope links start with the envelope length
-        (length,), buffer = buffer.unpack("<Q")
-
-        # Read the locator
-        locator, buffer = RLocator.read(buffer)
-
-        return cls(length, locator), buffer
 
     def get_buffer(self, fetch_data: DataFetcher):
         """Returns the buffer for the byte range specified by the locator."""
