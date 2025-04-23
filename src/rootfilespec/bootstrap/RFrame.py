@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Generic, TypeVar
 
-from typing_extensions import Self
-
 from rootfilespec.bootstrap.envelope_base import (
     REnvelopeLink,
 )
@@ -23,25 +21,8 @@ Item = TypeVar("Item", bound=ROOTSerializable)
 
 @dataclass
 class RFrame(ROOTSerializable):
-    fSize: int  # abbott Q: do we need to save fSize?
+    fSize: int
     _unknown: bytes = field(init=False, repr=False)
-
-    @classmethod
-    def read_as(
-        cls, itemtype: type[Item], buffer: ReadBuffer
-    ) -> tuple[Any, ReadBuffer]:
-        # Peek at the metadata to determine the type of frame but don't consume it
-        (fSize,), _ = buffer.unpack("<q")
-
-        # If the size is positive, it's a Record Frame
-        if fSize > 0:
-            return RecordFrame.read_as(itemtype, buffer)
-        # If the size is negative, it's a List Frame
-        if fSize < 0:
-            return ListFrame.read_as(itemtype, buffer)
-        # If the size is zero, something is wrong
-        msg = f"Expected metadata to be non-zero, but got {fSize=}"
-        raise ValueError(msg)
 
 
 @dataclass
@@ -51,9 +32,9 @@ class ListFrame(RFrame, Generic[Item]):
     @classmethod
     def read_as(
         cls,
-        itemtype: type[Item],  # type: ignore[override]
+        itemtype: type[Item],
         buffer: ReadBuffer,
-    ) -> tuple[Self, ReadBuffer]:
+    ):
         # Save initial buffer position (for checking unknown bytes)
         start_position = buffer.relpos
 
@@ -224,7 +205,7 @@ class ClusterSummary(RecordFrame):
     def fFeatureFlag(self) -> int:
         """The feature flag for the cluster."""
         # The 8 most significant bits of the 64 bit integer
-        return (self.fNEntriesAndFeatureFlag >> 56) & 0x00000000000000FF
+        return (self.fNEntriesAndFeatureFlag >> 56) & 0xFF
 
 
 @serializable
@@ -243,7 +224,7 @@ class RPageDescription(ROOTSerializable):
 
         Top-Most List Frame -> Outer List Frame -> Inner List Frame ->  Inner Item
             Clusters     ->      Columns     ->       Pages      ->  Page Description
-
+        return (self.fNEntriesAndFeatureFlag >> 56) & 0xFF
     Note that Page Description is not a record frame.
     """
 
