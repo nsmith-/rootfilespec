@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TypeVar
+from dataclasses import dataclass, field
+from typing import Self, TypeVar
 
 from rootfilespec.bootstrap.RLocator import RLocator
 from rootfilespec.structutil import (
@@ -10,7 +10,69 @@ from rootfilespec.structutil import (
     ROOTSerializable,
 )
 
-EnvType = TypeVar("EnvType", bound=ROOTSerializable)
+# Map of envelope type to string for printing
+ENVELOPE_TYPE_MAP = {0x00: "Reserved"}
+
+@dataclass
+class REnvelope(ROOTSerializable):
+    """A class representing the RNTuple Envelope.
+    An RNTuple Envelope is a data block that contains information about the RNTuple data.
+    The following envelope types exist
+    - Header Envelope (0x01): RNTuple schema information (field and column types)
+    - Footer Envelope (0x02): Description of clusters
+    - Page List Envelope (0x03): Location of data pages
+    - Reserved (0x00): Unused and Reserved
+
+    """
+
+    typeID: int
+    length: int
+    checksum: int
+    _unknown: bytes = field(init=False, repr=False)
+
+    @classmethod
+    def read(cls, buffer: ReadBuffer) -> tuple[Self, ReadBuffer]:
+        """Reads an REnvelope from the given buffer."""
+        #### Save initial buffer position (for checking unknown bytes)
+        payload_start_pos = buffer.relpos
+
+        #### Get the first 64bit integer (lengthType) which contains the length and type of the envelope
+        # lengthType, buffer = buffer.consume(8)
+        (lengthType,), buffer = buffer.unpack("<Q")
+        
+        # Envelope type, encoded in the 16 least significant bits
+        typeID = lengthType & 0xFFFF
+        # Check that the typeID matches the class
+        if ENVELOPE_TYPE_MAP[typeID] != cls.__name__:
+            msg = f"Envelope type {typeID} read does not match passed class {cls.__name__}"
+            raise ValueError(msg)
+
+
+        # Envelope size (uncompressed), encoded in the 48 most significant bits
+        length = lengthType >> 16
+        # Ensure that the length of the envelope matches the buffer length
+        if length - 8 != len(buffer):
+            msg = f"Length of envelope ({length} minus 8) of type {typeID} does not match buffer length ({len(buffer)})"
+            raise ValueError(msg)
+
+        #### Get the payload
+        cls_args, buffer = cls.read_members(buffer)
+
+        #### Consume any unknown trailing information in the envelope
+        _unknown, buffer = buffer.consume(
+            length - (buffer.relpos - payload_start_pos) - 8
+        )
+        # Unknown Bytes = Envelope Size - Envelope Bytes Read - Checksum (8 bytes)
+        #   Envelope Bytes Read  = buffer.relpos - payload_start_pos
+
+        #### Get the checksum (appended to envelope when writing to disk)
+        (checksum,), buffer = buffer.unpack("<Q")  # Last 8 bytes of the envelope
+
+        envelope = cls(typeID, length, checksum, *cls_args)
+        envelope._unknown = _unknown
+        return envelope, buffer
+
+EnvType = TypeVar("EnvType", bound=REnvelope)
 
 
 @dataclass

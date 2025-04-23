@@ -5,7 +5,7 @@ from typing import Annotated, Any, Generic, TypeVar
 
 from typing_extensions import Self
 
-from rootfilespec.bootstrap.REnvelopeLink import (
+from rootfilespec.bootstrap.envelope_base import (
     REnvelopeLink,
 )
 from rootfilespec.bootstrap.RLocator import RLocator

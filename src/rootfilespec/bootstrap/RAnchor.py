@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from rootfilespec.bootstrap.REnvelope import FooterEnvelope, HeaderEnvelope
-from rootfilespec.bootstrap.REnvelopeLink import (
+from rootfilespec.bootstrap.envelope_base import (
     REnvelopeLink,
 )
+from rootfilespec.bootstrap.envelopes import FooterEnvelope, HeaderEnvelope
 from rootfilespec.bootstrap.RLocator import LargeLocator
 from rootfilespec.bootstrap.TObject import StreamedObject
 from rootfilespec.dispatch import DICTIONARY
