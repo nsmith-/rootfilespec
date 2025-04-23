@@ -3,12 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Annotated
 
-from rootfilespec.bootstrap.envelope_base import ENVELOPE_TYPE_MAP, REnvelope
+from rootfilespec.bootstrap.envelopebase import ENVELOPE_TYPE_MAP, REnvelope
+from rootfilespec.bootstrap.pagelocations import ClusterLocations
 from rootfilespec.bootstrap.RFrame import (
     ClusterGroup,
     ClusterSummary,
     ListFrame,
-    PageLocations_Clusters,
     SchemaExtension,
 )
 from rootfilespec.bootstrap.RPage import RPage
@@ -114,12 +114,12 @@ class PageListEnvelope(REnvelope):
     Attributes:
     headerChecksum (int): Checksum of the Header Envelope
     clusterSummaries (ListFrame[ClusterSummary]): List Frame of Cluster Summary Record Frames
-    pageLocations (PageLocations_Clusters): The Page Locations Triple Nested List Frame
+    pageLocations (ClusterLocations): The Page Locations Triple Nested List Frame
     """
 
     headerChecksum: Annotated[int, Fmt("<Q")]
     clusterSummaries: ListFrame[ClusterSummary]
-    pageLocations: PageLocations_Clusters
+    pageLocations: ClusterLocations
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer):
@@ -131,7 +131,7 @@ class PageListEnvelope(REnvelope):
         clusterSummaries, buffer = ListFrame.read_as(ClusterSummary, buffer)
 
         # Read the page locations
-        pageLocations, buffer = PageLocations_Clusters.read(buffer)
+        pageLocations, buffer = ClusterLocations.read(buffer)
 
         return (headerChecksum, clusterSummaries, pageLocations), buffer
 

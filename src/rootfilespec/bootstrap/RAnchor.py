@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from rootfilespec.bootstrap.envelope_base import (
+from rootfilespec.bootstrap.envelopebase import (
     REnvelopeLink,
 )
 from rootfilespec.bootstrap.envelopes import FooterEnvelope, HeaderEnvelope
