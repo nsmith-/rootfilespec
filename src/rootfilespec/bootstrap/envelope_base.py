@@ -11,6 +11,7 @@ from rootfilespec.structutil import (
     Fmt,
     ReadBuffer,
     ROOTSerializable,
+    serializable,
 )
 
 # Map of envelope type to string for printing
@@ -79,7 +80,7 @@ class REnvelope(ROOTSerializable):
 EnvType = TypeVar("EnvType", bound=REnvelope)
 
 
-@dataclass
+@serializable
 class REnvelopeLink(ROOTSerializable):
     """A class representing the RNTuple Envelope Link (somewhat analogous to a TKey).
     An Envelope Link references an Envelope in an RNTuple.
@@ -97,10 +98,6 @@ class REnvelopeLink(ROOTSerializable):
 
     length: Annotated[int, Fmt("<Q")]  # Uncompressed size of the envelope
     locator: RLocator  # Locator base class
-
-    def get_buffer(self, fetch_data: DataFetcher):
-        """Returns the buffer for the byte range specified by the locator."""
-        return self.locator.get_buffer(fetch_data)
 
     def read_envelope(
         self,
