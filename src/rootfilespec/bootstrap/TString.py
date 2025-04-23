@@ -9,6 +9,7 @@ class TString(ROOTSerializable):
     """A class representing a TString."""
 
     fString: bytes
+    """The string data."""
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer):

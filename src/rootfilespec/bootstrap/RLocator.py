@@ -29,12 +29,10 @@ class RLocator(ROOTSerializable):
 
     All Envelope Links will have a Locator, but a Locator doesn't require an Envelope Link.
     (See the Page Location in the Page List Envelopes for an example of a Locator without an Envelope Link.)
-
-    Attributes:
-        size (int): The (compressed) size of the byte range to locate.
     """
 
     size: int
+    """The (compressed) size of the byte range to locate."""
 
     @classmethod
     def read(cls, buffer: ReadBuffer):
@@ -89,12 +87,10 @@ class StandardLocator(RLocator):
     """A class representing a Standard RNTuple Locator.
     A locator is a generalized way to specify a certain byte range on the storage medium.
     A standard locator is a locator that specifies a byte size and byte offset. (simple on-disk or in-file locator).
-
-    Attributes:
-        offset (int): The byte offset to the byte range to locate.
     """
 
     offset: int
+    """The byte offset to the byte range to locate."""
 
     @classmethod
     def read(cls, buffer: ReadBuffer):
@@ -119,12 +115,10 @@ class LargeLocator(RLocator):
     """A class representing the payload of the "Large" type of Non-Standard RNTuple Locator .
     A Large Locator is like the standard on-disk locator but with a 64bit size instead of 32bit.
     The type for the Large Locator is 0x01.
-
-    Attributes:
-        offset (int): The byte offset to the byte range to locate.
     """
 
     offset: int
+    """The byte offset to the byte range to locate."""
 
     @classmethod
     def read(cls, buffer: ReadBuffer):

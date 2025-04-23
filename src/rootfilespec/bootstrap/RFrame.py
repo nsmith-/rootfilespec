@@ -18,13 +18,22 @@ Item = TypeVar("Item", bound=ROOTSerializable)
 
 @dataclass
 class RFrame(ROOTSerializable):
+    """A class representing an RNTuple Frame.
+    The ListFrame and RecordFrame classes inherit from this class."""
+    
     fSize: int
+    """The size of the frame in bytes. The size is negative for List Frames."""
     _unknown: bytes = field(init=False, repr=False)
+    """Unknown bytes at the end of the frame."""
 
 
 @dataclass
 class ListFrame(RFrame, Generic[Item]):
+    """A class representing an RNTuple List Frame.
+    The List Frame is a container for a list of items of type Item."""
+    
     items: list[Item]
+    """The list of items in the List Frame."""
 
     @classmethod
     def read_as(
@@ -80,6 +89,9 @@ class ListFrame(RFrame, Generic[Item]):
 
 @dataclass
 class RecordFrame(RFrame):
+    """A class representing an RNTuple Record Frame.
+    There are many Record Frames, each with a unique format."""
+
     @classmethod
     def read(cls, buffer: ReadBuffer):
         #### Save initial buffer position (for checking unknown bytes)
@@ -118,18 +130,16 @@ class ClusterGroup(RecordFrame):
     """A class representing an RNTuple Cluster Group Record Frame.
     This Record Frame is found in a List Frame in the Footer Envelope of an RNTuple.
     It references the Page List Envelopes for groups of clusters in the RNTuple.
-
-    Attributes:
-        fMinEntryNumber (int): The minimum of the first entry number across all of the clusters in the group.
-        fEntrySpan (int): The number of entries that are covered by this cluster group.
-        fNClusters (int): The number of clusters in the group.
-        pagelistLink (REnvelopeLink): Envelope Link to the Page List Envelope for the cluster group.
     """
 
     fMinEntryNumber: Annotated[int, Fmt("<Q")]
+    """The minimum of the first entry number across all of the clusters in the group."""
     fEntrySpan: Annotated[int, Fmt("<Q")]
+    """The number of entries that are covered by this cluster group."""
     fNClusters: Annotated[int, Fmt("<I")]
+    """The number of clusters in the group."""
     pagelistLink: REnvelopeLink
+    """Envelope Link to the Page List Envelope for the cluster group."""
 
 
 @serializable
@@ -138,8 +148,6 @@ class SchemaExtension(RecordFrame):
     This Record Frame is found in the Footer Envelope of an RNTuple.
     It is an extension of the "Schema Description" located in the Header Envelope.
     The schema description is not yet implemented.
-
-
     """
 
     """ The schema extension record frame contains an additional schema description that is incremental with respect to
@@ -174,11 +182,6 @@ class ClusterSummary(RecordFrame):
     The Cluster Summary Record Frame contains the entry range of a cluster.
     The order of Cluster Summaries defines the cluster IDs, starting from
         the first cluster ID of the cluster group that corresponds to the page list.
-
-    Attributes:
-        firstEntryNumber (int): The first entry number in the cluster.
-        nEntries (int): The number of entries in the cluster.
-        featureFlag (int): The feature flag for the cluster.
     """
 
     # Notes:
@@ -187,10 +190,11 @@ class ClusterSummary(RecordFrame):
     # For now, readers should abort when this flag is set. Other flags should be ignored.
 
     fFirstEntryNumber: Annotated[int, Fmt("<Q")]
+    """The first entry number in the cluster."""
     fNEntriesAndFeatureFlag: Annotated[int, Fmt("<Q")]
-    #### Note: nEntries and featureFlag are encoded together in a single 64 bit integer
-    # nEntries: int  # The 56 least significant bits of the 64 bit integer
-    # featureFlag: int  # The 8 most significant bits of the 64 bit integer
+    """The number of entries in the cluster and the feature flag for the cluster, encoded together in a single 64 bit integer.
+    The 56 least significant bits of the 64 bit integer are the number of entries in the cluster.
+    The 8 most significant bits of the 64 bit integer are the feature flag for the cluster."""
 
     @property
     def fNEntries(self) -> int:

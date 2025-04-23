@@ -36,22 +36,19 @@ Format of a TDirectory record in release 3.02.06. It is never compressed.
 @serializable
 class TDirectory_header_v622(ROOTSerializable):
     """Format of a TDirectory record in release 6.22.06. It is never compressed.
-
     Header information from https://root.cern/doc/master/tdirectory.html
-
-    Attributes:
-        fVersion (int): TDirectory class version identifier
-        fDatimeC (int): Date and time when directory was created
-        fDatimeM (int): Date and time when directory was last modified
-        fNbytesKeys (int): Number of bytes in the associated KeysList record
-        fNbytesName (int): Number of bytes in TKey+TNamed at creation
     """
 
     fVersion: Annotated[int, Fmt(">h")]
+    """TDirectory class version identifier"""
     fDatimeC: Annotated[int, Fmt(">I")]
+    """Date and time when directory was created"""
     fDatimeM: Annotated[int, Fmt(">I")]
+    """Date and time when directory was last modified"""
     fNbytesKeys: Annotated[int, Fmt(">i")]
+    """Number of bytes in the associated KeysList record"""
     fNbytesName: Annotated[int, Fmt(">i")]
+    """Number of bytes in TKey+TNamed at creation"""
 
     def create_time(self):
         """Date and time when directory was created"""
@@ -66,21 +63,18 @@ class TDirectory_header_v622(ROOTSerializable):
 class TDirectory(ROOTSerializable):
     """TDirectory object.
     Binary Spec (the DATA section): https://root.cern.ch/doc/master/tdirectory.html
-
-    Attributes:
-        header (TDirectory_header_v622): TDirectory header information
-        fSeekDir (int): Byte offset of directory record in file
-        fSeekParent (int): Byte offset of parent directory record in file
-        fSeekKeys (int): Byte offset of associated KeysList record in file
-        fUUID (TUUID): Universally Unique Identifier
     """
 
-    # Fields for a TDirectory
     header: TDirectory_header_v622
+    """TDirectory header information"""
     fSeekDir: int
+    """Byte offset of directory record in file"""
     fSeekParent: int
+    """Byte offset of parent directory record in file"""
     fSeekKeys: int
+    """Byte offset of associated KeysList record in file"""
     fUUID: TUUID
+    """Universally Unique Identifier"""
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer):
@@ -132,9 +126,11 @@ class TKeyList(ROOTSerializable, Mapping[str, TKey]):
     Binary Spec: https://root.cern.ch/doc/master/keyslist.html
     """
 
-    # Fields for a TKeyList
     fKeys: list[TKey]
+    """List of TKey objects"""
     padding: bytes
+    """Padding bytes to align the TKeyList to 8 byte boundaries"""
+    # abbott: Nick, please check this docstring
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer):

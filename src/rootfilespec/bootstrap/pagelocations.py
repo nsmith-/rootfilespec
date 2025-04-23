@@ -19,10 +19,6 @@ class RPageDescription(ROOTSerializable):
     """A class representing an RNTuple Page Description.
     This class represents the location of a page for a column for a cluster.
 
-    Attributes:
-        fNElements (int): The number of elements in the page.
-        locator (RLocator): The locator for the page.
-
     Notes:
     This class is the Inner Item in the triple nested List Frame of RNTuple page locations.
 
@@ -34,7 +30,9 @@ class RPageDescription(ROOTSerializable):
     """
 
     fNElements: Annotated[int, Fmt("<i")]
+    """The number of elements in the page."""
     locator: RLocator
+    """The locator for the page."""
 
     def get_page(self, fetch_data: DataFetcher) -> RPage:
         """Reads the page data from the data source using the locator.
@@ -64,10 +62,6 @@ class PageLocations(ListFrame[RPageDescription]):
     The order of the pages matches the order of the pages in the ROOT file.
     The element offset is negative if the column is suppressed.
 
-    Attributes:
-        elementoffset (int): The offset for the first element for this column.
-        compressionsettings (int | None): The compression settings for the pages in this column.
-
     Notes:
     This class is the Inner List Frame in the triple nested List Frame of RNTuple page locations.
 
@@ -80,7 +74,9 @@ class PageLocations(ListFrame[RPageDescription]):
     """
 
     elementoffset: int
+    """The offset for the first element for this column."""
     compressionsettings: int | None
+    """The compression settings for the pages in this column."""
 
     @classmethod
     def read(cls, buffer: ReadBuffer) -> tuple[PageLocations, ReadBuffer]:

@@ -22,18 +22,21 @@ ENVELOPE_TYPE_MAP = {0x00: "Reserved"}
 class REnvelope(ROOTSerializable):
     """A class representing the RNTuple Envelope.
     An RNTuple Envelope is a data block that contains information about the RNTuple data.
-    The following envelope types exist
+    The following envelope types exist:
     - Header Envelope (0x01): RNTuple schema information (field and column types)
     - Footer Envelope (0x02): Description of clusters
     - Page List Envelope (0x03): Location of data pages
     - Reserved (0x00): Unused and Reserved
-
     """
 
     typeID: int
+    """The type of the envelope."""
     length: int
+    """The length of the envelope (including the envelope header)."""
     checksum: int
+    """The checksum of the envelope."""
     _unknown: bytes = field(init=False, repr=False)
+    """Unknown bytes at the end of the envelope."""
 
     @classmethod
     def read(cls, buffer: ReadBuffer) -> tuple[Self, ReadBuffer]:
@@ -90,14 +93,12 @@ class REnvelopeLink(ROOTSerializable):
     Envelope Links of this form (currently seem to be) only used to locate Page List Envelopes.
     The Header Envelope and Footer Envelope are located using the information in the RNTuple Anchor.
     The Header and Footer Envelope Links are created in the RNTuple Anchor class by casting directly to this class.
-
-    Attributes:
-        length (int): Uncompressed size of the envelope
-        locator (RLocator): Locator for the envelope
     """
 
-    length: Annotated[int, Fmt("<Q")]  # Uncompressed size of the envelope
-    locator: RLocator  # Locator base class
+    length: Annotated[int, Fmt("<Q")]
+    """The uncompressed size of the envelope."""
+    locator: RLocator
+    """The locator for the envelope."""
 
     def read_envelope(
         self,

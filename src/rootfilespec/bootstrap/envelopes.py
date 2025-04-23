@@ -28,12 +28,10 @@ class RFeatureFlags(ROOTSerializable):
     This class reads the RNTuple Feature Flags from the buffer.
     It also checks if the flags are set for a given feature.
     It aborts reading when an unknown feature is encountered (unknown bit set).
-
-    Attributes:
-        flags (int): The RNTuple Feature Flags (signed 64-bit integer)
     """
 
     flags: int
+    """The RNTuple Feature Flags (signed 64-bit integer)"""
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer):
@@ -61,19 +59,16 @@ ENVELOPE_TYPE_MAP[0x01] = "HeaderEnvelope"
 
 @serializable
 class FooterEnvelope(REnvelope):
-    """A class representing the RNTuple Footer Envelope payload structure.
-
-    Attributes:
-        featureFlags (RFeatureFlags): The RNTuple Feature Flags (verify this file can be read)
-        headerChecksum (int): Checksum of the Header Envelope
-        schemaExtension (SchemaExtension): The Schema Extension Record Frame
-        clusterGroups (ListFrame[ClusterGroup]): The List Frame of Cluster Group Record Frames
-    """
+    """A class representing the RNTuple Footer Envelope payload structure."""
 
     featureFlags: RFeatureFlags
+    """The RNTuple Feature Flags (verify this file can be read)"""
     headerChecksum: Annotated[int, Fmt("<Q")]
+    """Checksum of the Header Envelope"""
     schemaExtension: SchemaExtension
+    """The Schema Extension Record Frame"""
     clusterGroups: ListFrame[ClusterGroup]
+    """The List Frame of Cluster Group Record Frames"""
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer):
@@ -109,17 +104,14 @@ ENVELOPE_TYPE_MAP[0x02] = "FooterEnvelope"
 
 @serializable
 class PageListEnvelope(REnvelope):
-    """A class representing the RNTuple Page List Envelope payload structure.
-
-    Attributes:
-    headerChecksum (int): Checksum of the Header Envelope
-    clusterSummaries (ListFrame[ClusterSummary]): List Frame of Cluster Summary Record Frames
-    pageLocations (ClusterLocations): The Page Locations Triple Nested List Frame
-    """
+    """A class representing the RNTuple Page List Envelope payload structure."""
 
     headerChecksum: Annotated[int, Fmt("<Q")]
+    """Checksum of the Header Envelope"""
     clusterSummaries: ListFrame[ClusterSummary]
+    """The List Frame of Cluster Summary Record Frames"""
     pageLocations: ClusterLocations
+    """The Page Locations Triple Nested List Frame"""
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer):

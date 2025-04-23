@@ -7,13 +7,10 @@ from rootfilespec.structutil import ReadBuffer, ROOTSerializable
 
 @dataclass
 class RPage(ROOTSerializable):
-    """A class to represent an RNTuple page.
-
-    Attributes:
-        page (bytes): The page raw data.
-    """
+    """A class to represent an RNTuple page."""
 
     page: bytes
+    """The RNTuple page raw data."""
 
     # TODO: Flush out RPage class
     @classmethod
