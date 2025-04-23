@@ -121,18 +121,6 @@ class REnvelopeLink(ROOTSerializable):
 
         # Now the envelope is uncompressed
 
-        #### Peek at the metadata to determine the type of envelope but don't consume it
-        (lengthType,), _ = buffer.unpack("<Q")
-
-        # Envelope type, encoded in the 16 least significant bits
-        typeID = lengthType & 0xFFFF
-        # Envelope size (uncompressed), encoded in the 48 most significant bits
-        length = lengthType >> 16
-        # Ensure that the length of the envelope matches the buffer length
-        if length != len(buffer):
-            msg = f"Length of envelope ({length}) of type {typeID} does not match buffer length ({len(buffer)})"
-            raise ValueError(msg)
-
         #### Read the envelope
         envelope, buffer = envtype.read(buffer)
 
