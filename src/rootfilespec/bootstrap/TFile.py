@@ -26,7 +26,7 @@ class VersionInfo(ROOTSerializable):
 
     @classmethod
     def read(cls, buffer: ReadBuffer):
-        (version,), buffer = buffer.unpack(">I")
+        (version,), buffer = buffer.unpack(">i")
         return cls(
             major=version // 10_000 % 100,
             minor=version // 100 % 100,
@@ -62,7 +62,7 @@ class ROOTFile_header_v302(ROOTSerializable):
     fNbytesFree: Annotated[int, Fmt(">i")]
     nfree: Annotated[int, Fmt(">i")]
     fNbytesName: Annotated[int, Fmt(">i")]
-    fUnits: Annotated[int, Fmt(">B")]
+    fUnits: Annotated[int, Fmt(">b")]
     fCompress: Annotated[int, Fmt(">i")]
     fSeekInfo: Annotated[int, Fmt(">i")]
     fNbytesInfo: Annotated[int, Fmt(">i")]
@@ -91,16 +91,16 @@ class ROOTFile_header_v622_small(ROOTSerializable):
         fNbytesInfo (int): Number of bytes in StreamerInfo record
     """
 
-    fBEGIN: Annotated[int, Fmt(">I")]
-    fEND: Annotated[int, Fmt(">I")]
-    fSeekFree: Annotated[int, Fmt(">I")]
-    fNbytesFree: Annotated[int, Fmt(">I")]
-    nfree: Annotated[int, Fmt(">I")]
-    fNbytesName: Annotated[int, Fmt(">I")]
-    fUnits: Annotated[int, Fmt(">B")]
-    fCompress: Annotated[int, Fmt(">I")]
-    fSeekInfo: Annotated[int, Fmt(">I")]
-    fNbytesInfo: Annotated[int, Fmt(">I")]
+    fBEGIN: Annotated[int, Fmt(">i")]
+    fEND: Annotated[int, Fmt(">i")]
+    fSeekFree: Annotated[int, Fmt(">i")]
+    fNbytesFree: Annotated[int, Fmt(">i")]
+    nfree: Annotated[int, Fmt(">i")]
+    fNbytesName: Annotated[int, Fmt(">i")]
+    fUnits: Annotated[int, Fmt(">b")]
+    fCompress: Annotated[int, Fmt(">i")]
+    fSeekInfo: Annotated[int, Fmt(">i")]
+    fNbytesInfo: Annotated[int, Fmt(">i")]
     fUUID: TUUID
 
 
@@ -114,7 +114,7 @@ class ROOTFile_header_v622_large(ROOTSerializable):
     fNbytesFree: Annotated[int, Fmt(">i")]
     nfree: Annotated[int, Fmt(">i")]
     fNbytesName: Annotated[int, Fmt(">i")]
-    fUnits: Annotated[int, Fmt(">B")]
+    fUnits: Annotated[int, Fmt("b")]
     fCompress: Annotated[int, Fmt(">i")]
     fSeekInfo: Annotated[int, Fmt(">q")]
     fNbytesInfo: Annotated[int, Fmt(">i")]
