@@ -55,7 +55,9 @@ class RFeatureFlags(ROOTSerializable):
 class HeaderEnvelope(REnvelope):
     """A class representing the RNTuple Header Envelope payload structure"""
 
+
 ENVELOPE_TYPE_MAP[0x01] = "HeaderEnvelope"
+
 
 @serializable
 class FooterEnvelope(REnvelope):
@@ -95,23 +97,15 @@ class FooterEnvelope(REnvelope):
         Page List Envelope Links are stored in the Cluster Group Record Frames in the Footer Envelope Payload.
         """
 
-        #### Get the Page List Envelopes
-        pagelist_envelopes = []  # List of RNTuple Page List Envelopes
+        #### Return the Page List Envelopes
+        return [
+            g.pagelistLink.read_envelope(fetch_data, PageListEnvelope)
+            for g in self.clusterGroups
+        ]
 
-        ### Iterate through the Cluster Group Record Frames
-        for _i, clusterGroup in enumerate(self.clusterGroups):
-            ## The cluster group record frame contains other info will be useful later.
-            #       i.e. Minimum Entry Number, Entry Span, and Number of Clusters.
-            # For now, we only need the Page List Envelope Link.
-
-            # Read the page list envelope
-            pagelist_envelope = clusterGroup.pagelistLink.read_envelope(
-                fetch_data, PageListEnvelope
-            )
-            pagelist_envelopes.append(pagelist_envelope)
-        return pagelist_envelopes
 
 ENVELOPE_TYPE_MAP[0x02] = "FooterEnvelope"
+
 
 @serializable
 class PageListEnvelope(REnvelope):
@@ -157,5 +151,6 @@ class PageListEnvelope(REnvelope):
                     page_locations[i_column][i_page].append(page)
 
         return page_locations
+
 
 ENVELOPE_TYPE_MAP[0x03] = "PageListEnvelope"

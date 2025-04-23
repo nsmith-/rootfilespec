@@ -30,7 +30,7 @@ class ROOT3a3aRNTuple(StreamedObject):
     fLenFooter: Annotated[int, Fmt(">Q")]
     fMaxKeySize: Annotated[int, Fmt(">Q")]
 
-    def get_header(self, fetch_data: DataFetcher) -> HeaderEnvelope:  # type: ignore[empty-body]
+    def get_header(self, fetch_data: DataFetcher) -> HeaderEnvelope:
         raise NotImplementedError
 
     def get_footer(self, fetch_data: DataFetcher) -> FooterEnvelope:

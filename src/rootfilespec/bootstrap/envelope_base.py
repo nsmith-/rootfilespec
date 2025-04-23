@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Self, TypeVar
+from typing import TypeVar
+
+from typing_extensions import Self
 
 from rootfilespec.bootstrap.RLocator import RLocator
 from rootfilespec.structutil import (
@@ -12,6 +14,7 @@ from rootfilespec.structutil import (
 
 # Map of envelope type to string for printing
 ENVELOPE_TYPE_MAP = {0x00: "Reserved"}
+
 
 @dataclass
 class REnvelope(ROOTSerializable):
@@ -39,14 +42,13 @@ class REnvelope(ROOTSerializable):
         #### Get the first 64bit integer (lengthType) which contains the length and type of the envelope
         # lengthType, buffer = buffer.consume(8)
         (lengthType,), buffer = buffer.unpack("<Q")
-        
+
         # Envelope type, encoded in the 16 least significant bits
         typeID = lengthType & 0xFFFF
         # Check that the typeID matches the class
         if ENVELOPE_TYPE_MAP[typeID] != cls.__name__:
             msg = f"Envelope type {typeID} read does not match passed class {cls.__name__}"
             raise ValueError(msg)
-
 
         # Envelope size (uncompressed), encoded in the 48 most significant bits
         length = lengthType >> 16
@@ -71,6 +73,7 @@ class REnvelope(ROOTSerializable):
         envelope = cls(typeID, length, checksum, *cls_args)
         envelope._unknown = _unknown
         return envelope, buffer
+
 
 EnvType = TypeVar("EnvType", bound=REnvelope)
 
