@@ -20,7 +20,7 @@ from rootfilespec.structutil import (
 @dataclass(order=True)
 class VersionInfo(ROOTSerializable):
     """Version information for the ROOT file."""
-    
+
     major: int
     """Major version number of the ROOT file."""
     minor: int

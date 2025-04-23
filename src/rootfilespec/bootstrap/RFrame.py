@@ -20,7 +20,7 @@ Item = TypeVar("Item", bound=ROOTSerializable)
 class RFrame(ROOTSerializable):
     """A class representing an RNTuple Frame.
     The ListFrame and RecordFrame classes inherit from this class."""
-    
+
     fSize: int
     """The size of the frame in bytes. The size is negative for List Frames."""
     _unknown: bytes = field(init=False, repr=False)
@@ -31,7 +31,7 @@ class RFrame(ROOTSerializable):
 class ListFrame(RFrame, Generic[Item]):
     """A class representing an RNTuple List Frame.
     The List Frame is a container for a list of items of type Item."""
-    
+
     items: list[Item]
     """The list of items in the List Frame."""
 

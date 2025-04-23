@@ -105,7 +105,7 @@ T = TypeVar("T", bound="StreamedObject")
 @serializable
 class StreamedObject(ROOTSerializable):
     """Base class for all streamed objects in ROOT."""
-    
+
     @classmethod
     def read(cls: type[T], buffer: ReadBuffer) -> tuple[T, ReadBuffer]:
         args, buffer = cls._read_all_members(buffer)
