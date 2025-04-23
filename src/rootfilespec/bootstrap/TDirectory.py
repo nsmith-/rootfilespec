@@ -96,7 +96,7 @@ class TDirectory(ROOTSerializable):
             buffer = buffer[12:]
         return (header, fSeekDir, fSeekParent, fSeekKeys, fUUID), buffer
 
-    def get_KeyList(self, fetch_data: DataFetcher) -> TKeyList:
+    def get_KeyList(self, fetch_data: DataFetcher):
         # The TKeyList for a TDirectory contains all the (visible) TKeys
         #   For RNTuples, it will only contain the RNTuple Anchor TKey(s)
         # Binary Spec: https://root.cern.ch/doc/master/keyslist.html
