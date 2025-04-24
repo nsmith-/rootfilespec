@@ -113,6 +113,11 @@ class ReadBuffer:
 
         Returns a copy of the data and the remaining buffer.
         """
+        if size < 0:
+            msg = (
+                f"Cannot consume a negative number of bytes: {size=}, {self.__len__()=}"
+            )
+            raise ValueError(msg)
         out = self.data[:size].tobytes()
         return out, self[size:]
 
@@ -206,6 +211,10 @@ T = TypeVar("T", bound="ROOTSerializable")
 
 @dataclasses.dataclass
 class ROOTSerializable:
+    """
+    A base class for objects that can be serialized and deserialized from a buffer.
+    """
+
     @classmethod
     def read(cls: type[T], buffer: ReadBuffer) -> tuple[T, ReadBuffer]:
         members, buffer = cls.read_members(buffer)

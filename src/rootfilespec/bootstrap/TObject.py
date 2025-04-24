@@ -14,40 +14,33 @@ from rootfilespec.structutil import (
 
 
 class _StreamConstants(IntEnum):
-    """Constants used for data members of StreamedObject class.
-
-    Attributes:
-        kByteCountMask (int): Mask for ByteCount
-        kClassMask (int): Mask for ClassInfo
-        kNewClassTag (int): New class tag
-        kNotAVersion (int): Either kClassMask or kNewClassTag is set in bytes 4-5
-    """
+    """Constants used for data members of StreamedObject class."""
 
     kByteCountMask = 0x40000000
+    """Mask for ByteCount"""
     kClassMask = 0x80000000
+    """Mask for ClassInfo"""
     kNewClassTag = 0xFFFFFFFF
+    """New class tag"""
     kNotAVersion = 0x8000
+    """Either kClassMask or kNewClassTag is set in bytes 4-5"""
 
 
 @dataclass
 class StreamHeader(ROOTSerializable):
     """Initial header for any streamed data object
-
     Reference: https://root.cern/doc/master/dobject.html
-
-    Attributes:
-        fByteCount (int): Number of remaining bytes in object (uncompressed)
-        fVersion (int): Version of Class
-        fClassName (bytes): Class name of object, if first instance of class in buffer
-        fClassRef (int): Position in buffer of class name if not specified here
-
     Only one of fVersion, fClassName, or fClassRef will be set.
     """
 
     fByteCount: int
+    """Number of remaining bytes in object (uncompressed)"""
     fVersion: Optional[int]
+    """Version of Class"""
     fClassName: Optional[bytes]
+    """Class name of object, if first instance of class in buffer"""
     fClassRef: Optional[int]
+    """Position in buffer of class name if not specified here"""
 
     @classmethod
     def read(cls, buffer: ReadBuffer):
@@ -90,24 +83,22 @@ class StreamHeader(ROOTSerializable):
 
 
 class TObjectBits(IntEnum):
-    """Bits for TObject class.
-
-    Relevant bits for ROOTIO are:
-        kCanDelete - if object in a list can be deleted.
-        kMustCleanup - if other objects may need to be deleted when this one is.
-        kIsReferenced - if object is referenced by pointer to persistent object.
-        kZombie - if object ctor succeeded but object shouldn't be used
-        kIsOnHeap - if object is on Heap.
-        kNotDeleted - if object has not been deleted.
-    """
+    """Bits for TObject class."""
 
     kCanDelete = 0x00000001
+    """If object in a list can be deleted."""
     kIsOnHeap = 0x01000000
+    """If object is on Heap."""
     kIsReferenced = 0x00000010
+    """If object is referenced by pointer to persistent object."""
     kMustCleanup = 0x00000008
+    """If other objects may need to be deleted when this one is."""
     kNotDeleted = 0x02000000
+    """If object has not been deleted."""
     kZombie = 0x00002000
+    """If object ctor succeeded but object shouldn't be used."""
     kNotSure = 0x00010000
+    """If object is not sure if it is on heap or not."""
 
 
 T = TypeVar("T", bound="StreamedObject")
@@ -127,6 +118,8 @@ def _auto_TObject_base(buffer) -> tuple[StreamHeader, ReadBuffer]:
 
 @serializable
 class StreamedObject(ROOTSerializable):
+    """Base class for all streamed objects in ROOT."""
+
     @classmethod
     def read(cls: type[T], buffer: ReadBuffer) -> tuple[T, ReadBuffer]:
         args, buffer = cls._read_all_members(buffer)
@@ -171,22 +164,21 @@ class StreamedObject(ROOTSerializable):
 @serializable
 class TObject(StreamedObject):
     """Format for TObject class.
-
     Reference: https://root.cern/doc/master/tobject.html
-
-    Attributes:
-        header (TObject_header): Header data for TObject class.
-        pidf (int): An identifier of the TProcessID record for the process that wrote the
-            object. This identifier is an unsigned short. The relevant record
-            has a name that is the string "ProcessID" concatenated with the ASCII
-            decimal representation of "pidf" (no leading zeros). 0 is a valid pidf.
-            Only present if the object is referenced by a pointer to persistent object.
     """
 
     fVersion: Annotated[int, Fmt(">h")]
+    """Version of the class."""
     fUniqueID: Annotated[int, Fmt(">i")]
+    """Unique ID of the object."""
     fBits: Annotated[int, Fmt(">i")]
+    """Bit mask for the object."""
     pidf: Optional[int]
+    """An identifier of the TProcessID record for the process that wrote the object.
+    This identifier is an unsigned short. The relevant record has a name that is
+    the string "ProcessID" concatenated with the ASCII decimal representation of
+    "pidf" (no leading zeros). 0 is a valid pidf. Only present if the object
+    is referenced by a pointer to persistent object."""
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer) -> tuple[Args, ReadBuffer]:
@@ -202,16 +194,12 @@ DICTIONARY["TObject"] = TObject
 
 @serializable
 class TNamed(TObject):
-    """Format for TNamed class.
-
-    Attributes:
-        b_object (TObject): TObject base class.
-        fName (TString): Name of the object.
-        fTitle (TString): Title of the object.
-    """
+    """Format for TNamed class."""
 
     fName: TString
+    """Name of the object."""
     fTitle: TString
+    """Title of the object."""
 
 
 DICTIONARY["TNamed"] = TNamed

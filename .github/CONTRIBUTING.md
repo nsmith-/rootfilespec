@@ -33,7 +33,7 @@ You can set up a development environment by running:
 ```bash
 python3 -m venv .venv
 source ./.venv/bin/activate
-pip install -v -e .[dev]
+pip install -v -e '.[dev]'
 ```
 
 If you have the

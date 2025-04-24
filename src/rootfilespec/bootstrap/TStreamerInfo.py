@@ -206,7 +206,7 @@ class ElementType(IntEnum):
             self.kUChar: (int, ">B"),
             self.kUShort: (int, ">H"),
             self.kUInt: (int, ">I"),
-            self.kULong: (int, ">L"),
+            self.kULong: (int, ">Q"),
             self.kLong64: (int, ">q"),
             self.kULong64: (int, ">Q"),
             self.kBool: (bool, ">?"),

@@ -8,18 +8,15 @@ from rootfilespec.structutil import ReadBuffer, ROOTSerializable, serializable
 @serializable
 class TList(TObject):
     """TList container class.
-
     Reference: https://root.cern/doc/master/streamerinfo.html (TList section)
-
-    Attributes:
-        fName (TString): Name of the list.
-        fN (int): Number of objects in the list.
-        items (list[TObject]): List of objects.
     """
 
     fName: TString
+    """Name of the list."""
     fN: int
+    """Number of objects in the list."""
     items: tuple[TObject, ...]
+    """List of objects."""
 
     @classmethod
     def read(cls, buffer: ReadBuffer):
@@ -58,10 +55,16 @@ DICTIONARY["TList"] = TList
 
 @serializable
 class TObjArray(TObject):
+    """TObjArray container class."""
+
     fName: TString
+    """Name of the array."""
     nObjects: int
+    """Number of objects in the array."""
     fLowerBound: int
+    """Lower bound of the array."""
     objects: tuple[ROOTSerializable, ...]
+    """List of objects."""
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer):
