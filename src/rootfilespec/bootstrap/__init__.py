@@ -1,8 +1,14 @@
+"""Minimal set of types found in TFile-like ROOT files
+
+With these, we can read the self-describing part of the file, namely the
+TStreamerInfo dictionary of types, along with the directory structure and
+object references (TKey and TBasket)
+
+These types generally hold big-endian encoded primitive types.
+"""
+
 from rootfilespec.bootstrap.assumed import ROOT3a3aTIOFeatures
-from rootfilespec.bootstrap.envelopebase import REnvelope, REnvelopeLink
 from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
-from rootfilespec.bootstrap.RLocator import RLocator
-from rootfilespec.bootstrap.RPage import RPage
 from rootfilespec.bootstrap.TDirectory import TDirectory, TKeyList
 from rootfilespec.bootstrap.TFile import ROOTFile, TFile
 from rootfilespec.bootstrap.TKey import TKey
@@ -17,13 +23,9 @@ from rootfilespec.bootstrap.TStreamerInfo import (
 from rootfilespec.bootstrap.TString import TString, string
 
 __all__ = [
-    "REnvelope",
-    "REnvelopeLink",
-    "RLocator",
     "ROOT3a3aRNTuple",
     "ROOT3a3aTIOFeatures",
     "ROOTFile",
-    "RPage",
     "StreamedObject",
     "TDirectory",
     "TFile",

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from rootfilespec.bootstrap.RFrame import ListFrame
-from rootfilespec.bootstrap.RLocator import RLocator
-from rootfilespec.bootstrap.RPage import RPage
+from rootfilespec.rntuple.RFrame import ListFrame
+from rootfilespec.rntuple.RLocator import RLocator
+from rootfilespec.rntuple.RPage import RPage
 from rootfilespec.structutil import (
     DataFetcher,
     Fmt,

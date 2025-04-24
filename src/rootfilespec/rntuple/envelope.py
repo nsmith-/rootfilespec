@@ -1,11 +1,9 @@
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from typing import Annotated, TypeVar
 
 from typing_extensions import Self
 
-from rootfilespec.bootstrap.RLocator import RLocator
+from rootfilespec.rntuple.RLocator import RLocator
 from rootfilespec.structutil import (
     DataFetcher,
     Fmt,
@@ -16,6 +14,34 @@ from rootfilespec.structutil import (
 
 # Map of envelope type to string for printing
 ENVELOPE_TYPE_MAP = {0x00: "Reserved"}
+
+
+@dataclass
+class RFeatureFlags(ROOTSerializable):
+    """A class representing the RNTuple Feature Flags.
+    RNTuple Feature Flags appear in the Header and Footer Envelopes.
+    This class reads the RNTuple Feature Flags from the buffer.
+    It also checks if the flags are set for a given feature.
+    It aborts reading when an unknown feature is encountered (unknown bit set).
+    """
+
+    flags: int
+    """The RNTuple Feature Flags (signed 64-bit integer)"""
+
+    @classmethod
+    def read_members(cls, buffer: ReadBuffer):
+        """Reads the RNTuple Feature Flags from the given buffer."""
+
+        # Read the flags from the buffer
+        (flags,), buffer = buffer.unpack("<q")  # Signed 64-bit integer
+
+        # There are no feature flags defined for RNTuple yet
+        # So abort if any bits are set
+        if flags != 0:
+            msg = f"Unknown feature flags encountered. int:{flags}; binary:{bin(flags)}"
+            raise NotImplementedError(msg)
+
+        return (flags,), buffer
 
 
 @dataclass

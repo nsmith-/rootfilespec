@@ -5,8 +5,8 @@ from pathlib import Path
 
 from rootfilespec.bootstrap import ROOTFile
 from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
-from rootfilespec.bootstrap.RPage import RPage
 from rootfilespec.dynamic import streamerinfo_to_classes
+from rootfilespec.rntuple.RPage import RPage
 from rootfilespec.structutil import ReadBuffer
 
 if __name__ == "__main__":
@@ -66,6 +66,7 @@ if __name__ == "__main__":
 
         # Get TStreamerInfo (List of classes used in the file)
         streamerinfo = file.get_StreamerInfo(fetch_data)
+        assert streamerinfo is not None, "StreamerInfo is None"
         classes = streamerinfo_to_classes(streamerinfo)
         with Path("classes.py").open("w") as f:
             f.write(classes)
