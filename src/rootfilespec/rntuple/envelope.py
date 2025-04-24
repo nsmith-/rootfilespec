@@ -4,12 +4,12 @@ from typing import Annotated, TypeVar
 from typing_extensions import Self
 
 from rootfilespec.rntuple.RLocator import RLocator
+from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     DataFetcher,
     Fmt,
     ReadBuffer,
     ROOTSerializable,
-    serializable,
 )
 
 # Map of envelope type to string for printing

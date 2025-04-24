@@ -8,11 +8,11 @@ from rootfilespec.rntuple.envelope import (
 )
 from rootfilespec.rntuple.pagelist import PageListEnvelope
 from rootfilespec.rntuple.RFrame import ListFrame, RecordFrame
+from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     DataFetcher,
     Fmt,
     ReadBuffer,
-    serializable,
 )
 
 

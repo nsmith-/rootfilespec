@@ -4,12 +4,12 @@ from typing import Annotated, Optional, TypeVar
 
 from rootfilespec.bootstrap.TString import TString
 from rootfilespec.dispatch import DICTIONARY, normalize
+from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     Args,
     Fmt,
     ReadBuffer,
     ROOTSerializable,
-    serializable,
 )
 
 

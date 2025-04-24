@@ -8,11 +8,11 @@ from numpy.typing import NDArray
 from rootfilespec.bootstrap.TKey import TKey
 from rootfilespec.bootstrap.TObject import StreamHeader
 from rootfilespec.dispatch import DICTIONARY
+from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     Fmt,
     ReadBuffer,
     ROOTSerializable,
-    serializable,
 )
 
 
@@ -55,9 +55,8 @@ class TBasket(TKey):
     def read_members(cls, buffer: ReadBuffer):
         start_position = buffer.relpos
         sheader, buffer = StreamHeader.read(buffer)
-        (header, fSeekKey, fSeekPdir, fClassName, fName, fTitle), buffer = (
-            TKey.read_members(buffer)
-        )
+        tkey_args, buffer = TKey.read_members(buffer)
+        base_tkey = TKey(*tkey_args)
         bheader, buffer = TBasket_header.read(buffer)
 
         fEntryOffset: NDArray[np.int32] = np.full(
@@ -69,24 +68,24 @@ class TBasket(TKey):
         if bheader.flag not in (11, 12):
             msg = f"TBasket header flag {bheader.flag} not supported"
             raise ValueError(msg)
-        if bheader.flag % 10 != 2:
+        if bheader.fNevBuf > 0 and bheader.flag % 10 != 2:
             # TODO: refactor this to use BasicArray
             (n,), buffer = buffer.unpack(">i")
             assert n == bheader.fNevBuf
             data, buffer = buffer.consume(n * fEntryOffset.dtype.itemsize)
             fEntryOffset = np.frombuffer(data, dtype=fEntryOffset.dtype, count=n)
-        if header.is_embedded():
+        if base_tkey.header.is_embedded():
             _, buffer = TKey.read_members(buffer)
             _, buffer = TBasket_header.read(buffer)
             end_position = start_position + sheader.fByteCount + 4
             fBuffer, buffer = buffer.consume(end_position - buffer.relpos)
         return (
-            header,
-            fSeekKey,
-            fSeekPdir,
-            fClassName,
-            fName,
-            fTitle,
+            base_tkey.header,
+            base_tkey.fSeekKey,
+            base_tkey.fSeekPdir,
+            base_tkey.fClassName,
+            base_tkey.fName,
+            base_tkey.fTitle,
             bheader,
             fEntryOffset,
             fBuffer,

@@ -7,11 +7,11 @@ from rootfilespec.rntuple.envelope import (
 from rootfilespec.rntuple.pagelocations import ClusterLocations
 from rootfilespec.rntuple.RFrame import ListFrame, RecordFrame
 from rootfilespec.rntuple.RPage import RPage
+from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     DataFetcher,
     Fmt,
     ReadBuffer,
-    serializable,
 )
 
 

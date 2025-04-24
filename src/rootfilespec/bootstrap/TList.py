@@ -2,7 +2,8 @@ from rootfilespec.bootstrap.streamedobject import read_streamed_item
 from rootfilespec.bootstrap.TObject import StreamHeader, TObject, TObjectBits
 from rootfilespec.bootstrap.TString import TString
 from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.structutil import ReadBuffer, ROOTSerializable, serializable
+from rootfilespec.serializable import serializable
+from rootfilespec.structutil import ReadBuffer, ROOTSerializable
 
 
 @serializable

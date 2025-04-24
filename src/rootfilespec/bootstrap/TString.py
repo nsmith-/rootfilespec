@@ -1,5 +1,6 @@
 from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.structutil import ReadBuffer, ROOTSerializable, serializable
+from rootfilespec.serializable import serializable
+from rootfilespec.structutil import ReadBuffer, ROOTSerializable
 
 
 @serializable

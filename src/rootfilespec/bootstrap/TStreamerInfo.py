@@ -7,7 +7,8 @@ from rootfilespec.bootstrap.TObject import TNamed
 from rootfilespec.bootstrap.TString import TString
 from rootfilespec.cpptype import cpptype_to_pytype
 from rootfilespec.dispatch import DICTIONARY, normalize
-from rootfilespec.structutil import Fmt, serializable
+from rootfilespec.serializable import serializable
+from rootfilespec.structutil import Fmt
 
 
 @dataclass

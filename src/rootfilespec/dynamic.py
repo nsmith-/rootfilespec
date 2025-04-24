@@ -14,13 +14,14 @@ import numpy as np
 
 from rootfilespec.bootstrap import *
 from rootfilespec.bootstrap.TKey import DICTIONARY
-from rootfilespec.structutil import (
+from rootfilespec.container import (
+    FixedSizeArray,
     BasicArray,
-    Fmt,
     Pointer,
     StdVector,
-    serializable,
 )
+from rootfilespec.structutil import Fmt
+from rootfilespec.serializable import serializable
 """
 
 BOOTSTRAP_TYPES: set[str] = set(bootstrap.__all__)

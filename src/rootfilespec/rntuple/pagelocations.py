@@ -5,12 +5,12 @@ from typing import Annotated, Any
 from rootfilespec.rntuple.RFrame import ListFrame
 from rootfilespec.rntuple.RLocator import RLocator
 from rootfilespec.rntuple.RPage import RPage
+from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     DataFetcher,
     Fmt,
     ReadBuffer,
     ROOTSerializable,
-    serializable,
 )
 
 

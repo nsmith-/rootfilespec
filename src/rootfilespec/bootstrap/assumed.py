@@ -9,11 +9,11 @@ from typing import Annotated
 
 from rootfilespec.bootstrap.TObject import StreamedObject
 from rootfilespec.dispatch import DICTIONARY
+from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     Fmt,
     ReadBuffer,
     ROOTSerializable,
-    serializable,
 )
 
 

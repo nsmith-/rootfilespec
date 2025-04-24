@@ -5,12 +5,12 @@ from rootfilespec.bootstrap.TKey import TKey
 from rootfilespec.bootstrap.TUUID import TUUID
 from rootfilespec.bootstrap.util import fDatime_to_datetime
 from rootfilespec.dispatch import DICTIONARY
+from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     DataFetcher,
     Fmt,
     ReadBuffer,
     ROOTSerializable,
-    serializable,
 )
 
 """
@@ -104,6 +104,9 @@ class TDirectory(ROOTSerializable):
         )
 
         key, _ = TKey.read(buffer)
+        if key.fSeekKey == 0:
+            msg = f"TDirectory.get_KeyList: fSeekKey is 0 {key.fSeekKey} (bad key but KeyList is valid, e.g. uproot-issue261.root)"
+            raise NotImplementedError(msg)
         if key.fSeekKey != self.fSeekKeys:
             msg = f"TDirectory.read_keylist: fSeekKey mismatch {key.fSeekKey} != {self.fSeekKeys}"
             raise ValueError(msg)
@@ -112,7 +115,7 @@ class TDirectory(ROOTSerializable):
             raise ValueError(msg)
 
         def fetch_cached(seek: int, size: int):
-            seek -= self.fSeekKeys
+            seek -= key.fSeekKey
             if seek + size <= len(buffer):
                 return buffer[seek : seek + size]
             msg = f"TDirectory.read_keylist: fetch_cached: {seek=} {size=} out of range"

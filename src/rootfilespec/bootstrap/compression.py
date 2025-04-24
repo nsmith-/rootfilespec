@@ -2,11 +2,11 @@ from typing import Annotated, Optional, Protocol
 
 import cramjam  # type: ignore[import-not-found]
 
+from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     Fmt,
     ReadBuffer,
     ROOTSerializable,
-    serializable,
 )
 
 

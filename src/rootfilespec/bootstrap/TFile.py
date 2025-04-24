@@ -6,12 +6,12 @@ from rootfilespec.bootstrap.TKey import TKey
 from rootfilespec.bootstrap.TList import TList
 from rootfilespec.bootstrap.TString import TString
 from rootfilespec.bootstrap.TUUID import TUUID
+from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     DataFetcher,
     Fmt,
     ReadBuffer,
     ROOTSerializable,
-    serializable,
 )
 
 

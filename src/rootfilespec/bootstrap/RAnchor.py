@@ -5,10 +5,10 @@ from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.rntuple import FooterEnvelope, HeaderEnvelope
 from rootfilespec.rntuple.envelope import REnvelopeLink
 from rootfilespec.rntuple.RLocator import LargeLocator
+from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     DataFetcher,
     Fmt,
-    serializable,
 )
 
 

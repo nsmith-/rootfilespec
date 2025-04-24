@@ -1,5 +1,5 @@
 from rootfilespec.rntuple.envelope import ENVELOPE_TYPE_MAP, REnvelope
-from rootfilespec.structutil import serializable
+from rootfilespec.serializable import serializable
 
 
 @serializable

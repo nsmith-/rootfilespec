@@ -4,13 +4,13 @@ from rootfilespec.bootstrap.compression import RCompressed
 from rootfilespec.bootstrap.TString import TString
 from rootfilespec.bootstrap.util import fDatime_to_datetime
 from rootfilespec.dispatch import DICTIONARY, normalize
+from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     Args,
     DataFetcher,
     Fmt,
     ReadBuffer,
     ROOTSerializable,
-    serializable,
 )
 
 
@@ -45,7 +45,7 @@ class TKey_header(ROOTSerializable):
 
     def is_embedded(self) -> bool:
         """Return if the key's payload is embedded"""
-        return self.fNbytes < self.fKeylen
+        return self.fNbytes <= self.fKeylen
 
 
 ObjType = TypeVar("ObjType", bound=ROOTSerializable)

@@ -1,9 +1,9 @@
 from typing import Annotated
 
+from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     ReadBuffer,
     ROOTSerializable,
-    serializable,
 )
 
 # TODO: template these classes
