@@ -19,17 +19,17 @@ from rootfilespec.structutil import (
 class TKey_header(ROOTSerializable):
     """TKey header information"""
 
-    fNbytes: Annotated[int, Fmt(">I")]
+    fNbytes: Annotated[int, Fmt(">i")]
     """Number of bytes in compressed record (Tkey+data)"""
-    fVersion: Annotated[int, Fmt(">H")]
+    fVersion: Annotated[int, Fmt(">h")]
     """TKey class version identifier"""
-    fObjlen: Annotated[int, Fmt(">I")]
+    fObjlen: Annotated[int, Fmt(">i")]
     """Number of bytes of uncompressed data"""
-    fDatime: Annotated[int, Fmt(">I")]
+    fDatime: Annotated[int, Fmt(">i")]
     """Date and time when record was written to file"""
-    fKeylen: Annotated[int, Fmt(">H")]
+    fKeylen: Annotated[int, Fmt(">h")]
     """Number of bytes in key structure (TKey)"""
-    fCycle: Annotated[int, Fmt(">H")]
+    fCycle: Annotated[int, Fmt(">h")]
     """Cycle of key"""
 
     def write_time(self):
@@ -64,9 +64,9 @@ class TKey(ROOTSerializable):
         initial_size = len(buffer)
         header, buffer = TKey_header.read(buffer)
         if header.fVersion < 1000:
-            (fSeekKey, fSeekPdir), buffer = buffer.unpack(">II")
+            (fSeekKey, fSeekPdir), buffer = buffer.unpack(">ii")
         else:
-            (fSeekKey, fSeekPdir), buffer = buffer.unpack(">QQ")
+            (fSeekKey, fSeekPdir), buffer = buffer.unpack(">qq")
         fClassName, buffer = TString.read(buffer)
         fName, buffer = TString.read(buffer)
         fTitle, buffer = TString.read(buffer)
@@ -92,9 +92,8 @@ class TKey(ROOTSerializable):
         objtype: type[ObjType] | None = None,
     ) -> ObjType | ROOTSerializable:
         buffer = fetch_data(
-            self.fSeekKey
-            + self.header.fKeylen,  # Points to the start of the object data
-            self.header.fNbytes - self.header.fKeylen,  # The size of the object data
+            self.fSeekKey + self.header.fKeylen,
+            self.header.fNbytes - self.header.fKeylen,
         )
 
         compressed = None

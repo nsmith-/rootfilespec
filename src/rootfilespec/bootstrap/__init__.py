@@ -21,7 +21,6 @@ from rootfilespec.bootstrap.TString import TString
 __all__ = [
     "REnvelope",
     "REnvelopeLink",
-    "RFrame",
     "RLocator",
     "ROOT3a3aRNTuple",
     "ROOT3a3aTIOFeatures",

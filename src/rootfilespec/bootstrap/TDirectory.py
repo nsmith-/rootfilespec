@@ -91,9 +91,6 @@ class TDirectory(ROOTSerializable):
         return (header, fSeekDir, fSeekParent, fSeekKeys, fUUID), buffer
 
     def get_KeyList(self, fetch_data: DataFetcher):
-        # The TKeyList for a TDirectory contains all the (visible) TKeys
-        #   For RNTuples, it will only contain the RNTuple Anchor TKey(s)
-        # Binary Spec: https://root.cern.ch/doc/master/keyslist.html
         buffer = fetch_data(
             self.fSeekKeys, self.header.fNbytesName + self.header.fNbytesKeys
         )
@@ -129,8 +126,7 @@ class TKeyList(ROOTSerializable, Mapping[str, TKey]):
     fKeys: list[TKey]
     """List of TKey objects"""
     padding: bytes
-    """Padding bytes to align the TKeyList to 8 byte boundaries"""
-    # abbott: Nick, please check this docstring
+    """Extra bytes in the end of the TKeyList record (unknown)"""
 
     @classmethod
     def read_members(cls, buffer: ReadBuffer):
