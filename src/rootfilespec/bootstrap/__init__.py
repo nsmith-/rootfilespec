@@ -7,8 +7,17 @@ object references (TKey and TBasket)
 These types generally hold big-endian encoded primitive types.
 """
 
-from rootfilespec.bootstrap.assumed import ROOT3a3aTIOFeatures
+from rootfilespec.bootstrap.array import (
+    TArrayC,
+    TArrayD,
+    TArrayF,
+    TArrayI,
+    TArrayS,
+)
+from rootfilespec.bootstrap.assumed import ROOT3a3aTIOFeatures, TAtt3D, TVirtualIndex
+from rootfilespec.bootstrap.compression import RCompressed, RCompressionHeader
 from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
+from rootfilespec.bootstrap.TBasket import TBasket
 from rootfilespec.bootstrap.TDirectory import TDirectory, TKeyList
 from rootfilespec.bootstrap.TFile import ROOTFile, TFile
 from rootfilespec.bootstrap.TKey import TKey
@@ -23,10 +32,19 @@ from rootfilespec.bootstrap.TStreamerInfo import (
 from rootfilespec.bootstrap.TString import TString, string
 
 __all__ = [
+    "RCompressed",
+    "RCompressionHeader",
     "ROOT3a3aRNTuple",
     "ROOT3a3aTIOFeatures",
     "ROOTFile",
     "StreamedObject",
+    "TArrayC",
+    "TArrayD",
+    "TArrayF",
+    "TArrayI",
+    "TArrayS",
+    "TAtt3D",
+    "TBasket",
     "TDirectory",
     "TFile",
     "TKey",
@@ -40,5 +58,6 @@ __all__ = [
     "TStreamerInfo",
     "TStreamerString",
     "TString",
+    "TVirtualIndex",
     "string",
 ]

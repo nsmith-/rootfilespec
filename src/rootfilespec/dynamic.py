@@ -1,4 +1,4 @@
-from rootfilespec.bootstrap import TList
+from rootfilespec import bootstrap
 from rootfilespec.bootstrap.TStreamerInfo import (
     ClassDef,
     TStreamerInfo,
@@ -12,25 +12,7 @@ from typing_extensions import Self
 
 import numpy as np
 
-from rootfilespec.bootstrap import (
-    StreamedObject,
-    TList,
-    TNamed,
-    TObjArray,
-    TObject,
-    TString,
-    string,
-)
-from rootfilespec.bootstrap.assumed import (
-    ROOT3a3aTIOFeatures,
-    TArrayC,
-    TArrayD,
-    TArrayF,
-    TArrayI,
-    TArrayS,
-    TAtt3D,
-    TVirtualIndex,
-)
+from rootfilespec.bootstrap import *
 from rootfilespec.bootstrap.TKey import DICTIONARY
 from rootfilespec.structutil import (
     BasicArray,
@@ -41,30 +23,10 @@ from rootfilespec.structutil import (
 )
 """
 
-BOOTSTRAP_TYPES: set[str] = {
-    "StreamedObject",
-    "TList",
-    "TNamed",
-    "TObjArray",
-    "TObject",
-    "TString",
-    "string",
-    "ROOT3a3aTIOFeatures",
-    "TArrayC",
-    "TArrayD",
-    "TArrayF",
-    "TArrayI",
-    "TArrayS",
-    "TAtt3D",
-    "TVirtualIndex",
-    "BasicArray",
-    "Fmt",
-    "Pointer",
-    "StdVector",
-}
+BOOTSTRAP_TYPES: set[str] = set(bootstrap.__all__)
 
 
-def streamerinfo_to_classes(streamerinfo: TList) -> str:
+def streamerinfo_to_classes(streamerinfo: bootstrap.TList) -> str:
     lines: list[str] = list(PREAMBLE.split("\n"))
 
     classes: dict[str, ClassDef] = {}
