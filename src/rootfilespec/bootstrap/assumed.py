@@ -39,10 +39,10 @@ class ROOT3a3aTIOFeatures(StreamedObject):
     @classmethod
     def update_members(cls, members: Members, buffer: ReadBuffer):
         (fIOBits,), buffer = buffer.unpack(">B")
-        extra = None
+        extra: Optional[int] = None
         if fIOBits > 0:
             # TODO: why is this 4 bytes here?
-            extra, buffer = buffer.unpack(">i")
+            (extra,), buffer = buffer.unpack(">i")
         members["fIOBits"] = fIOBits
         members["extra"] = extra
         return members, buffer
