@@ -3,6 +3,8 @@ import sys
 from typing import (
     Annotated,
     Any,
+    Callable,
+    Generic,
     TypeVar,
     get_args,
     get_origin,
@@ -11,16 +13,13 @@ from typing import (
 
 from typing_extensions import dataclass_transform
 
-from rootfilespec.structutil import (
-    ContainerSerDe,
-    Members,
-    MemberSerDe,
-    ReadBuffer,
-    ReadMembersMethod,
-    ROOTSerializable,
-)
+from rootfilespec.buffer import ReadBuffer
 
 T = TypeVar("T", bound="ROOTSerializable")
+OutType = TypeVar("OutType")
+Members = dict[str, Any]
+ReadMembersMethod = Callable[[Members, ReadBuffer], tuple[Members, ReadBuffer]]
+ReadObjMethod = Callable[[ReadBuffer], tuple[OutType, ReadBuffer]]
 
 
 def _get_annotations(cls: type) -> dict[str, Any]:
@@ -37,6 +36,27 @@ def _get_annotations(cls: type) -> dict[str, Any]:
 
 
 @dataclasses.dataclass
+class ROOTSerializable:
+    """
+    A base class for objects that can be serialized and deserialized from a buffer.
+    """
+
+    @classmethod
+    def read(cls: type[T], buffer: ReadBuffer) -> tuple[T, ReadBuffer]:
+        members: Members = {}
+        # TODO: always loop through base classes? StreamedObject does this a special way
+        members, buffer = cls.update_members(members, buffer)
+        return cls(**members), buffer
+
+    @classmethod
+    def update_members(
+        cls, members: Members, buffer: ReadBuffer
+    ) -> tuple[Members, ReadBuffer]:
+        msg = f"Unimplemented method: {cls.__name__}.update_members"
+        raise NotImplementedError(msg)
+
+
+@dataclasses.dataclass
 class _ReadWrapper:
     fname: str
     objtype: type[ROOTSerializable]
@@ -45,6 +65,49 @@ class _ReadWrapper:
         obj, buffer = self.objtype.read(buffer)
         members[self.fname] = obj
         return members, buffer
+
+
+class ContainerSerDe(Generic[OutType]):
+    """A protocol for (De)serialization of generic container fields.
+
+    The @serializable decorator will use these annotations to determine how to read
+    the field from the buffer. For example, if a dataclass has a field of type
+        `field: Container[Type]`
+    Then `ContainerSerDe.build_reader(build_reader(Type))` will be called to get a function that
+    can read the field from the buffer.
+    """
+
+    @classmethod
+    def build_reader(
+        cls, fname: str, inner_reader: ReadObjMethod[OutType]
+    ) -> ReadMembersMethod:
+        """Build a reader function for the given field name and inner read implementation.
+
+        The reader function should take a ReadBuffer and return a tuple of the new
+        arguments and the remaining buffer.
+        """
+        msg = f"Cannot build reader for {cls.__name__}"
+        raise NotImplementedError(msg)
+
+
+class MemberSerDe:
+    """A protocol for Serialization/Deserialization method annotations for a field.
+
+    The @serializable decorator will use these annotations to determine how to read
+    the field from the buffer. For example, if a dataclass has a field of type
+        `field: Annotated[Type, MemberSerDe(*args)]`
+    Then `MemberSerDe.build_reader(Type)` will be called to get a function that
+    can read the field from the buffer.
+    """
+
+    def build_reader(self, fname: str, ftype: type) -> ReadMembersMethod:
+        """Build a reader function for the given field name and type.
+
+        The reader function should take a ReadBuffer and return a tuple of the new
+        arguments and the remaining buffer.
+        """
+        msg = f"Cannot build reader for {self.__class__.__name__}"
+        raise NotImplementedError(msg)
 
 
 def _get_read_method(fname: str, ftype: Any) -> ReadMembersMethod:

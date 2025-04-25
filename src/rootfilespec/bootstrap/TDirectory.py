@@ -4,15 +4,10 @@ from typing import Annotated, Optional
 from rootfilespec.bootstrap.TKey import TKey
 from rootfilespec.bootstrap.TUUID import TUUID
 from rootfilespec.bootstrap.util import fDatime_to_datetime
+from rootfilespec.buffer import DataFetcher, ReadBuffer
 from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.serializable import serializable
-from rootfilespec.structutil import (
-    DataFetcher,
-    Fmt,
-    Members,
-    ReadBuffer,
-    ROOTSerializable,
-)
+from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.structutil import Fmt
 
 """
 TODO: TDirectory for ROOT 3.02.06

@@ -2,17 +2,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
+from rootfilespec.buffer import DataFetcher, ReadBuffer
 from rootfilespec.rntuple.RFrame import ListFrame
 from rootfilespec.rntuple.RLocator import RLocator
 from rootfilespec.rntuple.RPage import RPage
-from rootfilespec.serializable import serializable
-from rootfilespec.structutil import (
-    DataFetcher,
-    Fmt,
-    Members,
-    ReadBuffer,
-    ROOTSerializable,
-)
+from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.structutil import Fmt
 
 
 @serializable

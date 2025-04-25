@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from rootfilespec.structutil import ReadBuffer, ROOTSerializable
+from rootfilespec.buffer import ReadBuffer
+from rootfilespec.serializable import ROOTSerializable
 
 
 @dataclass

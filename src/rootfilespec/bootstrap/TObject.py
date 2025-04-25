@@ -3,13 +3,10 @@ from typing import Annotated, Optional
 
 from rootfilespec.bootstrap.streamedobject import StreamedObject
 from rootfilespec.bootstrap.strings import TString
+from rootfilespec.buffer import ReadBuffer
 from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.serializable import serializable
-from rootfilespec.structutil import (
-    Fmt,
-    Members,
-    ReadBuffer,
-)
+from rootfilespec.serializable import Members, serializable
+from rootfilespec.structutil import Fmt
 
 
 class TObjectBits(IntEnum):

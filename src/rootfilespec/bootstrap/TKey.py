@@ -3,15 +3,10 @@ from typing import Annotated, Optional, TypeVar, Union, overload
 from rootfilespec.bootstrap.compression import RCompressed
 from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.util import fDatime_to_datetime
+from rootfilespec.buffer import DataFetcher, ReadBuffer
 from rootfilespec.dispatch import DICTIONARY, normalize
-from rootfilespec.serializable import serializable
-from rootfilespec.structutil import (
-    DataFetcher,
-    Fmt,
-    Members,
-    ReadBuffer,
-    ROOTSerializable,
-)
+from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.structutil import Fmt
 
 
 @serializable

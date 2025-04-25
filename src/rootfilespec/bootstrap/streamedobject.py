@@ -2,9 +2,14 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Generic, Optional, TypeVar, get_args, get_origin
 
+from rootfilespec.buffer import ReadBuffer
 from rootfilespec.dispatch import DICTIONARY, normalize
-from rootfilespec.serializable import serializable
-from rootfilespec.structutil import Members, MemberSerDe, ReadBuffer, ROOTSerializable
+from rootfilespec.serializable import (
+    Members,
+    MemberSerDe,
+    ROOTSerializable,
+    serializable,
+)
 
 
 class _StreamConstants(IntEnum):

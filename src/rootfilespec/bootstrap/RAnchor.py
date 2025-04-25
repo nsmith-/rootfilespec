@@ -1,15 +1,13 @@
 from typing import Annotated
 
 from rootfilespec.bootstrap.streamedobject import StreamedObject
+from rootfilespec.buffer import DataFetcher
 from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.rntuple import FooterEnvelope, HeaderEnvelope
 from rootfilespec.rntuple.envelope import REnvelopeLink
 from rootfilespec.rntuple.RLocator import LargeLocator
 from rootfilespec.serializable import serializable
-from rootfilespec.structutil import (
-    DataFetcher,
-    Fmt,
-)
+from rootfilespec.structutil import Fmt
 
 
 @serializable

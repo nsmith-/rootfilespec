@@ -6,9 +6,9 @@ import pytest
 from skhep_testdata import data_path, known_files  # type: ignore[import-not-found]
 
 from rootfilespec.bootstrap import ROOTFile, TDirectory
+from rootfilespec.buffer import DataFetcher, ReadBuffer
 from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.dynamic import streamerinfo_to_classes
-from rootfilespec.structutil import DataFetcher, ReadBuffer
 
 TESTABLE_FILES = [f for f in known_files if f.endswith(".root")]
 

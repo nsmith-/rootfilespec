@@ -7,14 +7,10 @@ from numpy.typing import NDArray
 
 from rootfilespec.bootstrap.streamedobject import StreamHeader
 from rootfilespec.bootstrap.TKey import TKey
+from rootfilespec.buffer import ReadBuffer
 from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.serializable import serializable
-from rootfilespec.structutil import (
-    Fmt,
-    Members,
-    ReadBuffer,
-    ROOTSerializable,
-)
+from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.structutil import Fmt
 
 
 @serializable

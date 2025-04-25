@@ -7,9 +7,9 @@ from skhep_testdata import data_path
 
 from rootfilespec.bootstrap import ROOTFile
 from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
+from rootfilespec.buffer import ReadBuffer
 from rootfilespec.dynamic import streamerinfo_to_classes
 from rootfilespec.rntuple.RPage import RPage
-from rootfilespec.structutil import ReadBuffer
 
 if __name__ == "__main__":
     initial_read_size = 512

@@ -1,4 +1,4 @@
-from rootfilespec.structutil import ROOTSerializable
+from rootfilespec.serializable import ROOTSerializable
 
 DICTIONARY: dict[str, type[ROOTSerializable]] = {}
 

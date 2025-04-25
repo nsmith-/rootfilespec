@@ -2,13 +2,9 @@ from typing import Annotated, Optional, Protocol
 
 import cramjam  # type: ignore[import-not-found]
 
-from rootfilespec.serializable import serializable
-from rootfilespec.structutil import (
-    Fmt,
-    Members,
-    ReadBuffer,
-    ROOTSerializable,
-)
+from rootfilespec.buffer import ReadBuffer
+from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.structutil import Fmt
 
 
 @serializable

@@ -8,13 +8,9 @@ implemented in their own files.
 from typing import Optional
 
 from rootfilespec.bootstrap.streamedobject import StreamedObject
+from rootfilespec.buffer import ReadBuffer
 from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.serializable import serializable
-from rootfilespec.structutil import (
-    Members,
-    ReadBuffer,
-    ROOTSerializable,
-)
+from rootfilespec.serializable import Members, ROOTSerializable, serializable
 
 
 @serializable

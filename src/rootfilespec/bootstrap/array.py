@@ -4,8 +4,8 @@ import numpy as np
 
 from rootfilespec.container import BasicArray
 from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.serializable import serializable
-from rootfilespec.structutil import Fmt, ROOTSerializable
+from rootfilespec.serializable import ROOTSerializable, serializable
+from rootfilespec.structutil import Fmt
 
 
 @serializable

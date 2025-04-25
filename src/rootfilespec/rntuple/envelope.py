@@ -3,15 +3,10 @@ from typing import Annotated, TypeVar
 
 from typing_extensions import Self
 
+from rootfilespec.buffer import DataFetcher, ReadBuffer
 from rootfilespec.rntuple.RLocator import RLocator
-from rootfilespec.serializable import serializable
-from rootfilespec.structutil import (
-    DataFetcher,
-    Fmt,
-    Members,
-    ReadBuffer,
-    ROOTSerializable,
-)
+from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.structutil import Fmt
 
 # Map of envelope type to string for printing
 ENVELOPE_TYPE_MAP = {0x00: "Reserved"}

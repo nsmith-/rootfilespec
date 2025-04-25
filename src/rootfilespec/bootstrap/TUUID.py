@@ -1,7 +1,7 @@
 from uuid import UUID
 
-from rootfilespec.serializable import serializable
-from rootfilespec.structutil import Members, ReadBuffer, ROOTSerializable
+from rootfilespec.buffer import ReadBuffer
+from rootfilespec.serializable import Members, ROOTSerializable, serializable
 
 
 @serializable

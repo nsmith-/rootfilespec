@@ -3,12 +3,11 @@ from typing import Any, TypeVar
 
 import numpy as np
 
-from rootfilespec.structutil import (
+from rootfilespec.buffer import ReadBuffer
+from rootfilespec.serializable import (
     ContainerSerDe,
     Members,
     MemberSerDe,
-    ReadBuffer,
-    ReadMembersMethod,
     ReadObjMethod,
     ROOTSerializable,
 )
@@ -110,9 +109,7 @@ class StdVector(ROOTSerializable, ContainerSerDe[T]):
     """The items in the vector."""
 
     @classmethod
-    def build_reader(
-        cls, fname: str, inner_reader: ReadObjMethod[T]
-    ) -> ReadMembersMethod:
+    def build_reader(cls, fname: str, inner_reader: ReadObjMethod[T]):
         def update_members(members: Members, buffer: ReadBuffer):
             (n,), buffer = buffer.unpack(">i")
             items: tuple[T, ...] = ()
