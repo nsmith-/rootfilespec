@@ -13,32 +13,33 @@ All deserialized data is stored as dataclass objects, inheriting from the base
 ```python
 Members = dict[str, Any]
 
+
 @dataclasses.dataclass
 class ROOTSerializable:
     @classmethod
-    def read(cls: type[T], buffer: ReadBuffer) -> tuple[T, ReadBuffer]:
-        ...
+    def read(cls: type[T], buffer: ReadBuffer) -> tuple[T, ReadBuffer]: ...
 
     @classmethod
     def update_members(
         cls, members: Members, buffer: ReadBuffer
-    ) -> tuple[Members, ReadBuffer]:
-        ...
+    ) -> tuple[Members, ReadBuffer]: ...
 ```
 
 The entry point for deserialization is the `read` method, which calls
 `update_members` on all the subclasses in the inheritance tree to build up the
 dictionary of class members (`Members`). Some classes may override `read` to
 implement header parsing, or to handle layouts that are not simply in base class
-order. The `read_mupdate_membersembers` method is only responsible for reading the
-members of the class, not any base class members.
+order. The `read_mupdate_membersembers` method is only responsible for reading
+the members of the class, not any base class members.
 
 The `update_members` signature has a type alias in `serializable.py`:
+
 ```python
 ReadMembersMethod = Callable[[Members, ReadBuffer], tuple[Members, ReadBuffer]]
 ```
-these is used to define more advanced types, and to set up the
-`@serializable` decorator.
+
+these is used to define more advanced types, and to set up the `@serializable`
+decorator.
 
 Note that python dataclasses inherit members from multiple bases in reverse
 order, so
