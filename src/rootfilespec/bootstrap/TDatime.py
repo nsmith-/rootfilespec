@@ -26,4 +26,5 @@ def TDatime_to_datetime(fDatime: int) -> datetime:
     )
 
 
+# TODO: convert to datetime through a MemberSerDe
 TDatime = Annotated[int, Fmt(">I")]
