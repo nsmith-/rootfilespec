@@ -12,6 +12,7 @@ from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     DataFetcher,
     Fmt,
+    Members,
     ReadBuffer,
 )
 
@@ -76,7 +77,7 @@ class FooterEnvelope(REnvelope):
     """The List Frame of Cluster Group Record Frames"""
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer):
+    def update_members(cls, members: Members, buffer: ReadBuffer):
         # Read the feature flags
         featureFlags, buffer = RFeatureFlags.read(buffer)
 
@@ -89,7 +90,11 @@ class FooterEnvelope(REnvelope):
         # Read the cluster group list frame
         clusterGroups, buffer = ListFrame.read_as(ClusterGroup, buffer)
 
-        return (featureFlags, headerChecksum, schemaExtension, clusterGroups), buffer
+        members["featureFlags"] = featureFlags
+        members["headerChecksum"] = headerChecksum
+        members["schemaExtension"] = schemaExtension
+        members["clusterGroups"] = clusterGroups
+        return members, buffer
 
     def get_pagelist(self, fetch_data: DataFetcher) -> list[PageListEnvelope]:
         """Get the RNTuple Page List Envelopes from the Footer Envelope.

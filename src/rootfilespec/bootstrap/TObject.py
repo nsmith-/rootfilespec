@@ -6,8 +6,8 @@ from rootfilespec.bootstrap.TString import TString
 from rootfilespec.dispatch import DICTIONARY, normalize
 from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
-    Args,
     Fmt,
+    Members,
     ReadBuffer,
     ROOTSerializable,
 )
@@ -122,43 +122,45 @@ class StreamedObject(ROOTSerializable):
 
     @classmethod
     def read(cls: type[T], buffer: ReadBuffer) -> tuple[T, ReadBuffer]:
-        args, buffer = cls._read_all_members(buffer)
-        return cls(*args), buffer
+        members, buffer = cls._read_all_members(buffer)
+        return cls(**members), buffer
 
     @classmethod
     def _read_all_members(
         cls: type[T], buffer: ReadBuffer, indent=0
-    ) -> tuple[Args, ReadBuffer]:
+    ) -> tuple[Members, ReadBuffer]:
         # TODO move this to a free function
         start_position = buffer.relpos
         if cls is TObject and indent > 0:
             itemheader, buffer = _auto_TObject_base(buffer)
         else:
             itemheader, buffer = StreamHeader.read(buffer)
-        if itemheader.fClassName and normalize(itemheader.fClassName) != cls.__name__:
+        if (
+            itemheader.fClassName
+            and normalize(itemheader.fClassName) != cls.__name__
+            and not cls.__name__.startswith("TLeaf")
+        ):
             msg = f"Expected class {cls.__name__} but got {normalize(itemheader.fClassName)}"
             raise ValueError(msg)
         end_position = start_position + itemheader.fByteCount + 4
-        args: Args = ()
+        members: Members = {}
         for base in reversed(cls.__bases__):
             if base is StreamedObject:
                 continue
             if issubclass(base, StreamedObject):
-                base_args, buffer = base._read_all_members(buffer, indent + 1)
-                args += base_args
+                base_members, buffer = base._read_all_members(buffer, indent + 1)
+                members.update(base_members)
             elif issubclass(base, ROOTSerializable):
-                base_args, buffer = base.read_members(buffer)
-                args += base_args
-        cls_args, buffer = cls.read_members(buffer)
-        args += cls_args
+                members, buffer = base.update_members(members, buffer)
+        members, buffer = cls.update_members(members, buffer)
         if indent == 0 and buffer.relpos != end_position:
             # TODO: figure out why this does not hold in the subclasses (indent > 0)
             msg = f"Expected position {end_position} but got {buffer.relpos}"
             msg += f"\nClass: {cls}"
-            msg += f"\nArgs: {args}"
+            msg += f"\nMembers: {members}"
             msg += f"\nBuffer: {buffer}"
             raise ValueError(msg)
-        return args, buffer
+        return members, buffer
 
 
 @serializable
@@ -181,15 +183,32 @@ class TObject(StreamedObject):
     is referenced by a pointer to persistent object."""
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer) -> tuple[Args, ReadBuffer]:
+    def update_members(
+        cls, members: Members, buffer: ReadBuffer
+    ) -> tuple[Members, ReadBuffer]:
         (fVersion, fUniqueID, fBits), buffer = buffer.unpack(">hii")
         pidf = None
         if fBits & TObjectBits.kIsReferenced:
             (pidf,), buffer = buffer.unpack(">H")
-        return (fVersion, fUniqueID, fBits, pidf), buffer
+        members["fVersion"] = fVersion
+        members["fUniqueID"] = fUniqueID
+        members["fBits"] = fBits
+        members["pidf"] = pidf
+        return members, buffer
 
 
 DICTIONARY["TObject"] = TObject
+
+
+@serializable
+class TObjString(TObject):
+    """Format for TObjString class."""
+
+    fString: TString
+    """String data of the object."""
+
+
+DICTIONARY["TObjString"] = TObjString
 
 
 @serializable

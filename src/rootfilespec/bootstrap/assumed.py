@@ -12,6 +12,7 @@ from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     Fmt,
+    Members,
     ReadBuffer,
     ROOTSerializable,
 )
@@ -22,7 +23,7 @@ class TVirtualIndex(ROOTSerializable):
     uninterpreted: bytes
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer):
+    def update_members(cls, members: Members, buffer: ReadBuffer):
         raise NotImplementedError
 
 
@@ -36,11 +37,12 @@ class ROOT3a3aTIOFeatures(StreamedObject):
     fIOBits: Annotated[int, Fmt(">B")]
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer):
+    def update_members(cls, members: Members, buffer: ReadBuffer):
         # TODO: why is this 4 bytes here?
         junk, buffer = buffer.unpack(">i")
         (fIOBits,), buffer = buffer.unpack(">B")
-        return (fIOBits,), buffer
+        members["fIOBits"] = fIOBits
+        return members, buffer
 
 
 DICTIONARY["ROOT3a3aTIOFeatures"] = ROOT3a3aTIOFeatures

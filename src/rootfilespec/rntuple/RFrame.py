@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
-from rootfilespec.structutil import ReadBuffer, ROOTSerializable
+from rootfilespec.structutil import Members, ReadBuffer, ROOTSerializable
 
 Item = TypeVar("Item", bound=ROOTSerializable)
 
@@ -52,22 +52,26 @@ class ListFrame(RFrame, Generic[Item]):
             item, buffer = itemtype.read(buffer)
             items.append(item)
 
-        cls_args, buffer = cls.read_members(buffer)
+        members: Members = {"fSize": fSize, "items": items}
+        # Read the rest of the members
+        members, buffer = cls.update_members(members, buffer)
 
         #### Consume any unknown trailing information in the frame
         _unknown, buffer = buffer.consume(fSize - (buffer.relpos - start_position))
         # Unknown Bytes = Frame Size - Bytes Read
         # Bytes Read = buffer.relpos - start_position
 
-        frame = cls(fSize, items, *cls_args)
+        frame = cls(**members)
         frame._unknown = _unknown
         return frame, buffer
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer) -> tuple[tuple[Any, ...], ReadBuffer]:
+    def update_members(
+        cls, members: Members, buffer: ReadBuffer
+    ) -> tuple[Members, ReadBuffer]:
         """Reads extra members from the buffer. This is a placeholder for subclasses to implement."""
         # For now, just return an empty tuple and the buffer unchanged
-        return (), buffer
+        return members, buffer
 
     def __len__(self):
         return len(self.items)
@@ -95,8 +99,10 @@ class RecordFrame(RFrame):
             msg = f"Expected fSize to be positive, but got {fSize}"
             raise ValueError(msg)
 
+        members: Members = {"fSize": fSize}
+
         #### Read the Record Frame Payload
-        args, buffer = cls.read_members(buffer)
+        members, buffer = cls.update_members(members, buffer)
 
         # abbott: any checks here?
 
@@ -105,6 +111,6 @@ class RecordFrame(RFrame):
         # Unknown Bytes = Frame Size - Bytes Read
         # Bytes Read = buffer.relpos - start_position
 
-        frame = cls(fSize, *args)
+        frame = cls(**members)
         frame._unknown = _unknown
         return frame, buffer

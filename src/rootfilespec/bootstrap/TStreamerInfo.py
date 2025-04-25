@@ -346,7 +346,7 @@ class TStreamerBasicPointer(TStreamerElement):
             raise ValueError(msg)
 
         countname = normalize(self.fCountName.fString)
-        atype = f"BasicArray(np.dtype({fmt!r}), {countname!r})"
+        atype = f"BasicArray({fmt!r}, {countname!r})"
         return (
             f"{self.member_name()}: Annotated[np.ndarray, {atype}]",
             [],
@@ -365,7 +365,7 @@ class TStreamerObject(TStreamerElement):
         typename = self.type_name()
         dependencies = []
         if typename == parent.class_name():
-            typename = "Self"
+            typename = f'"{typename}"'
         # elif typename == "TObjArray":
         #     typename = "TObjArray_v3"
         else:
@@ -386,8 +386,8 @@ class TStreamerObjectPointer(TStreamerElement):
         typename, dependencies = cpptype_to_pytype(self.fTypeName.fString)
         if typename == parent.class_name():
             dependencies.remove(typename)
-            typename = "Self"
-        mdef = f"{self.member_name()}: Pointer[{typename}]"
+            typename = f'"{typename}"'
+        mdef = f"{self.member_name()}: Annotated[Ref[{typename}], Pointer()]"
         return mdef, list(dependencies)
 
 
@@ -419,7 +419,8 @@ class TStreamerObjectAny(TStreamerElement):
             msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
         if self.type_name() == parent.class_name():
-            return f"{self.member_name()}: Self", []
+            typename = f'"{self.type_name()}"'
+            return f"{self.member_name()}: {typename}", []
         # This may be a non-trivial type, e.g. vector<double>
         # or vector<TLorentzVector>
         typename, dependencies = cpptype_to_pytype(self.cpp_typename())
@@ -438,8 +439,8 @@ class TStreamerObjectAnyPointer(TStreamerElement):
         typename, dependencies = cpptype_to_pytype(self.fTypeName.fString)
         if typename == parent.class_name():
             dependencies.remove(typename)
-            typename = "Self"
-        mdef = f"{self.member_name()}: Pointer[{typename}]"
+            typename = f'"{typename}"'
+        mdef = f"{self.member_name()}: Annotated[Ref[{typename}], Pointer()]"
         return mdef, list(dependencies)
 
 
@@ -494,7 +495,10 @@ class TStreamerSTL(TStreamerElement):
             assert typename == "string"
             return f"{self.member_name()}: {typename}", list(dependencies)
         if self.fSTLtype == STLType.vectorPointer:
-            return f"{self.member_name()}: Pointer[{typename}]", list(dependencies)
+            return (
+                f"{self.member_name()}: Annotated[Ref[{typename}], Pointer()]",
+                list(dependencies),
+            )
         msg = f"STL type {self.type_name()} not implemented yet"
         raise NotImplementedError(msg)
 

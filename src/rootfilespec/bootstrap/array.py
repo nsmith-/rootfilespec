@@ -1,69 +1,52 @@
 from typing import Annotated
 
+import numpy as np
+
+from rootfilespec.container import BasicArray
 from rootfilespec.serializable import serializable
-from rootfilespec.structutil import (
-    ReadBuffer,
-    ROOTSerializable,
-)
-
-# TODO: template these classes
+from rootfilespec.structutil import Fmt, ROOTSerializable
 
 
 @serializable
-class TArrayC(ROOTSerializable):
-    fN: Annotated[int, ">i"]
-    fA: Annotated[list[int], ">B"]
+class TArray(ROOTSerializable):
+    """A class to hold an array of a given type.
 
-    @classmethod
-    def read_members(cls, buffer: ReadBuffer):
-        (n,), buffer = buffer.unpack(">i")
-        a, buffer = buffer.unpack(f">{n}B")
-        return (n, list(a)), buffer
+    Most popularly used in TH1x histograms.
+    """
 
-
-@serializable
-class TArrayS(ROOTSerializable):
-    fN: Annotated[int, ">i"]
-    fA: Annotated[list[int], ">h"]
-
-    @classmethod
-    def read_members(cls, buffer: ReadBuffer):
-        (n,), buffer = buffer.unpack(">i")
-        a, buffer = buffer.unpack(f">{n}h")
-        return (n, list(a)), buffer
+    # TODO: when ROOTSerializable calls base constructors this can be used
+    # fN: Annotated[int, Fmt(">i")]
 
 
 @serializable
-class TArrayI(ROOTSerializable):
-    fN: Annotated[int, ">i"]
-    fA: Annotated[list[int], ">i"]
-
-    @classmethod
-    def read_members(cls, buffer: ReadBuffer):
-        (n,), buffer = buffer.unpack(">i")
-        a, buffer = buffer.unpack(f">{n}i")
-        return (n, list(a)), buffer
+class TArrayC(TArray):
+    fN: Annotated[int, Fmt(">i")]
+    fArray: Annotated[np.typing.NDArray[np.uint8], BasicArray(">B", "fN", haspad=False)]
 
 
 @serializable
-class TArrayF(ROOTSerializable):
-    fN: Annotated[int, ">i"]
-    fA: Annotated[list[float], ">f"]
-
-    @classmethod
-    def read_members(cls, buffer: ReadBuffer):
-        (n,), buffer = buffer.unpack(">i")
-        a, buffer = buffer.unpack(f">{n}f")
-        return (n, list(a)), buffer
+class TArrayS(TArray):
+    fN: Annotated[int, Fmt(">i")]
+    fArray: Annotated[np.typing.NDArray[np.short], BasicArray(">h", "fN", haspad=False)]
 
 
 @serializable
-class TArrayD(ROOTSerializable):
-    fN: Annotated[int, ">i"]
-    fA: Annotated[list[float], ">d"]
+class TArrayI(TArray):
+    fN: Annotated[int, Fmt(">i")]
+    fArray: Annotated[np.typing.NDArray[np.int32], BasicArray(">i", "fN", haspad=False)]
 
-    @classmethod
-    def read_members(cls, buffer: ReadBuffer):
-        (n,), buffer = buffer.unpack(">i")
-        a, buffer = buffer.unpack(f">{n}d")
-        return (n, list(a)), buffer
+
+@serializable
+class TArrayF(TArray):
+    fN: Annotated[int, Fmt(">i")]
+    fArray: Annotated[
+        np.typing.NDArray[np.float32], BasicArray(">f", "fN", haspad=False)
+    ]
+
+
+@serializable
+class TArrayD(TArray):
+    fN: Annotated[int, Fmt(">i")]
+    fArray: Annotated[
+        np.typing.NDArray[np.float64], BasicArray(">d", "fN", haspad=False)
+    ]

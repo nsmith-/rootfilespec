@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from rootfilespec.serializable import serializable
-from rootfilespec.structutil import ReadBuffer, ROOTSerializable
+from rootfilespec.structutil import Members, ReadBuffer, ROOTSerializable
 
 
 @serializable
@@ -10,8 +10,10 @@ class TUUID(ROOTSerializable):
     fUUID: UUID
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer):
+    def update_members(cls, members: Members, buffer: ReadBuffer):
         (fVersion,), buffer = buffer.unpack(">h")
         data, buffer = buffer.consume(16)
         uuid = UUID(bytes=data)
-        return (fVersion, uuid), buffer
+        members["fVersion"] = fVersion
+        members["fUUID"] = uuid
+        return members, buffer

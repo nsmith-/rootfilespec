@@ -6,9 +6,9 @@ from rootfilespec.bootstrap.util import fDatime_to_datetime
 from rootfilespec.dispatch import DICTIONARY, normalize
 from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
-    Args,
     DataFetcher,
     Fmt,
+    Members,
     ReadBuffer,
     ROOTSerializable,
 )
@@ -73,17 +73,20 @@ class TKey(ROOTSerializable):
     @classmethod
     def read(cls, buffer: ReadBuffer):
         start_position = buffer.relpos
-        members, buffer = cls.read_members(buffer)
+        members: Members = {}
+        members, buffer = cls.update_members(members, buffer)
         keylen = buffer.relpos - start_position
-        header = members[0]
+        header: TKey_header = members["header"]
         if keylen != header.fKeylen and keylen != header.fKeylen + 4:
             # TODO: understand why we sometimes read 4 more bytes
             msg = f"TKey.read: key length mismatch: read {keylen}, header expects {header.fKeylen}"
             raise ValueError(msg)
-        return cls(*members), buffer
+        return cls(**members), buffer
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer) -> tuple[Args, ReadBuffer]:
+    def update_members(
+        cls, members: Members, buffer: ReadBuffer
+    ) -> tuple[Members, ReadBuffer]:
         header, buffer = TKey_header.read(buffer)
         if header.fVersion < 1000:
             (fSeekKey, fSeekPdir), buffer = buffer.unpack(">ii")
@@ -95,7 +98,13 @@ class TKey(ROOTSerializable):
         if header.fVersion % 1000 not in (2, 4):
             msg = f"TKey.read_members: unexpected version {header.fVersion}"
             raise ValueError(msg)
-        return (header, fSeekKey, fSeekPdir, fClassName, fName, fTitle), buffer
+        members["header"] = header
+        members["fSeekKey"] = fSeekKey
+        members["fSeekPdir"] = fSeekPdir
+        members["fClassName"] = fClassName
+        members["fName"] = fName
+        members["fTitle"] = fTitle
+        return members, buffer
 
     @overload
     def read_object(self, fetch_data: DataFetcher) -> ROOTSerializable: ...

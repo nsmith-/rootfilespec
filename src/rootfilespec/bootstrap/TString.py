@@ -1,17 +1,20 @@
 from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.serializable import serializable
-from rootfilespec.structutil import ReadBuffer, ROOTSerializable
+from rootfilespec.structutil import Members, ReadBuffer, ROOTSerializable
 
 
 @serializable
 class TString(ROOTSerializable):
-    """A class representing a TString."""
+    """A class representing a TString.
+
+    TODO: this can just be Annotated[bytes, TString] since nobody subclasses it
+    """
 
     fString: bytes
     """The string data."""
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer):
+    def update_members(cls, members: Members, buffer: ReadBuffer):
         """Reads a TString from the given buffer.
         TStrings are always prefixed with a byte indicating the length of the string.
         If that byte is larger than 255, then there are 4 additional bytes are used to store the length.
@@ -23,7 +26,8 @@ class TString(ROOTSerializable):
         if length == 255:
             (length,), buffer = buffer.unpack(">i")
         data, buffer = buffer.consume(length)
-        return (data,), buffer
+        members["fString"] = data
+        return members, buffer
 
 
 DICTIONARY["TString"] = TString
@@ -34,12 +38,13 @@ class string(ROOTSerializable):
     value: bytes
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer):
+    def update_members(cls, members: Members, buffer: ReadBuffer):
         (length,), buffer = buffer.unpack(">B")
         if length == 255:
             (length,), buffer = buffer.unpack(">i")
         data, buffer = buffer.consume(length)
-        return (data,), buffer
+        members["value"] = data
+        return members, buffer
 
 
 DICTIONARY["string"] = string

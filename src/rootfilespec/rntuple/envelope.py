@@ -8,6 +8,7 @@ from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     DataFetcher,
     Fmt,
+    Members,
     ReadBuffer,
     ROOTSerializable,
 )
@@ -29,7 +30,7 @@ class RFeatureFlags(ROOTSerializable):
     """The RNTuple Feature Flags (signed 64-bit integer)"""
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer):
+    def update_members(cls, members: Members, buffer: ReadBuffer):
         """Reads the RNTuple Feature Flags from the given buffer."""
 
         # Read the flags from the buffer
@@ -40,8 +41,8 @@ class RFeatureFlags(ROOTSerializable):
         if flags != 0:
             msg = f"Unknown feature flags encountered. int:{flags}; binary:{bin(flags)}"
             raise NotImplementedError(msg)
-
-        return (flags,), buffer
+        members["flags"] = flags
+        return members, buffer
 
 
 @dataclass
@@ -88,8 +89,9 @@ class REnvelope(ROOTSerializable):
             msg = f"Length of envelope ({length} minus 8) of type {typeID} does not match buffer length ({len(buffer)})"
             raise ValueError(msg)
 
+        members = {"typeID": typeID, "length": length}
         #### Get the payload
-        cls_args, buffer = cls.read_members(buffer)
+        members, buffer = cls.update_members(members, buffer)
 
         #### Consume any unknown trailing information in the envelope
         _unknown, buffer = buffer.consume(
@@ -100,8 +102,8 @@ class REnvelope(ROOTSerializable):
 
         #### Get the checksum (appended to envelope when writing to disk)
         (checksum,), buffer = buffer.unpack("<Q")  # Last 8 bytes of the envelope
-
-        envelope = cls(typeID, length, checksum, *cls_args)
+        members["checksum"] = checksum
+        envelope = cls(**members)
         envelope._unknown = _unknown
         return envelope, buffer
 

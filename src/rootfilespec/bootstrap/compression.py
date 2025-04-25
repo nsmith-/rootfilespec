@@ -5,6 +5,7 @@ import cramjam  # type: ignore[import-not-found]
 from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     Fmt,
+    Members,
     ReadBuffer,
     ROOTSerializable,
 )
@@ -76,7 +77,7 @@ class RCompressed(ROOTSerializable):
     payload: memoryview
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer):
+    def update_members(cls, members: Members, buffer: ReadBuffer):
         header, buffer = RCompressionHeader.read(buffer)
         if header.fAlgorithm == b"L4":
             checksum, buffer = buffer.consume(8)
@@ -85,7 +86,10 @@ class RCompressed(ROOTSerializable):
         # Not using .consume() to avoid copying the payload
         nbytes = header.compressed_size()
         payload, buffer = buffer.consume_view(nbytes)
-        return (header, checksum, payload), buffer
+        members["header"] = header
+        members["checksum"] = checksum
+        members["payload"] = payload
+        return members, buffer
 
     def decompress(self) -> memoryview:
         if self.checksum is not None:

@@ -9,6 +9,7 @@ from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     DataFetcher,
     Fmt,
+    Members,
     ReadBuffer,
     ROOTSerializable,
 )
@@ -83,7 +84,7 @@ class TDirectory(ROOTSerializable):
     """Universally Unique Identifier"""
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer):
+    def update_members(cls, members: Members, buffer: ReadBuffer):
         header, buffer = TDirectory_header_v622.read(buffer)
         if header.is_large():
             (fSeekDir, fSeekParent, fSeekKeys), buffer = buffer.unpack(">qqq")
@@ -96,7 +97,12 @@ class TDirectory(ROOTSerializable):
         if not header.is_large():
             # Extra space to allow seeks to become 64 bit without moving this header
             buffer = buffer[12:]
-        return (header, fSeekDir, fSeekParent, fSeekKeys, fUUID), buffer
+        members["header"] = header
+        members["fSeekDir"] = fSeekDir
+        members["fSeekParent"] = fSeekParent
+        members["fSeekKeys"] = fSeekKeys
+        members["fUUID"] = fUUID
+        return members, buffer
 
     def get_KeyList(self, fetch_data: DataFetcher):
         buffer = fetch_data(
@@ -142,7 +148,7 @@ class TKeyList(ROOTSerializable, Mapping[str, TKey]):
     """Extra bytes in the end of the TKeyList record (unknown)"""
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer):
+    def update_members(cls, members: Members, buffer: ReadBuffer):
         (nKeys,), buffer = buffer.unpack(">i")
         keys: list[TKey] = []
         while len(keys) < nKeys:
@@ -150,7 +156,9 @@ class TKeyList(ROOTSerializable, Mapping[str, TKey]):
             keys.append(key)
         # TODO: absorb padding bytes
         padding = b""
-        return (keys, padding), buffer
+        members["fKeys"] = keys
+        members["padding"] = padding
+        return members, buffer
 
     def __len__(self):
         return len(self.fKeys)

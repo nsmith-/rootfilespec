@@ -11,6 +11,7 @@ from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     DataFetcher,
     Fmt,
+    Members,
     ReadBuffer,
 )
 
@@ -61,7 +62,7 @@ class PageListEnvelope(REnvelope):
     """The Page Locations Triple Nested List Frame"""
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer):
+    def update_members(cls, members: Members, buffer: ReadBuffer):
         """Reads the RNTuple Page List Envelope payload from the given buffer."""
         # Read the header checksum
         (headerChecksum,), buffer = buffer.unpack("<Q")
@@ -72,7 +73,10 @@ class PageListEnvelope(REnvelope):
         # Read the page locations
         pageLocations, buffer = ClusterLocations.read(buffer)
 
-        return (headerChecksum, clusterSummaries, pageLocations), buffer
+        members["headerChecksum"] = headerChecksum
+        members["clusterSummaries"] = clusterSummaries
+        members["pageLocations"] = pageLocations
+        return members, buffer
 
     def get_pages(self, fetch_data: DataFetcher):
         """Get the RNTuple Pages from the Page Locations Nested List Frame."""

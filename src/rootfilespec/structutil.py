@@ -8,8 +8,6 @@ from typing import (
     TypeVar,
 )
 
-Args = tuple[Any, ...]
-
 
 class ReadBuffer:
     """A ReadBuffer is a memoryview that keeps track of the absolute and relative
@@ -79,7 +77,7 @@ class ReadBuffer:
     def __bool__(self) -> bool:
         return bool(self.data)
 
-    def unpack(self, fmt: str) -> tuple[Args, "ReadBuffer"]:
+    def unpack(self, fmt: str) -> tuple[tuple[Any, ...], "ReadBuffer"]:
         """Unpack the buffer according to the given format."""
         size = struct.calcsize(fmt)
         out = struct.unpack(fmt, self.data[:size])
@@ -107,9 +105,9 @@ class ReadBuffer:
 
 
 DataFetcher = Callable[[int, int], ReadBuffer]
-# Members = dict[str, Any]
+Members = dict[str, Any]
 OutType = TypeVar("OutType")
-ReadMethod = Callable[[ReadBuffer, Args], tuple[Args, ReadBuffer]]
+ReadMembersMethod = Callable[[Members, ReadBuffer], tuple[Members, ReadBuffer]]
 ReadObjMethod = Callable[[ReadBuffer], tuple[OutType, ReadBuffer]]
 
 
@@ -123,8 +121,8 @@ class MemberSerDe:
     can read the field from the buffer.
     """
 
-    def build_reader(self, ftype: type) -> ReadMethod:
-        """Build a reader function for the given field type and arguments.
+    def build_reader(self, fname: str, ftype: type) -> ReadMembersMethod:
+        """Build a reader function for the given field name and type.
 
         The reader function should take a ReadBuffer and return a tuple of the new
         arguments and the remaining buffer.
@@ -143,24 +141,31 @@ class ContainerSerDe(Generic[OutType]):
     can read the field from the buffer.
     """
 
-    def build_reader(self, inner_reader: ReadObjMethod[OutType]) -> ReadMethod:
-        """Build a reader function for the given field type and arguments.
+    @classmethod
+    def build_reader(
+        cls, fname: str, inner_reader: ReadObjMethod[OutType]
+    ) -> ReadMembersMethod:
+        """Build a reader function for the given field name and inner read implementation.
 
         The reader function should take a ReadBuffer and return a tuple of the new
         arguments and the remaining buffer.
         """
-        msg = f"Cannot build reader for {self.__class__.__name__}"
+        msg = f"Cannot build reader for {cls.__name__}"
         raise NotImplementedError(msg)
 
 
 @dataclasses.dataclass
 class _FmtReader:
+    fname: str
     fmt: str
     outtype: type
 
-    def __call__(self, buffer: ReadBuffer, args: Args) -> tuple[Args, ReadBuffer]:
+    def __call__(
+        self, members: Members, buffer: ReadBuffer
+    ) -> tuple[Members, ReadBuffer]:
         tup, buffer = buffer.unpack(self.fmt)
-        return (*args, self.outtype(*tup)), buffer
+        members[self.fname] = self.outtype(*tup)
+        return members, buffer
 
 
 @dataclasses.dataclass
@@ -169,8 +174,8 @@ class Fmt(MemberSerDe):
 
     fmt: str
 
-    def build_reader(self, ftype: type) -> ReadMethod:
-        return _FmtReader(self.fmt, ftype)
+    def build_reader(self, fname: str, ftype: type) -> ReadMembersMethod:
+        return _FmtReader(fname, self.fmt, ftype)
 
 
 T = TypeVar("T", bound="ROOTSerializable")
@@ -184,10 +189,14 @@ class ROOTSerializable:
 
     @classmethod
     def read(cls: type[T], buffer: ReadBuffer) -> tuple[T, ReadBuffer]:
-        members, buffer = cls.read_members(buffer)
-        return cls(*members), buffer
+        members: Members = {}
+        # TODO: always loop through base classes? StreamedObject does this a special way
+        members, buffer = cls.update_members(members, buffer)
+        return cls(**members), buffer
 
     @classmethod
-    def read_members(cls, buffer: ReadBuffer) -> tuple[Args, ReadBuffer]:
-        msg = "Unimplemented method: {cls.__name__}.read_members"
+    def update_members(
+        cls, members: Members, buffer: ReadBuffer
+    ) -> tuple[Members, ReadBuffer]:
+        msg = f"Unimplemented method: {cls.__name__}.update_members"
         raise NotImplementedError(msg)

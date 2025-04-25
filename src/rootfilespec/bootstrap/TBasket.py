@@ -11,6 +11,7 @@ from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
     Fmt,
+    Members,
     ReadBuffer,
     ROOTSerializable,
 )
@@ -47,16 +48,11 @@ class TBasket(TKey):
     "Buffer if the basket owns it"
 
     @classmethod
-    def read(cls, buffer: ReadBuffer):
-        args, buffer = cls.read_members(buffer)
-        return cls(*args), buffer
-
-    @classmethod
-    def read_members(cls, buffer: ReadBuffer):
+    def update_members(cls, members: Members, buffer: ReadBuffer):
         start_position = buffer.relpos
         sheader, buffer = StreamHeader.read(buffer)
-        tkey_args, buffer = TKey.read_members(buffer)
-        base_tkey = TKey(*tkey_args)
+        members, buffer = TKey.update_members(members, buffer)
+        base_tkey = TKey(**members)
         bheader, buffer = TBasket_header.read(buffer)
 
         fEntryOffset: NDArray[np.int32] = np.full(
@@ -75,21 +71,16 @@ class TBasket(TKey):
             data, buffer = buffer.consume(n * fEntryOffset.dtype.itemsize)
             fEntryOffset = np.frombuffer(data, dtype=fEntryOffset.dtype, count=n)
         if base_tkey.header.is_embedded():
-            _, buffer = TKey.read_members(buffer)
+            _, buffer = TKey.update_members(
+                {}, buffer
+            )  # TODO: worth checking consistency?
             _, buffer = TBasket_header.read(buffer)
             end_position = start_position + sheader.fByteCount + 4
             fBuffer, buffer = buffer.consume(end_position - buffer.relpos)
-        return (
-            base_tkey.header,
-            base_tkey.fSeekKey,
-            base_tkey.fSeekPdir,
-            base_tkey.fClassName,
-            base_tkey.fName,
-            base_tkey.fTitle,
-            bheader,
-            fEntryOffset,
-            fBuffer,
-        ), buffer
+        members["bheader"] = bheader
+        members["fEntryOffset"] = fEntryOffset
+        members["fBuffer"] = fBuffer
+        return members, buffer
 
 
 DICTIONARY["TBasket"] = TBasket
