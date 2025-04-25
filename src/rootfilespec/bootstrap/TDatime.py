@@ -25,4 +25,5 @@ def TDatime_to_datetime(fDatime: int) -> datetime:
         second=(fDatime & 0x3F),
     )
 
+
 TDatime = Annotated[int, Fmt(">I")]
