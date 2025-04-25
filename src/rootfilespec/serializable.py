@@ -18,8 +18,8 @@ from rootfilespec.buffer import ReadBuffer
 T = TypeVar("T", bound="ROOTSerializable")
 OutType = TypeVar("OutType")
 Members = dict[str, Any]
-ReadMembersMethod = Callable[[Members, ReadBuffer], tuple[Members, ReadBuffer]]
 ReadObjMethod = Callable[[ReadBuffer], tuple[OutType, ReadBuffer]]
+ReadMembersMethod = Callable[[Members, ReadBuffer], tuple[Members, ReadBuffer]]
 
 
 def _get_annotations(cls: type) -> dict[str, Any]:

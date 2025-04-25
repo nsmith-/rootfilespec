@@ -1,13 +1,15 @@
 # rootfilespec
 
-```{toctree}
-:maxdepth: 2
-:hidden:
+```{include} ../README.md
 
 ```
 
-```{include} ../README.md
-:start-after: <!-- SPHINX-START -->
+```{toctree}
+:maxdepth: 2
+:caption: Contents:
+:hidden:
+Home <self>
+design.md
 ```
 
 ## Indices and tables
