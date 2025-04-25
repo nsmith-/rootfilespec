@@ -10,7 +10,7 @@ from typing import Optional
 from rootfilespec.bootstrap.streamedobject import StreamedObject
 from rootfilespec.buffer import ReadBuffer
 from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.serializable import Members, serializable
 
 
 @serializable
@@ -21,8 +21,15 @@ class TVirtualIndex(StreamedObject):
 
 
 @serializable
-class TAtt3D(ROOTSerializable):
-    """Empty class for marking a TH1 as 3D"""
+class TAtt3D(StreamedObject):
+    """Some TH3D attributes
+
+    This class is usually in the StreamerInfo, but missing in some files:
+        uproot-from-geant4.root
+        uproot-issue-250.root
+    So we get "ValueError: Class TH3 depends on TAtt3D, which is not declared"
+    Note that the second file also has a suspicious TH1D object with fByteCount == 0
+    """
 
 
 @serializable

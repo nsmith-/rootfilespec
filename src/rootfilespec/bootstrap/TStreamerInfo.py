@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Annotated
+from typing import Annotated, Union
 
 from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TList import TObjArray
@@ -20,7 +20,7 @@ class ClassDef:
 
 @serializable
 class TStreamerInfo(TNamed):
-    fCheckSum: Annotated[int, Fmt(">i")]
+    fCheckSum: Annotated[int, Fmt(">I")]
     fClassVersion: Annotated[int, Fmt(">i")]
     fObjects: TObjArray
 
@@ -69,6 +69,21 @@ class TStreamerInfo(TNamed):
 
 
 DICTIONARY["TStreamerInfo"] = TStreamerInfo
+
+
+def _structtype_to_pytype(fmt: str) -> type[Union[int, float, bool, bytes]]:
+    if fmt.lstrip("<>").lower() in "bhilq":
+        return int
+    if fmt.lstrip("<>").lower() in "fd":
+        return float
+    if fmt.lstrip("<>") == "?":
+        return bool
+    if fmt in ("float16", "double32"):
+        return float
+    if fmt == "charstar":
+        return bytes
+    msg = f"Unknown format character {fmt!r}"
+    raise ValueError(msg)
 
 
 class ElementType(IntEnum):
@@ -186,43 +201,41 @@ class ElementType(IntEnum):
         """Get a string representation of this element type."""
         return f"{self.__class__.__name__}.{self.name}"
 
+    def is_array(self) -> bool:
+        """Check if the element type is an array."""
+        return self.value >= self.kOffsetL and self.value < self.kOffsetL + 20
+
     def is_basicpointer(self) -> bool:
         """Check if the element type is a pointer to a basic type."""
         return self.value >= self.kOffsetP and self.value < self.kOffsetP + 20
 
-    def as_fmt(self) -> tuple[str, str]:
-        """Get the format character and type name for this element type.
-        Returns:
-            tuple[str, str]: Type name and format character.
-        Raises:
-            ValueError: If the element type is not a basic type.
-        """
+    def as_fmt(self) -> str:
+        """Get the format character for this element type."""
         fmtmap = {
-            self.kChar: (int, ">b"),
-            self.kShort: (int, ">h"),
-            self.kInt: (int, ">i"),
-            self.kLong: (int, ">l"),
-            self.kFloat: (float, ">f"),
-            self.kDouble: (float, ">d"),
-            self.kUChar: (int, ">B"),
-            self.kUShort: (int, ">H"),
-            self.kUInt: (int, ">I"),
-            self.kULong: (int, ">Q"),
-            self.kLong64: (int, ">q"),
-            self.kULong64: (int, ">Q"),
-            self.kBool: (bool, ">?"),
-            self.kBits: (int, ">I"),
-            self.kCounter: (int, ">i"),
+            self.kChar: ">b",
+            self.kShort: ">h",
+            self.kInt: ">i",
+            self.kLong: ">l",
+            self.kFloat: ">f",
+            self.kDouble: ">d",
+            self.kUChar: ">B",
+            self.kUShort: ">H",
+            self.kUInt: ">I",
+            self.kULong: ">Q",
+            self.kLong64: ">q",
+            self.kULong64: ">Q",
+            self.kBool: ">?",
+            self.kBits: ">I",
+            self.kCounter: ">i",
+            self.kCharStar: "charstar",
+            self.kDouble32: "double32",
+            self.kFloat16: "float16",
         }
         if self not in fmtmap:
-            if self < 40:
-                msg = f"Reading {self!r} not implemented"
-                raise NotImplementedError(msg)
             msg = f"Cannot convert {self!r} to format character"
             raise ValueError(msg)
 
-        type_, fmt = fmtmap[self]
-        return type_.__name__, fmt
+        return fmtmap[self]
 
 
 @dataclass
@@ -298,10 +311,12 @@ DICTIONARY["TStreamerBase"] = TStreamerBase
 class TStreamerBasicType(TStreamerElement):
     def member_definition(self, parent: TStreamerInfo):  # noqa: ARG002
         if self.fArrayLength > 0:
-            msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
-            raise NotImplementedError(msg)
-        type_, fmt = self.fType.as_fmt()
-        return f"{self.member_name()}: Annotated[{type_}, Fmt({fmt!r})]", []
+            fmt = ElementType(self.fType - ElementType.kOffsetL).as_fmt()
+            atype = f"FixedSizeArray({fmt!r}, {self.fArrayLength})"
+            return f"{self.member_name()}: Annotated[np.ndarray, {atype}]", []
+        fmt = self.fType.as_fmt()
+        pytype = _structtype_to_pytype(fmt).__name__
+        return f"{self.member_name()}: Annotated[{pytype}, Fmt({fmt!r})]", []
 
 
 DICTIONARY["TStreamerBasicType"] = TStreamerBasicType
@@ -337,7 +352,8 @@ class TStreamerBasicPointer(TStreamerElement):
         if self.fArrayLength > 0:
             msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
-        _, fmt = ElementType(self.fType - ElementType.kOffsetP).as_fmt()
+
+        fmt = ElementType(self.fType - ElementType.kOffsetP).as_fmt()
         if not (
             self.fCountClass == parent.fName
             or normalize(self.fCountClass.fString) in parent.base_classes()

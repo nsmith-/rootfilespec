@@ -2,7 +2,7 @@ from typing import Annotated, Optional, TypeVar, Union, overload
 
 from rootfilespec.bootstrap.compression import RCompressed
 from rootfilespec.bootstrap.strings import TString
-from rootfilespec.bootstrap.util import fDatime_to_datetime
+from rootfilespec.bootstrap.TDatime import TDatime, TDatime_to_datetime
 from rootfilespec.buffer import DataFetcher, ReadBuffer
 from rootfilespec.dispatch import DICTIONARY, normalize
 from rootfilespec.serializable import Members, ROOTSerializable, serializable
@@ -19,7 +19,7 @@ class TKey_header(ROOTSerializable):
     """TKey class version identifier"""
     fObjlen: Annotated[int, Fmt(">i")]
     """Number of bytes of uncompressed data"""
-    fDatime: Annotated[int, Fmt(">i")]
+    fDatime: TDatime
     """Date and time when record was written to file"""
     fKeylen: Annotated[int, Fmt(">h")]
     """Number of bytes in key structure (TKey)"""
@@ -28,7 +28,7 @@ class TKey_header(ROOTSerializable):
 
     def write_time(self):
         """Date and time when record was written to file"""
-        return fDatime_to_datetime(self.fDatime)
+        return TDatime_to_datetime(self.fDatime)
 
     def is_short(self) -> bool:
         """Return if the key is short (i.e. the seeks are 32 bit)"""

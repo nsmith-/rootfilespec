@@ -43,14 +43,17 @@ class _ArrayReader:
 class BasicArray(MemberSerDe):
     """A class to hold a basic array of a given type."""
 
-    dtype: str
+    fmt: str
     shapefield: str
     """The field that holds the shape of the array."""
     haspad: bool = True
     """Whether the array has a pad byte or not"""
 
     def build_reader(self, fname: str, ftype: type):  # noqa: ARG002
-        return _ArrayReader(fname, np.dtype(self.dtype), self.shapefield, self.haspad)
+        if self.fmt in ("float16", "double32", "charstar"):
+            msg = f"Unimplemented format {self.fmt}"
+            raise NotImplementedError(msg)
+        return _ArrayReader(fname, np.dtype(self.fmt), self.shapefield, self.haspad)
 
 
 @dataclasses.dataclass
@@ -80,6 +83,25 @@ class CArray(MemberSerDe):
 
 
 @dataclasses.dataclass
+class _FixedSizeArrayReader:
+    """Array that has its length at the beginning of the array and has no pad byte"""
+
+    name: str
+    dtype: np.dtype[Any]
+    size: int
+
+    def __call__(
+        self, members: Members, buffer: ReadBuffer
+    ) -> tuple[Members, ReadBuffer]:
+        msg = "FixedSizeArrayReader not implemented"
+        raise NotImplementedError(msg)
+        # data, buffer = buffer.consume(self.size * self.dtype.itemsize)
+        # arg = np.frombuffer(data, dtype=self.dtype, count=self.size)
+        # members[self.name] = arg
+        # return members, buffer
+
+
+@dataclasses.dataclass
 class FixedSizeArray(MemberSerDe):
     """A class to hold a fixed size array of a given type.
 
@@ -88,17 +110,14 @@ class FixedSizeArray(MemberSerDe):
         size (int): The size of the array.
     """
 
-    dtype: np.dtype[Any]
+    fmt: str
     size: int
 
     def build_reader(self, fname: str, ftype: type):  # noqa: ARG002
-        def read(members: Members, buffer: ReadBuffer) -> tuple[Members, ReadBuffer]:
-            data, buffer = buffer.consume(self.size * self.dtype.itemsize)
-            arg = np.frombuffer(data, dtype=self.dtype, count=self.size)
-            members[fname] = arg
-            return members, buffer
-
-        return read
+        if self.fmt in ("float16", "double32", "charstar"):
+            msg = f"Unimplemented format {self.fmt}"
+            raise NotImplementedError(msg)
+        return _FixedSizeArrayReader(fname, np.dtype(self.fmt), self.size)
 
 
 @dataclasses.dataclass

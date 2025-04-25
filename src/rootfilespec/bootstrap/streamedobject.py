@@ -135,6 +135,8 @@ def _read_all_members(
     start_position = buffer.relpos
     if cls.__name__ == "TObject" and indent > 0:
         itemheader, buffer = _auto_TObject_base(buffer)
+    elif indent > 0 and getattr(cls, "_SkipHeader", False):
+        itemheader = StreamHeader(0, None, None, None)
     else:
         itemheader, buffer = StreamHeader.read(buffer)
         if itemheader.fByteCount == 0:
@@ -143,15 +145,13 @@ def _read_all_members(
                 raise NotImplementedError(msg)
             msg = "fByteCount is 0"
             raise ValueError(msg)
-    if (
-        itemheader.fClassName
-        and normalize(itemheader.fClassName) != cls.__name__
-        and not cls.__name__.startswith("TLeaf")
-    ):
-        msg = (
-            f"Expected class {cls.__name__} but got {normalize(itemheader.fClassName)}"
-        )
-        raise ValueError(msg)
+        if (
+            itemheader.fClassName
+            and normalize(itemheader.fClassName) != cls.__name__
+            and not cls.__name__.startswith("TLeaf")
+        ):
+            msg = f"Expected class {cls.__name__} but got {normalize(itemheader.fClassName)}"
+            raise ValueError(msg)
     end_position = start_position + itemheader.fByteCount + 4
     members: Members = {}
     for base in reversed(cls.__bases__):
