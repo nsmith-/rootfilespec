@@ -2,7 +2,7 @@ from enum import IntEnum
 from typing import Annotated, Optional
 
 from rootfilespec.bootstrap.streamedobject import StreamedObject
-from rootfilespec.bootstrap.TString import TString
+from rootfilespec.bootstrap.strings import TString
 from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (

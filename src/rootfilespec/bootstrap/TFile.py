@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from typing import Annotated, Union
 
+from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TDirectory import TDirectory
 from rootfilespec.bootstrap.TKey import TKey
 from rootfilespec.bootstrap.TList import TList
-from rootfilespec.bootstrap.TString import TString
 from rootfilespec.bootstrap.TUUID import TUUID
 from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (

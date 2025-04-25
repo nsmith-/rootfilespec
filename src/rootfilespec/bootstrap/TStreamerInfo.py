@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Annotated
 
+from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TList import TObjArray
 from rootfilespec.bootstrap.TObject import TNamed
-from rootfilespec.bootstrap.TString import TString
 from rootfilespec.cpptype import cpptype_to_pytype
 from rootfilespec.dispatch import DICTIONARY, normalize
 from rootfilespec.serializable import serializable

@@ -1,7 +1,7 @@
 from typing import Annotated, Optional, TypeVar, Union, overload
 
 from rootfilespec.bootstrap.compression import RCompressed
-from rootfilespec.bootstrap.TString import TString
+from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.util import fDatime_to_datetime
 from rootfilespec.dispatch import DICTIONARY, normalize
 from rootfilespec.serializable import serializable

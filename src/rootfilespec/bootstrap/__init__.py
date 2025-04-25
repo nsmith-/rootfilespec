@@ -18,6 +18,7 @@ from rootfilespec.bootstrap.assumed import ROOT3a3aTIOFeatures, TAtt3D, TVirtual
 from rootfilespec.bootstrap.compression import RCompressed, RCompressionHeader
 from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
 from rootfilespec.bootstrap.streamedobject import StreamedObject
+from rootfilespec.bootstrap.strings import TString, string
 from rootfilespec.bootstrap.TBasket import TBasket
 from rootfilespec.bootstrap.TDirectory import TDirectory, TKeyList
 from rootfilespec.bootstrap.TFile import ROOTFile, TFile
@@ -30,7 +31,6 @@ from rootfilespec.bootstrap.TStreamerInfo import (
     TStreamerInfo,
     TStreamerString,
 )
-from rootfilespec.bootstrap.TString import TString, string
 
 __all__ = [
     "RCompressed",
