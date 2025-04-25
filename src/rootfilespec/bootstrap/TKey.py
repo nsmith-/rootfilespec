@@ -71,19 +71,6 @@ class TKey(ROOTSerializable):
     """Title of the object"""
 
     @classmethod
-    def read(cls, buffer: ReadBuffer):
-        start_position = buffer.relpos
-        members: Members = {}
-        members, buffer = cls.update_members(members, buffer)
-        keylen = buffer.relpos - start_position
-        header: TKey_header = members["header"]
-        if keylen != header.fKeylen and keylen != header.fKeylen + 4:
-            # TODO: understand why we sometimes read 4 more bytes
-            msg = f"TKey.read: key length mismatch: read {keylen}, header expects {header.fKeylen}"
-            raise ValueError(msg)
-        return cls(**members), buffer
-
-    @classmethod
     def update_members(
         cls, members: Members, buffer: ReadBuffer
     ) -> tuple[Members, ReadBuffer]:

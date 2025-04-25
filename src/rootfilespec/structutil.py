@@ -37,7 +37,7 @@ class ReadBuffer:
         self.data = data
         self.abspos = abspos
         self.relpos = relpos
-        self.local_refs = local_refs or {}
+        self.local_refs = {} if local_refs is None else local_refs
 
     def __getitem__(self, key: slice):
         """Get a slice of the buffer."""

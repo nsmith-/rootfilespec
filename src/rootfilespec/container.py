@@ -128,12 +128,14 @@ class Ref(Generic[T]):
         if addr & 0x40000000:
             # this isn't actually an address but an object
             addr &= ~0x40000000
-            buffer = buffer[addr:]
+            buffer = buffer[addr + 4 :]
             return cls(None), buffer
             # obj, buffer = ftype.read(buffer)
             # return cls(obj), buffer
-        msg = f"Pointer to address {addr} not implemented"
-        raise NotImplementedError(msg)
+        # TODO: finish Pointer implementation
+        return cls(None), buffer[4:]
+        # msg = f"Pointer to address {addr} not implemented"
+        # raise NotImplementedError(msg)
 
 
 @dataclasses.dataclass

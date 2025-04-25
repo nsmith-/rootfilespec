@@ -135,6 +135,12 @@ class StreamedObject(ROOTSerializable):
             itemheader, buffer = _auto_TObject_base(buffer)
         else:
             itemheader, buffer = StreamHeader.read(buffer)
+            if itemheader.fByteCount == 0:
+                if cls.__name__ == "TH1D":
+                    msg = "Suspicious TH1D object with fByteCount == 0 (e.g. uproot-issue-250.root)"
+                    raise NotImplementedError(msg)
+                msg = "fByteCount is 0"
+                raise ValueError(msg)
         if (
             itemheader.fClassName
             and normalize(itemheader.fClassName) != cls.__name__

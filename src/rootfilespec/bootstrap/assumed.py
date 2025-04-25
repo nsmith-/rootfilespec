@@ -5,13 +5,12 @@ TBasket and TArray* are also examples of this, but they are
 implemented in their own files.
 """
 
-from typing import Annotated
+from typing import Optional
 
 from rootfilespec.bootstrap.TObject import StreamedObject
 from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (
-    Fmt,
     Members,
     ReadBuffer,
     ROOTSerializable,
@@ -34,14 +33,18 @@ class TAtt3D(ROOTSerializable):
 
 @serializable
 class ROOT3a3aTIOFeatures(StreamedObject):
-    fIOBits: Annotated[int, Fmt(">B")]
+    fIOBits: int
+    extra: Optional[int]
 
     @classmethod
     def update_members(cls, members: Members, buffer: ReadBuffer):
-        # TODO: why is this 4 bytes here?
-        junk, buffer = buffer.unpack(">i")
         (fIOBits,), buffer = buffer.unpack(">B")
+        extra = None
+        if fIOBits > 0:
+            # TODO: why is this 4 bytes here?
+            extra, buffer = buffer.unpack(">i")
         members["fIOBits"] = fIOBits
+        members["extra"] = extra
         return members, buffer
 
 
