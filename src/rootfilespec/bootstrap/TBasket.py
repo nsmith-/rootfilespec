@@ -5,8 +5,8 @@ from typing import Annotated
 import numpy as np
 from numpy.typing import NDArray
 
+from rootfilespec.bootstrap.streamedobject import StreamHeader
 from rootfilespec.bootstrap.TKey import TKey
-from rootfilespec.bootstrap.TObject import StreamHeader
 from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (

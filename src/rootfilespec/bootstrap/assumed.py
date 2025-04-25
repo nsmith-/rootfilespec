@@ -7,7 +7,7 @@ implemented in their own files.
 
 from typing import Optional
 
-from rootfilespec.bootstrap.TObject import StreamedObject
+from rootfilespec.bootstrap.streamedobject import StreamedObject
 from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.serializable import serializable
 from rootfilespec.structutil import (

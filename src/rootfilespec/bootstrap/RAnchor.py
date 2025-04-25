@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from rootfilespec.bootstrap.TObject import StreamedObject
+from rootfilespec.bootstrap.streamedobject import StreamedObject
 from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.rntuple import FooterEnvelope, HeaderEnvelope
 from rootfilespec.rntuple.envelope import REnvelopeLink
