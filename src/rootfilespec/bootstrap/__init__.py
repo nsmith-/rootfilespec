@@ -17,7 +17,7 @@ from rootfilespec.bootstrap.array import (
 from rootfilespec.bootstrap.assumed import ROOT3a3aTIOFeatures, TAtt3D, TVirtualIndex
 from rootfilespec.bootstrap.compression import RCompressed, RCompressionHeader
 from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
-from rootfilespec.bootstrap.streamedobject import StreamedObject
+from rootfilespec.bootstrap.streamedobject import Pointer, Ref, StreamedObject
 from rootfilespec.bootstrap.strings import TString, string
 from rootfilespec.bootstrap.TBasket import TBasket
 from rootfilespec.bootstrap.TDirectory import TDirectory, TKeyList
@@ -33,11 +33,13 @@ from rootfilespec.bootstrap.TStreamerInfo import (
 )
 
 __all__ = [
+    "Pointer",
     "RCompressed",
     "RCompressionHeader",
     "ROOT3a3aRNTuple",
     "ROOT3a3aTIOFeatures",
     "ROOTFile",
+    "Ref",
     "StreamedObject",
     "TArrayC",
     "TArrayD",

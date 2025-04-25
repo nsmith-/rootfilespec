@@ -18,9 +18,7 @@ from rootfilespec.structutil import (
 
 
 @serializable
-class TVirtualIndex(ROOTSerializable):
-    uninterpreted: bytes
-
+class TVirtualIndex(StreamedObject):
     @classmethod
     def update_members(cls, members: Members, buffer: ReadBuffer):
         raise NotImplementedError

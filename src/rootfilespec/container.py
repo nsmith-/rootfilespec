@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Any, Generic, Optional, TypeVar, get_args, get_origin
+from typing import Any, TypeVar
 
 import numpy as np
 
@@ -97,61 +97,6 @@ class FixedSizeArray(MemberSerDe):
             data, buffer = buffer.consume(self.size * self.dtype.itemsize)
             arg = np.frombuffer(data, dtype=self.dtype, count=self.size)
             members[fname] = arg
-            return members, buffer
-
-        return read
-
-
-class Ref(Generic[T]):
-    """A class to hold a reference to an object.
-
-    We cannot use a dataclass here because its repr might end up
-    being cyclic and cause a stack overflow.
-    """
-
-    obj: Optional[T]
-    """The object that is referenced."""
-
-    def __init__(self, obj: Optional[T]):
-        self.obj = obj
-
-    def __repr__(self):
-        label = type(self.obj).__name__ if self.obj else "None"
-        return f"Ref({label})"
-
-    @classmethod
-    def read_as(cls, ftype: type[T], buffer: ReadBuffer):  # noqa: ARG003
-        (addr,), _ = buffer.unpack(">i")
-        if not addr:
-            buffer = buffer[4:]
-            return cls(None), buffer
-        if addr & 0x40000000:
-            # this isn't actually an address but an object
-            addr &= ~0x40000000
-            buffer = buffer[addr + 4 :]
-            return cls(None), buffer
-            # obj, buffer = ftype.read(buffer)
-            # return cls(obj), buffer
-        # TODO: finish Pointer implementation
-        return cls(None), buffer[4:]
-        # msg = f"Pointer to address {addr} not implemented"
-        # raise NotImplementedError(msg)
-
-
-@dataclasses.dataclass
-class Pointer(MemberSerDe):
-    def build_reader(self, fname: str, ftype: type):
-        if (origin := get_origin(ftype)) is not Ref:
-            msg = f"Pointer() only can be used with Ref, got {origin}"
-            raise ValueError(msg)
-        (ftype,) = get_args(ftype)
-        if not issubclass(ftype, ROOTSerializable):
-            msg = f"Pointer() only can be used with Ref[ROOTSerializable], got {ftype}"
-            raise ValueError(msg)
-
-        def read(members: Members, buffer: ReadBuffer) -> tuple[Members, ReadBuffer]:
-            obj, buffer = Ref.read_as(ftype, buffer)
-            members[fname] = obj
             return members, buffer
 
         return read
