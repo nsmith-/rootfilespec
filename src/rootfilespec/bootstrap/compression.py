@@ -26,6 +26,7 @@ class RCompressionHeader(ROOTSerializable):
 
     fAlgorithm: Annotated[bytes, Fmt("2s")]
     fVersion: Annotated[int, Fmt("B")]
+    # TODO: Make this a 3-byte integer using a custom MemberSerDe
     fCompressedSize: Annotated[bytes, Fmt("3s")]
     fUncompressedSize: Annotated[bytes, Fmt("3s")]
 
