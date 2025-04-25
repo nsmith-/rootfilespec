@@ -1,4 +1,4 @@
-from rootfilespec.bootstrap.streamedobject import StreamHeader, read_streamed_item
+from rootfilespec.bootstrap.streamedobject import read_streamed_item
 from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TObject import TObject, TObjectBits
 from rootfilespec.dispatch import DICTIONARY
@@ -70,12 +70,6 @@ class TObjArray(TObject):
         objects: list[ROOTSerializable] = []
         for _ in range(nObjects):
             item, buffer = read_streamed_item(buffer)
-            if isinstance(item, StreamHeader):
-                # TODO: Resolve or build pointer to TObject
-                continue
-            # if not isinstance(item, TObject):
-            #     msg = f"Expected TObject but got {item!r}"
-            #     raise ValueError(msg)
             objects.append(item)
         members["fName"] = fName
         members["nObjects"] = nObjects

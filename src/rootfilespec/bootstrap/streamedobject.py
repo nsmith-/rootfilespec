@@ -80,9 +80,7 @@ def read_streamed_item(buffer: ReadBuffer):
     # Read ahead the stream header to determine the type of the object
     itemheader, _ = StreamHeader.read(buffer)
     if itemheader.fByteCount == 0 and itemheader.fClassRef is not None:
-        # TODO: implement dereferencing of fClassRef
-        item, buffer = StreamHeader.read(buffer)
-        return item, buffer
+        return _read_ref(buffer)
     if not itemheader.fClassName:
         msg = f"StreamHeader has no class name: {itemheader}"
         raise ValueError(msg)
@@ -104,10 +102,10 @@ def read_streamed_item(buffer: ReadBuffer):
     item_end = itemheader.fByteCount + 4
     buffer, remaining = buffer[:item_end], buffer[item_end:]
     item, buffer = dyntype.read(buffer)
+    # TODO: register the object addr in the buffer local_refs
     if buffer:
         msg = f"Expected buffer to be empty after reading {dyntype}, but got\n{buffer}"
         raise ValueError(msg)
-    assert buffer.local_refs == remaining.local_refs
     return item, remaining
 
 
@@ -180,7 +178,12 @@ class StreamedObject(ROOTSerializable):
         return cls(**members), buffer
 
 
-class Ref(Generic[T]):
+def _read_ref(buffer: ReadBuffer) -> tuple["Ref[StreamedObject]", ReadBuffer]:
+    # TODO: implement getting the ref from buffer.local_refs
+    return Ref(None), buffer[4:]
+
+
+class Ref(ROOTSerializable, Generic[T]):
     """A class to hold a reference to an object.
 
     We cannot use a dataclass here because its repr might end up
@@ -209,9 +212,9 @@ class Ref(Generic[T]):
             buffer = buffer[addr + 4 :]
             return cls(None), buffer
             # obj, buffer = ftype.read(buffer)
+            # TODO: register the object addr in the buffer local_refs
             # return cls(obj), buffer
-        # TODO: finish Pointer implementation
-        return cls(None), buffer[4:]
+        return _read_ref(buffer)
 
 
 class Pointer(MemberSerDe):
@@ -230,5 +233,3 @@ class Pointer(MemberSerDe):
             return members, buffer
 
         return read
-        # msg = f"Pointer to address {addr} not implemented"
-        # raise NotImplementedError(msg)
