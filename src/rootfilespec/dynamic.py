@@ -13,14 +13,15 @@ from typing import Annotated, Optional
 import numpy as np
 
 from rootfilespec.bootstrap import *
-from rootfilespec.bootstrap.TKey import DICTIONARY
 from rootfilespec.container import (
-    FixedSizeArray,
     BasicArray,
+    FixedSizeArray,
     StdVector,
 )
-from rootfilespec.structutil import Fmt
+from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.serializable import serializable
+from rootfilespec.structutil import Fmt
+
 """
 
 BOOTSTRAP_TYPES: set[str] = set(bootstrap.__all__)
