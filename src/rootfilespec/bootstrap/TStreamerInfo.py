@@ -400,7 +400,8 @@ class TStreamerObjectPointer(TStreamerElement):
         if self.fArrayLength > 0:
             msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
-        typename, dependencies = cpptype_to_pytype(self.fTypeName.fString)
+        typename = normalize(self.fTypeName.fString)
+        dependencies = {typename}
         if typename == parent.class_name():
             dependencies.remove(typename)
             typename = f'"{typename}"'

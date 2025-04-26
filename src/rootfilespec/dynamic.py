@@ -20,7 +20,9 @@ from rootfilespec.container import (
     FixedSizeArray,
     StdVector,
     StdSet,
+    StdDeque,
     StdMap,
+    StdPair,
 )
 from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.serializable import serializable

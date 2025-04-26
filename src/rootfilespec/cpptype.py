@@ -47,6 +47,8 @@ _cpp_templates = {
     b"vector": "StdVector",
     b"map": "StdMap",
     b"set": "StdSet",
+    b"deque": "StdDeque",
+    b"pair": "StdPair",
 }
 
 

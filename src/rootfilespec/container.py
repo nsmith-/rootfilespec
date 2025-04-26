@@ -160,6 +160,9 @@ class StdVector(ContainerSerDe, Generic[T]):
         if hasheader:
             header, buffer = StreamHeader.read(buffer)
             # TODO: byte count check
+            if header.is_memberwise():
+                msg = "Memberwise reading of StdVector not implemented"
+                raise NotImplementedError(msg)
         (n,), buffer = buffer.unpack(">i")
         items: list[T] = []
         for _ in range(n):
@@ -191,6 +194,22 @@ class StdSet(ContainerSerDe, Generic[T]):
         return update_members
 
 
+@dataclasses.dataclass
+class StdDeque(ContainerSerDe, Generic[T]):
+    """A class to represent a std::set<T>."""
+
+    items: set[T]
+    """The items in the set."""
+
+    @classmethod
+    def build_reader(cls, fname: str, inner_reader: ReadObjMethod):  # noqa: ARG003
+        def update_members(members: Members, buffer: ReadBuffer):
+            msg = "StdDeque not implemented"
+            raise NotImplementedError(msg)
+
+        return update_members
+
+
 K = TypeVar("K", bound=Hashable)
 V = TypeVar("V", bound=MemberType)
 
@@ -217,8 +236,8 @@ class StdMap(AssociativeContainerSerDe, Generic[K, V]):
         cls, key_reader: ReadObjMethod, value_reader: ReadObjMethod, buffer: ReadBuffer
     ):
         header, buffer = StreamHeader.read(buffer)
-        if header.fVersion == 0x4009:
-            msg = "Suspicious map with large version seen in uproot-issue465-flat.root"
+        if header.is_memberwise():
+            msg = "Suspicious map with memberwise reading, incorrect length seen in uproot-issue465-flat.root"
             raise NotImplementedError(msg)
         (n,), buffer = buffer.unpack(">i")
         items: dict[K, V] = {}
@@ -227,3 +246,30 @@ class StdMap(AssociativeContainerSerDe, Generic[K, V]):
             value, buffer = value_reader(buffer)
             items[key] = value
         return cls(items), buffer
+
+
+@dataclasses.dataclass
+class StdPair(AssociativeContainerSerDe, Generic[K, V]):
+    """A class to represent a std::pair<K, V>."""
+
+    items: tuple[K, V]
+    """The items in the pair."""
+
+    @classmethod
+    def build_reader(
+        cls, fname: str, key_reader: ReadObjMethod, value_reader: ReadObjMethod
+    ):
+        def update_members(members: Members, buffer: ReadBuffer):
+            members[fname], buffer = cls.read_as(key_reader, value_reader, buffer)
+            return members, buffer
+
+        return update_members
+
+    @classmethod
+    def read_as(
+        cls, key_reader: ReadObjMethod, value_reader: ReadObjMethod, buffer: ReadBuffer
+    ):
+        raise NotImplementedError
+        key, buffer = key_reader(buffer)
+        value, buffer = value_reader(buffer)
+        return cls((key, value)), buffer
