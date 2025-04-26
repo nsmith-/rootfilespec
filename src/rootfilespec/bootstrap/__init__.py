@@ -14,7 +14,12 @@ from rootfilespec.bootstrap.array import (
     TArrayI,
     TArrayS,
 )
-from rootfilespec.bootstrap.assumed import ROOT3a3aTIOFeatures, TAtt3D, TVirtualIndex
+from rootfilespec.bootstrap.assumed import (
+    ROOT3a3aTIOFeatures,
+    TAtt3D,
+    TVirtualIndex,
+    Uninterpreted,
+)
 from rootfilespec.bootstrap.compression import RCompressed, RCompressionHeader
 from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
 from rootfilespec.bootstrap.streamedobject import Pointer, Ref, StreamedObject
@@ -84,5 +89,6 @@ __all__ = [
     "TStreamerString",
     "TString",
     "TVirtualIndex",
+    "Uninterpreted",
     "string",
 ]

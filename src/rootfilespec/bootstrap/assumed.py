@@ -7,7 +7,7 @@ implemented in their own files.
 
 from typing import Optional
 
-from rootfilespec.bootstrap.streamedobject import StreamedObject
+from rootfilespec.bootstrap.streamedobject import StreamedObject, StreamHeader
 from rootfilespec.buffer import ReadBuffer
 from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.serializable import Members, serializable
@@ -50,3 +50,27 @@ class ROOT3a3aTIOFeatures(StreamedObject):
 
 
 DICTIONARY["ROOT3a3aTIOFeatures"] = ROOT3a3aTIOFeatures
+
+
+@serializable
+class Uninterpreted(StreamedObject):
+    """A class to represent an uninterpreted streamed object
+
+    This is used for objects that are not recognized by the library.
+    """
+
+    header: StreamHeader
+    """The header of the object."""
+    data: bytes
+    """The uninterpreted data of the object."""
+
+    @classmethod
+    def read(cls, buffer: ReadBuffer):
+        header, buffer = StreamHeader.read(buffer)
+        data, buffer = buffer.consume(header.fByteCount - 4)
+        return cls(header, data), buffer
+
+    @classmethod
+    def update_members(cls, members: Members, buffer: ReadBuffer):  # noqa: ARG003
+        msg = "Logic error"
+        raise RuntimeError(msg)

@@ -41,6 +41,7 @@ class TStreamerInfo(TNamed):
     def class_definition(self) -> ClassDef:
         """Get the class definition code of this streamer info."""
         bases = self.base_classes()
+        # TODO: f"_VERSION = {self.fClassVersion}"
         members: list[str] = []
         dependencies: list[str] = []
         for element in self.fObjects.objects:

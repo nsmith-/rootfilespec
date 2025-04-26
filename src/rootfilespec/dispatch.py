@@ -11,6 +11,7 @@ def normalize(s: bytes) -> str:
 
     This is used to generate the class name in the DICTIONARY.
     """
+    # TODO: #22 append version to all class names
     return (
         s.decode(ENCODING)
         .replace(":", "3a")

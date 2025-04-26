@@ -48,6 +48,10 @@ def streamerinfo_to_classes(streamerinfo: bootstrap.TList) -> str:
         classdef = item.class_definition()
         classes[classdef.name] = classdef
 
+    # Collect all warnings for users here since the stack level
+    # is not predictable in the recursive write function
+    warning_log: list[str] = []
+
     # Write out in dependency order
     def write(classdef: ClassDef):
         for dep in classdef.dependencies:
@@ -55,13 +59,19 @@ def streamerinfo_to_classes(streamerinfo: bootstrap.TList) -> str:
             if depdef is not None:
                 write(depdef)
             elif dep not in declared:
-                msg = f"Class {classdef.name} depends on {dep}, which is not declared"
-                warnings.warn(msg, UserWarning, stacklevel=1)
+                warning_log.append(
+                    f"Class {classdef.name} depends on {dep}, which is not declared"
+                )
+                lines.append(f"class {dep}(Uninterpreted):\n    pass\n")
         lines.append(classdef.code)
         declared.add(classdef.name)
 
     while classes:
         _, classdef = classes.popitem()
         write(classdef)
+
+    # Write out the warnings
+    for msg in warning_log:
+        warnings.warn(msg, UserWarning, stacklevel=2)
 
     return "\n".join(lines)
