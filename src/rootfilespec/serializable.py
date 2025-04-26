@@ -4,7 +4,6 @@ from typing import (
     Annotated,
     Any,
     Callable,
-    Generic,
     TypeVar,
     get_args,
     get_origin,
@@ -15,10 +14,10 @@ from typing_extensions import dataclass_transform
 
 from rootfilespec.buffer import ReadBuffer
 
-T = TypeVar("T", bound="ROOTSerializable")
-OutType = TypeVar("OutType")
-Members = dict[str, Any]
-ReadObjMethod = Callable[[ReadBuffer], tuple[OutType, ReadBuffer]]
+RT = TypeVar("RT", bound="ROOTSerializable")
+MemberType = Any
+Members = dict[str, MemberType]
+ReadObjMethod = Callable[[ReadBuffer], tuple[MemberType, ReadBuffer]]
 ReadMembersMethod = Callable[[Members, ReadBuffer], tuple[Members, ReadBuffer]]
 
 
@@ -42,7 +41,7 @@ class ROOTSerializable:
     """
 
     @classmethod
-    def read(cls: type[T], buffer: ReadBuffer) -> tuple[T, ReadBuffer]:
+    def read(cls: type[RT], buffer: ReadBuffer) -> tuple[RT, ReadBuffer]:
         members: Members = {}
         # TODO: always loop through base classes? StreamedObject does this a special way
         members, buffer = cls.update_members(members, buffer)
@@ -67,7 +66,7 @@ class _ReadWrapper:
         return members, buffer
 
 
-class ContainerSerDe(Generic[OutType]):
+class ContainerSerDe:
     """A protocol for (De)serialization of generic container fields.
 
     The @serializable decorator will use these annotations to determine how to read
@@ -78,8 +77,29 @@ class ContainerSerDe(Generic[OutType]):
     """
 
     @classmethod
+    def build_reader(cls, fname: str, inner_reader: ReadObjMethod) -> ReadMembersMethod:
+        """Build a reader function for the given field name and inner read implementation.
+
+        The reader function should take a ReadBuffer and return a tuple of the new
+        arguments and the remaining buffer.
+        """
+        msg = f"Cannot build reader for {cls.__name__}"
+        raise NotImplementedError(msg)
+
+
+class AssociativeContainerSerDe:
+    """A protocol for (De)serialization of generic associative container fields.
+
+    The @serializable decorator will use these annotations to determine how to read
+    the field from the buffer. For example, if a dataclass has a field of type
+        `field: AssociativeContainer[KeyType, ValueType]`
+    Then `AssociativeContainerSerDe.build_reader(build_reader(KeyType), build_reader(ValueType))`
+    will be called to get a function that can read the field from the buffer.
+    """
+
+    @classmethod
     def build_reader(
-        cls, fname: str, inner_reader: ReadObjMethod[OutType]
+        cls, fname: str, key_reader: ReadObjMethod, value_reader: ReadObjMethod
     ) -> ReadMembersMethod:
         """Build a reader function for the given field name and inner read implementation.
 
@@ -110,29 +130,40 @@ class MemberSerDe:
         raise NotImplementedError(msg)
 
 
-def _get_read_method(fname: str, ftype: Any) -> ReadMembersMethod:
+def _build_read(ftype: type[MemberType]) -> ReadObjMethod:
+    membermethod = _build_update_members("", ftype)
+
+    def reader(buffer: ReadBuffer):
+        members, buffer = membermethod({}, buffer)
+        return ftype(**members), buffer
+
+    return reader
+
+
+def _build_update_members(fname: str, ftype: Any) -> ReadMembersMethod:
     if isinstance(ftype, type) and issubclass(ftype, ROOTSerializable):
         return _ReadWrapper(fname, ftype)
     if origin := get_origin(ftype):
         if origin is Annotated:
-            ftype, *annotations = get_args(ftype)
+            itype, *annotations = get_args(ftype)
             memberserde = next(
                 (ann for ann in annotations if isinstance(ann, MemberSerDe)), None
             )
             if memberserde:
-                return memberserde.build_reader(fname, ftype)
-            msg = f"Cannot read type {ftype} with annotations {annotations}"
+                return memberserde.build_reader(fname, itype)
+            msg = f"Cannot read type {itype} with annotations {annotations}"
             raise NotImplementedError(msg)
-        if issubclass(origin, ContainerSerDe):
-            ftype, *args = get_args(ftype)
-            assert not args  # TODO: will not work for std::pair
-            membermethod = _get_read_method("", ftype)
-
-            def inner_reader(buffer: ReadBuffer):
-                members, buffer = membermethod({}, buffer)
-                return ftype(**members), buffer
-
-            return origin.build_reader(fname, inner_reader)  # type: ignore[no-any-return]
+        if isinstance(origin, type) and issubclass(origin, ContainerSerDe):
+            itype, *args = get_args(ftype)
+            assert not args
+            item_reader = _build_read(itype)
+            return origin.build_reader(fname, item_reader)
+        if isinstance(origin, type) and issubclass(origin, AssociativeContainerSerDe):
+            ktype, vtype, *args = get_args(ftype)
+            assert not args
+            key_reader = _build_read(ktype)
+            value_reader = _build_read(vtype)
+            return origin.build_reader(fname, key_reader, value_reader)
         msg = f"Cannot read subscripted type {ftype} with origin {origin}"
         raise NotImplementedError(msg)
     msg = f"Cannot read type {ftype}"
@@ -140,7 +171,7 @@ def _get_read_method(fname: str, ftype: Any) -> ReadMembersMethod:
 
 
 @dataclass_transform()
-def serializable(cls: type[T]) -> type[T]:
+def serializable(cls: type[RT]) -> type[RT]:
     """A decorator to add a update_members method to a class that reads its fields from a buffer.
 
     The class must have type hints for its fields, and the fields must be of types that
@@ -161,14 +192,15 @@ def serializable(cls: type[T]) -> type[T]:
     localns = {cls.__name__: cls}
     namespace = get_type_hints(cls, localns=localns, include_extras=True)
     member_readers = [
-        _get_read_method(field, namespace[field]) for field in _get_annotations(cls)
+        _build_update_members(field, namespace[field])
+        for field in _get_annotations(cls)
     ]
 
     # TODO: scan through and coalesce the _FmtReader objects into a single function call
 
     @classmethod  # type: ignore[misc]
     def update_members(
-        _: type[T], members: Members, buffer: ReadBuffer
+        _: type[RT], members: Members, buffer: ReadBuffer
     ) -> tuple[Members, ReadBuffer]:
         for reader in member_readers:
             members, buffer = reader(members, buffer)

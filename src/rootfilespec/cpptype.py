@@ -45,6 +45,8 @@ _cpp_primitives = {
 }
 _cpp_templates = {
     b"vector": "StdVector",
+    b"map": "StdMap",
+    b"set": "StdSet",
 }
 
 

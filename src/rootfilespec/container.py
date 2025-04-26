@@ -1,18 +1,18 @@
 import dataclasses
-from typing import Any, TypeVar
+from typing import Any, Generic, TypeVar
 
 import numpy as np
 
 from rootfilespec.buffer import ReadBuffer
 from rootfilespec.serializable import (
+    AssociativeContainerSerDe,
     ContainerSerDe,
     Members,
     MemberSerDe,
+    MemberType,
     ReadObjMethod,
     ROOTSerializable,
 )
-
-T = TypeVar("T", bound="ROOTSerializable")
 
 
 @dataclasses.dataclass
@@ -120,22 +120,73 @@ class FixedSizeArray(MemberSerDe):
         return _FixedSizeArrayReader(fname, np.dtype(self.fmt), self.size)
 
 
+T = TypeVar("T", bound=MemberType)
+
+
 @dataclasses.dataclass
-class StdVector(ROOTSerializable, ContainerSerDe[T]):
+class StdVector(ROOTSerializable, ContainerSerDe, Generic[T]):
     """A class to represent a std::vector<T>."""
 
-    items: tuple[T, ...]
+    items: list[T]
     """The items in the vector."""
 
     @classmethod
-    def build_reader(cls, fname: str, inner_reader: ReadObjMethod[T]):
+    def build_reader(cls, fname: str, inner_reader: ReadObjMethod):
         def update_members(members: Members, buffer: ReadBuffer):
             (n,), buffer = buffer.unpack(">i")
-            items: tuple[T, ...] = ()
+            items: list[T] = []
             for _ in range(n):
                 obj, buffer = inner_reader(buffer)
-                items += (obj,)
+                items.append(obj)
             members[fname] = items
             return members, buffer
+
+        return update_members
+
+
+@dataclasses.dataclass
+class StdSet(ROOTSerializable, ContainerSerDe, Generic[T]):
+    """A class to represent a std::set<T>."""
+
+    items: set[T]
+    """The items in the set."""
+
+    @classmethod
+    def build_reader(cls, fname: str, inner_reader: ReadObjMethod):  # noqa: ARG003
+        def update_members(members: Members, buffer: ReadBuffer):
+            msg = "StdSet not implemented"
+            raise NotImplementedError(msg)
+            # (n,), buffer = buffer.unpack(">i")
+            # items: set[T] = set()
+            # for _ in range(n):
+            #     obj, buffer = inner_reader(buffer)
+            #     items.add(obj)
+            # members[fname] = items
+            # return members, buffer
+
+        return update_members
+
+
+K = TypeVar("K", bound=MemberType)
+V = TypeVar("V", bound=MemberType)
+
+
+@dataclasses.dataclass
+class StdMap(ROOTSerializable, AssociativeContainerSerDe, Generic[K, V]):
+    """A class to represent a std::map<K, V>."""
+
+    items: dict[K, V]
+    """The items in the map."""
+
+    @classmethod
+    def build_reader(
+        cls,
+        fname: str,  # noqa: ARG003
+        key_reader: ReadObjMethod,  # noqa: ARG003
+        value_reader: ReadObjMethod,  # noqa: ARG003
+    ):
+        def update_members(members: Members, buffer: ReadBuffer):
+            msg = "StdMap not implemented"
+            raise NotImplementedError(msg)
 
         return update_members

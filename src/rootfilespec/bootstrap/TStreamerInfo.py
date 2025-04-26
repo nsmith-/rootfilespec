@@ -464,27 +464,62 @@ DICTIONARY["TStreamerObjectAnyPointer"] = TStreamerObjectAnyPointer
 
 
 class STLType(IntEnum):
+    """STL container type codes.
+
+    https://github.com/root-project/root/blob/v6-34-08/core/foundation/inc/ESTLType.h#L28
+    """
+
     kOffsetP = 40
     vector = 1
     list = 2
     deque = 3
     map = 4
-    set = 5
-    multimap = 6
+    multimap = 5
+    set = 6
     multiset = 7
     bitset = 8
-    unordered_map = 12
+    forwardlist = 9
+    unorderedset = 10
+    unorderedmultiset = 11
+    unorderedmap = 12
+    unorderedmultimap = 13
     RVec = 14
     "ROOT::VecOps::RVec<T>"
-    vectorPointer = kOffsetP + 1
-    listPointer = kOffsetP + 2
-    dequePointer = kOffsetP + 3
-    mapPointer = kOffsetP + 4
-    setPointer = kOffsetP + 5
-    multimapPointer = kOffsetP + 6
-    multisetPointer = kOffsetP + 7
-    bitsetPointer = kOffsetP + 8
+    kSTLend = 15
+    vectorPointer = kOffsetP + vector
+    listPointer = kOffsetP + list
+    dequePointer = kOffsetP + deque
+    mapPointer = kOffsetP + map
+    multimapPointer = kOffsetP + multimap
+    setPointer = kOffsetP + set
+    multisetPointer = kOffsetP + multiset
+    bitsetPointer = kOffsetP + bitset
+    forwardlistPointer = kOffsetP + forwardlist
+    unorderedsetPointer = kOffsetP + unorderedset
+    unorderedmultisetPointer = kOffsetP + unorderedmultiset
+    unorderedmapPointer = kOffsetP + unorderedmap
+    unorderedmultimapPointer = kOffsetP + unorderedmultimap
     string = 365
+
+    def __repr__(self) -> str:
+        """Get a string representation of this element type."""
+        return f"{self.__class__.__name__}.{self.name}"
+
+
+_cpp_primitives = {
+    "bool": "Annotated[bool, Fmt('>?')]",
+    "char": "Annotated[int, Fmt('>b')]",
+    "unsigned char": "Annotated[int, Fmt('>B')]",
+    "short": "Annotated[int, Fmt('>h')]",
+    "unsigned short": "Annotated[int, Fmt('>H')]",
+    "int": "Annotated[int, Fmt('>i')]",
+    "unsigned int": "Annotated[int, Fmt('>I')]",
+    "Long64_t": "Annotated[int, Fmt('>q')]",
+    "long": "Annotated[int, Fmt('>q')]",
+    "unsigned long": "Annotated[int, Fmt('>Q')]",
+    "float": "Annotated[float, Fmt('>f')]",
+    "double": "Annotated[float, Fmt('>d')]",
+}
 
 
 @serializable
@@ -503,20 +538,11 @@ class TStreamerSTL(TStreamerElement):
     fCType: Annotated[ElementType, Fmt(">i")]
 
     def member_definition(self, parent: TStreamerInfo):  # noqa: ARG002
+        if STLType.kOffsetP <= self.fSTLtype < STLType.kOffsetP + STLType.kSTLend:
+            msg = f"STL pointer type {self.fSTLtype!r} not implemented"
+            raise NotImplementedError(msg)
         typename, dependencies = cpptype_to_pytype(self.cpp_typename())
-        if self.fSTLtype == STLType.vector:
-            assert typename.startswith("StdVector[")
-            return f"{self.member_name()}: {typename}", list(dependencies)
-        if self.fSTLtype == STLType.string:
-            assert typename == "string"
-            return f"{self.member_name()}: {typename}", list(dependencies)
-        if self.fSTLtype == STLType.vectorPointer:
-            return (
-                f"{self.member_name()}: Annotated[Ref[{typename}], Pointer()]",
-                list(dependencies),
-            )
-        msg = f"STL type {self.type_name()} not implemented yet"
-        raise NotImplementedError(msg)
+        return f"{self.member_name()}: {typename}", list(dependencies)
 
 
 DICTIONARY["TStreamerSTL"] = TStreamerSTL

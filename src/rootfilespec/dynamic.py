@@ -1,3 +1,5 @@
+import warnings
+
 from rootfilespec import bootstrap
 from rootfilespec.bootstrap.TStreamerInfo import (
     ClassDef,
@@ -17,6 +19,8 @@ from rootfilespec.container import (
     BasicArray,
     FixedSizeArray,
     StdVector,
+    StdSet,
+    StdMap,
 )
 from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.serializable import serializable
@@ -52,7 +56,7 @@ def streamerinfo_to_classes(streamerinfo: bootstrap.TList) -> str:
                 write(depdef)
             elif dep not in declared:
                 msg = f"Class {classdef.name} depends on {dep}, which is not declared"
-                raise ValueError(msg)
+                warnings.warn(msg, UserWarning, stacklevel=1)
         lines.append(classdef.code)
         declared.add(classdef.name)
 
