@@ -11,7 +11,6 @@ from rootfilespec.serializable import (
     MemberSerDe,
     MemberType,
     ReadObjMethod,
-    ROOTSerializable,
 )
 
 
@@ -124,7 +123,7 @@ T = TypeVar("T", bound=MemberType)
 
 
 @dataclasses.dataclass
-class StdVector(ROOTSerializable, ContainerSerDe, Generic[T]):
+class StdVector(ContainerSerDe, Generic[T]):
     """A class to represent a std::vector<T>."""
 
     items: list[T]
@@ -132,20 +131,28 @@ class StdVector(ROOTSerializable, ContainerSerDe, Generic[T]):
 
     @classmethod
     def build_reader(cls, fname: str, inner_reader: ReadObjMethod):
+        """Build a reader for the std::vector<T>.
+
+        Implementation note:
+        In principle, ReadObjMethod should be a generic type that
+        accepts T, but since this is called at runtime the linter
+        never sees the type, so the lower bound of MemberType is ok
+        """
+
         def update_members(members: Members, buffer: ReadBuffer):
             (n,), buffer = buffer.unpack(">i")
             items: list[T] = []
             for _ in range(n):
                 obj, buffer = inner_reader(buffer)
                 items.append(obj)
-            members[fname] = items
+            members[fname] = cls(items)
             return members, buffer
 
         return update_members
 
 
 @dataclasses.dataclass
-class StdSet(ROOTSerializable, ContainerSerDe, Generic[T]):
+class StdSet(ContainerSerDe, Generic[T]):
     """A class to represent a std::set<T>."""
 
     items: set[T]
@@ -172,7 +179,7 @@ V = TypeVar("V", bound=MemberType)
 
 
 @dataclasses.dataclass
-class StdMap(ROOTSerializable, AssociativeContainerSerDe, Generic[K, V]):
+class StdMap(AssociativeContainerSerDe, Generic[K, V]):
     """A class to represent a std::map<K, V>."""
 
     items: dict[K, V]
