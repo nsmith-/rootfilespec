@@ -80,8 +80,10 @@ class ContainerSerDe:
     def build_reader(cls, fname: str, inner_reader: ReadObjMethod) -> ReadMembersMethod:
         """Build a reader function for the given field name and inner read implementation.
 
-        The reader function should take a ReadBuffer and return a tuple of the new
-        arguments and the remaining buffer.
+        Implementation note:
+        In principle, ReadObjMethod should be a generic type that
+        accepts T, but since this is called at runtime the linter
+        never sees the type, so the lower bound of MemberType is ok
         """
         msg = f"Cannot build reader for {cls.__name__}"
         raise NotImplementedError(msg)
@@ -101,11 +103,7 @@ class AssociativeContainerSerDe:
     def build_reader(
         cls, fname: str, key_reader: ReadObjMethod, value_reader: ReadObjMethod
     ) -> ReadMembersMethod:
-        """Build a reader function for the given field name and inner read implementation.
-
-        The reader function should take a ReadBuffer and return a tuple of the new
-        arguments and the remaining buffer.
-        """
+        """Build a reader function for the given field name and inner read implementation."""
         msg = f"Cannot build reader for {cls.__name__}"
         raise NotImplementedError(msg)
 
@@ -130,14 +128,18 @@ class MemberSerDe:
         raise NotImplementedError(msg)
 
 
+@dataclasses.dataclass
+class _ObjectReader:
+    membermethod: ReadMembersMethod
+
+    def __call__(self, buffer: ReadBuffer) -> tuple[MemberType, ReadBuffer]:
+        members, buffer = self.membermethod({}, buffer)
+        return members[""], buffer
+
+
 def _build_read(ftype: type[MemberType]) -> ReadObjMethod:
     membermethod = _build_update_members("", ftype)
-
-    def reader(buffer: ReadBuffer):
-        members, buffer = membermethod({}, buffer)
-        return ftype(**members), buffer
-
-    return reader
+    return _ObjectReader(membermethod)
 
 
 def _build_update_members(fname: str, ftype: Any) -> ReadMembersMethod:
@@ -152,7 +154,7 @@ def _build_update_members(fname: str, ftype: Any) -> ReadMembersMethod:
             if memberserde:
                 return memberserde.build_reader(fname, itype)
             msg = f"Cannot read type {itype} with annotations {annotations}"
-            raise NotImplementedError(msg)
+            raise ValueError(msg)
         if isinstance(origin, type) and issubclass(origin, ContainerSerDe):
             itype, *args = get_args(ftype)
             assert not args
@@ -165,9 +167,9 @@ def _build_update_members(fname: str, ftype: Any) -> ReadMembersMethod:
             value_reader = _build_read(vtype)
             return origin.build_reader(fname, key_reader, value_reader)
         msg = f"Cannot read subscripted type {ftype} with origin {origin}"
-        raise NotImplementedError(msg)
+        raise ValueError(msg)
     msg = f"Cannot read type {ftype}"
-    raise NotImplementedError(msg)
+    raise ValueError(msg)
 
 
 @dataclass_transform()

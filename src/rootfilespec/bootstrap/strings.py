@@ -1,3 +1,4 @@
+from rootfilespec.bootstrap.streamedobject import StreamedObject
 from rootfilespec.buffer import ReadBuffer
 from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.serializable import Members, ROOTSerializable, serializable
@@ -12,6 +13,9 @@ class TString(ROOTSerializable):
 
     fString: bytes
     """The string data."""
+
+    def __hash__(self) -> int:
+        return hash(self.fString)
 
     @classmethod
     def update_members(cls, members: Members, buffer: ReadBuffer):
@@ -30,11 +34,17 @@ class TString(ROOTSerializable):
         return members, buffer
 
 
+# No examples so far of TString being streamed but it is in most StreamerInfo
 DICTIONARY["TString"] = TString
+
+string = TString
+DICTIONARY["string"] = TString
 
 
 @serializable
-class string(ROOTSerializable):
+class STLString(StreamedObject):
+    """String with a stream header (see also TObjString)"""
+
     value: bytes
 
     @classmethod
@@ -47,4 +57,4 @@ class string(ROOTSerializable):
         return members, buffer
 
 
-DICTIONARY["string"] = string
+DICTIONARY["STLString"] = STLString

@@ -1,8 +1,10 @@
 import dataclasses
+from collections.abc import Hashable
 from typing import Any, Generic, TypeVar
 
 import numpy as np
 
+from rootfilespec.bootstrap.streamedobject import StreamHeader
 from rootfilespec.buffer import ReadBuffer
 from rootfilespec.serializable import (
     AssociativeContainerSerDe,
@@ -11,6 +13,7 @@ from rootfilespec.serializable import (
     MemberSerDe,
     MemberType,
     ReadObjMethod,
+    _ObjectReader,
 )
 
 
@@ -92,12 +95,10 @@ class _FixedSizeArrayReader:
     def __call__(
         self, members: Members, buffer: ReadBuffer
     ) -> tuple[Members, ReadBuffer]:
-        msg = "FixedSizeArrayReader not implemented"
-        raise NotImplementedError(msg)
-        # data, buffer = buffer.consume(self.size * self.dtype.itemsize)
-        # arg = np.frombuffer(data, dtype=self.dtype, count=self.size)
-        # members[self.name] = arg
-        # return members, buffer
+        data, buffer = buffer.consume(self.size * self.dtype.itemsize)
+        arg = np.frombuffer(data, dtype=self.dtype, count=self.size)
+        members[self.name] = arg
+        return members, buffer
 
 
 @dataclasses.dataclass
@@ -123,6 +124,22 @@ T = TypeVar("T", bound=MemberType)
 
 
 @dataclasses.dataclass
+class _StdVectorReader:
+    name: str
+    inner_reader: ReadObjMethod
+    hasheader: bool = True
+    """When vectors are nested, the StreamHeader is not present in the inner vector."""
+
+    def __call__(
+        self, members: Members, buffer: ReadBuffer
+    ) -> tuple[Members, ReadBuffer]:
+        members[self.name], buffer = StdVector.read_as(
+            self.inner_reader, self.hasheader, buffer
+        )
+        return members, buffer
+
+
+@dataclasses.dataclass
 class StdVector(ContainerSerDe, Generic[T]):
     """A class to represent a std::vector<T>."""
 
@@ -131,24 +148,24 @@ class StdVector(ContainerSerDe, Generic[T]):
 
     @classmethod
     def build_reader(cls, fname: str, inner_reader: ReadObjMethod):
-        """Build a reader for the std::vector<T>.
+        """Build a reader for the std::vector<T>."""
+        if isinstance(inner_reader, _ObjectReader) and isinstance(
+            inner_reader.membermethod, _StdVectorReader
+        ):
+            inner_reader.membermethod.hasheader = False
+        return _StdVectorReader(fname, inner_reader)
 
-        Implementation note:
-        In principle, ReadObjMethod should be a generic type that
-        accepts T, but since this is called at runtime the linter
-        never sees the type, so the lower bound of MemberType is ok
-        """
-
-        def update_members(members: Members, buffer: ReadBuffer):
-            (n,), buffer = buffer.unpack(">i")
-            items: list[T] = []
-            for _ in range(n):
-                obj, buffer = inner_reader(buffer)
-                items.append(obj)
-            members[fname] = cls(items)
-            return members, buffer
-
-        return update_members
+    @classmethod
+    def read_as(cls, inner_reader: ReadObjMethod, hasheader: bool, buffer: ReadBuffer):
+        if hasheader:
+            header, buffer = StreamHeader.read(buffer)
+            # TODO: byte count check
+        (n,), buffer = buffer.unpack(">i")
+        items: list[T] = []
+        for _ in range(n):
+            obj, buffer = inner_reader(buffer)
+            items.append(obj)
+        return cls(items), buffer
 
 
 @dataclasses.dataclass
@@ -174,7 +191,7 @@ class StdSet(ContainerSerDe, Generic[T]):
         return update_members
 
 
-K = TypeVar("K", bound=MemberType)
+K = TypeVar("K", bound=Hashable)
 V = TypeVar("V", bound=MemberType)
 
 
@@ -187,13 +204,26 @@ class StdMap(AssociativeContainerSerDe, Generic[K, V]):
 
     @classmethod
     def build_reader(
-        cls,
-        fname: str,  # noqa: ARG003
-        key_reader: ReadObjMethod,  # noqa: ARG003
-        value_reader: ReadObjMethod,  # noqa: ARG003
+        cls, fname: str, key_reader: ReadObjMethod, value_reader: ReadObjMethod
     ):
         def update_members(members: Members, buffer: ReadBuffer):
-            msg = "StdMap not implemented"
-            raise NotImplementedError(msg)
+            members[fname], buffer = cls.read_as(key_reader, value_reader, buffer)
+            return members, buffer
 
         return update_members
+
+    @classmethod
+    def read_as(
+        cls, key_reader: ReadObjMethod, value_reader: ReadObjMethod, buffer: ReadBuffer
+    ):
+        header, buffer = StreamHeader.read(buffer)
+        if header.fVersion == 0x4009:
+            msg = "Suspicious map with large version seen in uproot-issue465-flat.root"
+            raise NotImplementedError(msg)
+        (n,), buffer = buffer.unpack(">i")
+        items: dict[K, V] = {}
+        for _ in range(n):
+            key, buffer = key_reader(buffer)
+            value, buffer = value_reader(buffer)
+            items[key] = value
+        return cls(items), buffer

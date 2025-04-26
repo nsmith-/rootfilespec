@@ -553,6 +553,9 @@ DICTIONARY["TStreamerSTL"] = TStreamerSTL
 class TStreamerSTLstring(TStreamerSTL):
     """STL string streamer element."""
 
+    def member_definition(self, parent: TStreamerInfo):  # noqa: ARG002
+        return f"{self.member_name()}: STLString", []
+
 
 # the lower case "string" is intentional
 DICTIONARY["TStreamerSTLstring"] = TStreamerSTLstring

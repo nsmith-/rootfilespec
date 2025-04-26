@@ -23,7 +23,7 @@ from rootfilespec.bootstrap.assumed import (
 from rootfilespec.bootstrap.compression import RCompressed, RCompressionHeader
 from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
 from rootfilespec.bootstrap.streamedobject import Pointer, Ref, StreamedObject
-from rootfilespec.bootstrap.strings import TString, string
+from rootfilespec.bootstrap.strings import STLString, TString, string
 from rootfilespec.bootstrap.TBasket import TBasket
 from rootfilespec.bootstrap.TDatime import TDatime
 from rootfilespec.bootstrap.TDirectory import TDirectory, TKeyList
@@ -55,6 +55,7 @@ __all__ = [
     "ROOT3a3aTIOFeatures",
     "ROOTFile",
     "Ref",
+    "STLString",
     "StreamedObject",
     "TArrayC",
     "TArrayD",

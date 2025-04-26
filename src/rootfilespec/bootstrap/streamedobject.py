@@ -23,6 +23,8 @@ class _StreamConstants(IntEnum):
     """New class tag"""
     kNotAVersion = 0x8000
     """Either kClassMask or kNewClassTag is set in bytes 4-5"""
+    kStreamedMemberwise = 0x4000
+    """Not sure if this is where it is used"""
 
 
 @dataclass
@@ -40,6 +42,10 @@ class StreamHeader(ROOTSerializable):
     """Class name of object, if first instance of class in buffer"""
     fClassRef: Optional[int]
     """Position in buffer of class name if not specified here"""
+
+    def is_memberwise(self) -> bool:
+        """Check if the object is memberwise streamed"""
+        return bool((self.fVersion or 0) & _StreamConstants.kStreamedMemberwise)
 
     @classmethod
     def read(cls, buffer: ReadBuffer):
