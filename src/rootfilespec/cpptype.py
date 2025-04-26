@@ -96,6 +96,14 @@ class _CppTypeAstTemplate(_CppTypeAstNode):
         """Convert C++ type name to Python type name."""
         if self.name in _cpp_templates:
             pyname = _cpp_templates[self.name]
+        elif self.name == b"bitset":
+            argn, *rest = self.args
+            if rest:
+                msg = "bitset template has too many arguments"
+                raise ValueError(msg)
+            n = int(argn.name)
+            pyname = f"Annotated[int, StdBitset({n})]"
+            return pyname, set()
         else:
             msg = f"Template type {self.name!r} not implemented"
             raise NotImplementedError(msg)

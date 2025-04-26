@@ -24,7 +24,7 @@ from rootfilespec.container import (
 )
 from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.serializable import serializable
-from rootfilespec.structutil import Fmt
+from rootfilespec.structutil import Fmt, StdBitset
 
 """
 
