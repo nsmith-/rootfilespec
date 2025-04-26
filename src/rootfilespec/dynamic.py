@@ -60,7 +60,7 @@ def streamerinfo_to_classes(streamerinfo: bootstrap.TList) -> str:
                 write(depdef)
             elif dep not in declared:
                 warning_log.append(
-                    f"Class {classdef.name} depends on {dep}, which is not declared"
+                    f"    Class {classdef.name} depends on {dep} which is missing"
                 )
                 lines.append(f"class {dep}(Uninterpreted):\n    pass\n")
         lines.append(classdef.code)
@@ -71,7 +71,10 @@ def streamerinfo_to_classes(streamerinfo: bootstrap.TList) -> str:
         write(classdef)
 
     # Write out the warnings
-    for msg in warning_log:
+    if warning_log:
+        msg = "Errors were found in the StreamerInfo:\n"
+        msg += "\n".join(warning_log)
+        msg += "\nThese members will be uninterpreted and skipped."
         warnings.warn(msg, UserWarning, stacklevel=2)
 
     return "\n".join(lines)
