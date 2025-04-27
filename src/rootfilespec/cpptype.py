@@ -43,12 +43,13 @@ _cpp_primitives = {
     b"float": "Annotated[float, Fmt('>f')]",
     b"double": "Annotated[float, Fmt('>d')]",
 }
-_cpp_templates = {
-    b"vector": "StdVector",
-    b"map": "StdMap",
-    b"set": "StdSet",
-    b"deque": "StdDeque",
-    b"pair": "StdPair",
+# cppname -> python name, expected number of template arguments
+_cpp_templates: dict[bytes, tuple[str, int]] = {
+    b"vector": ("StdVector", 1),
+    b"set": ("StdSet", 1),
+    b"deque": ("StdDeque", 1),
+    b"map": ("StdMap", 2),
+    b"pair": ("StdPair", 2),
 }
 
 
@@ -97,7 +98,7 @@ class _CppTypeAstTemplate(_CppTypeAstNode):
     def to_pytype(self):
         """Convert C++ type name to Python type name."""
         if self.name in _cpp_templates:
-            pyname = _cpp_templates[self.name]
+            pyname, nargs = _cpp_templates[self.name]
         elif self.name == b"bitset":
             argn, *rest = self.args
             if rest:
@@ -111,7 +112,11 @@ class _CppTypeAstTemplate(_CppTypeAstNode):
             raise NotImplementedError(msg)
         args = []
         deps: set[str] = set()
-        for arg in self.args:
+        if len(self.args) > nargs:
+            # TODO: warn when we have extra arguments?
+            # these can be e.g. the comparison argument in std::map (defaults to std::less<Key>)
+            pass
+        for arg in self.args[:nargs]:
             argname, argdeps = arg.to_pytype()
             args.append(argname)
             deps = deps.union(argdeps)

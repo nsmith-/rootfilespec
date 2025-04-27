@@ -274,10 +274,6 @@ class TStreamerElement(TNamed):
         """Get the member name of this streamer element."""
         return normalize(self.fName.fString)
 
-    def cpp_typename(self) -> bytes:
-        """Get the C++ type name of this streamer element."""
-        return self.fTypeName.fString
-
     def type_name(self) -> str:
         """Get the type name of this streamer element."""
         return normalize(self.fTypeName.fString)
@@ -442,7 +438,7 @@ class TStreamerObjectAny(TStreamerElement):
             return f"{self.member_name()}: {typename}", []
         # This may be a non-trivial type, e.g. vector<double>
         # or vector<TLorentzVector>
-        typename, dependencies = cpptype_to_pytype(self.cpp_typename())
+        typename, dependencies = cpptype_to_pytype(self.fTypeName.fString)
         return f"{self.member_name()}: {typename}", list(dependencies)
 
 
@@ -545,9 +541,12 @@ class TStreamerSTL(TStreamerElement):
 
     def member_definition(self, parent: TStreamerInfo):  # noqa: ARG002
         if STLType.kOffsetP <= self.fSTLtype < STLType.kOffsetP + STLType.kSTLend:
-            msg = f"STL pointer type {self.fSTLtype!r} not implemented"
-            raise NotImplementedError(msg)
-        typename, dependencies = cpptype_to_pytype(self.cpp_typename())
+            assert self.fTypeName.fString.endswith(b"*")
+            typename, dependencies = cpptype_to_pytype(
+                self.fTypeName.fString.removesuffix(b"*")
+            )
+        else:
+            typename, dependencies = cpptype_to_pytype(self.fTypeName.fString)
         return f"{self.member_name()}: {typename}", list(dependencies)
 
 
