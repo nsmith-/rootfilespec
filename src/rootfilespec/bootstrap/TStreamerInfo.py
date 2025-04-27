@@ -400,12 +400,13 @@ class TStreamerObjectPointer(TStreamerElement):
         if self.fArrayLength > 0:
             msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
-        typename = normalize(self.fTypeName.fString)
+        assert self.fTypeName.fString.endswith(b"*")
+        typename = normalize(self.fTypeName.fString.removesuffix(b"*"))
         dependencies = {typename}
         if typename == parent.class_name():
             dependencies.remove(typename)
             typename = f'"{typename}"'
-        mdef = f"{self.member_name()}: Annotated[Ref[{typename}], Pointer()]"
+        mdef = f"{self.member_name()}: Ref[{typename}]"
         return mdef, list(dependencies)
 
 
@@ -454,11 +455,14 @@ class TStreamerObjectAnyPointer(TStreamerElement):
         if self.fArrayLength > 0:
             msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
-        typename, dependencies = cpptype_to_pytype(self.fTypeName.fString)
+        assert self.fTypeName.fString.endswith(b"*")
+        typename, dependencies = cpptype_to_pytype(
+            self.fTypeName.fString.removesuffix(b"*")
+        )
         if typename == parent.class_name():
             dependencies.remove(typename)
             typename = f'"{typename}"'
-        mdef = f"{self.member_name()}: Annotated[Ref[{typename}], Pointer()]"
+        mdef = f"{self.member_name()}: Ref[{typename}]"
         return mdef, list(dependencies)
 
 

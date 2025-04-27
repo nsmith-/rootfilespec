@@ -1,12 +1,14 @@
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Generic, Optional, TypeVar, get_args, get_origin
+from typing import Generic, Optional, TypeVar, overload
 
 from rootfilespec.buffer import ReadBuffer
 from rootfilespec.dispatch import DICTIONARY, normalize
 from rootfilespec.serializable import (
+    ContainerSerDe,
     Members,
-    MemberSerDe,
+    MemberType,
+    ReadObjMethod,
     ROOTSerializable,
     serializable,
 )
@@ -49,22 +51,20 @@ class StreamHeader(ROOTSerializable):
 
     @classmethod
     def read(cls, buffer: ReadBuffer):
-        # read all we might need in one go and advance later (optimization)
-        (fByteCount, tmp1, tmp2), _ = buffer.unpack(">iHH")
+        (fByteCount,), buffer = buffer.unpack(">i")
         if fByteCount & _StreamConstants.kByteCountMask:
             fByteCount &= ~_StreamConstants.kByteCountMask
         else:
             # This is a reference to another object in the buffer
-            _, buffer = buffer.consume(4)
             return cls(0, None, None, fByteCount), buffer
         fVersion, fClassName, fClassRef = None, None, None
+        (tmp1,), buffer = buffer.unpack(">H")
         if not (tmp1 & _StreamConstants.kNotAVersion):
             fVersion = tmp1
-            _, buffer = buffer.consume(6)  # now advance the buffer
         else:
             fVersion = None
+            (tmp2,), buffer = buffer.unpack(">H")
             fClassInfo: int = (tmp1 << 16) | tmp2
-            _, buffer = buffer.consume(8)  # now advance the buffer
             if fClassInfo == _StreamConstants.kNewClassTag:
                 fClassRef = buffer.relpos - 4
                 fClassName = b""
@@ -87,35 +87,97 @@ class StreamHeader(ROOTSerializable):
         return cls(fByteCount, fVersion, fClassName, fClassRef), buffer
 
 
-def read_streamed_item(buffer: ReadBuffer):
+@dataclass
+class _RefReader:
+    name: str
+    inner_reader: ReadObjMethod
+
+    def __call__(self, members: Members, buffer: ReadBuffer):
+        members[self.name], buffer = read_streamed_item(buffer, self.inner_reader)
+        return members, buffer
+
+
+T = TypeVar("T", bound=MemberType)
+
+
+class Ref(ContainerSerDe, Generic[T]):
+    """A class to hold a reference to an object.
+
+    We cannot use a dataclass here because its repr might end up
+    being cyclic and cause a stack overflow.
+    """
+
+    obj: Optional[T]
+    """The object that is referenced."""
+
+    def __init__(self, obj: Optional[T]):
+        self.obj = obj
+
+    def __repr__(self):
+        label = type(self.obj).__name__ if self.obj else "None"
+        return f"Ref({label})"
+
+    @classmethod
+    def build_reader(cls, fname: str, inner_reader: ReadObjMethod):
+        return _RefReader(fname, inner_reader)
+
+
+@overload
+def read_streamed_item(
+    buffer: ReadBuffer, method: ReadObjMethod
+) -> tuple[Ref[MemberType], ReadBuffer]: ...
+
+
+@overload
+def read_streamed_item(
+    buffer: ReadBuffer,
+) -> tuple[ROOTSerializable, ReadBuffer]: ...
+
+
+def read_streamed_item(
+    buffer: ReadBuffer, method: Optional[ReadObjMethod] = None
+) -> tuple[ROOTSerializable, ReadBuffer]:
     # Read ahead the stream header to determine the type of the object
     itemheader, _ = StreamHeader.read(buffer)
     if itemheader.fByteCount == 0 and itemheader.fClassRef is not None:
-        return _read_ref(buffer)
-    if not itemheader.fClassName:
+        # This is a reference to another object in the buffer
+        if itemheader.fClassRef == 0:
+            # Null reference, return None
+            _, buffer = buffer.consume(4)
+            return Ref(None), buffer
+        # TODO: fetch the referenced object from the buffer.instance_refs
+        _, buffer = buffer.consume(4)
+        return Ref(None), buffer
+    if itemheader.fClassName:
+        clsname = normalize(itemheader.fClassName)
+        if clsname not in DICTIONARY:
+            if clsname == "TLeafI":
+                msg = "TLeafI not declared in StreamerInfo perhaps? e.g. uproot-issue413.root"
+                # (84 other test files have it, e.g. uproot-issue121.root)
+                # https://github.com/scikit-hep/uproot3/issues/413
+                # Likely groot-v0.21.0 (Go ROOT file implementation) did not write the streamers for TLeaf
+                raise NotImplementedError(msg)
+            msg = f"Unknown class name: {itemheader.fClassName}"
+            msg += f"\nStreamHeader: {itemheader}"
+            raise ValueError(msg)
+        dynmethod = DICTIONARY[clsname].read
+    elif method is not None:
+        clsname = f"Ref ({method})"
+
+        def dynmethod(buffer: ReadBuffer) -> tuple[ROOTSerializable, ReadBuffer]:
+            item, buffer = method(buffer)
+            return Ref(item), buffer
+    else:
         msg = f"StreamHeader has no class name: {itemheader}"
         raise ValueError(msg)
-    clsname = normalize(itemheader.fClassName)
-    if clsname not in DICTIONARY:
-        if clsname == "TLeafI":
-            msg = (
-                "TLeafI not declared in StreamerInfo perhaps? e.g. uproot-issue413.root\n"
-                "(84 other test files have it, e.g. uproot-issue121.root)"
-            )
-            # https://github.com/scikit-hep/uproot3/issues/413
-            # Likely groot-v0.21.0 (Go ROOT file implementation) did not write the streamers for TLeaf
-            raise NotImplementedError(msg)
-        msg = f"Unknown class name: {itemheader.fClassName}"
-        msg += f"\nStreamHeader: {itemheader}"
-        raise ValueError(msg)
+
     # Now actually read the object
-    dyntype = DICTIONARY[clsname]
     item_end = itemheader.fByteCount + 4
     buffer, remaining = buffer[:item_end], buffer[item_end:]
-    item, buffer = dyntype.read(buffer)
-    # TODO: register the object addr in the buffer local_refs
+    item, buffer = dynmethod(buffer)
+    # TODO: register the object addr in the buffer instance_refs
     if buffer:
-        msg = f"Expected buffer to be empty after reading {dyntype}, but got\n{buffer}"
+        msg = f"Expected buffer to be empty after reading {clsname}, but got\n{buffer}"
         raise ValueError(msg)
     return item, remaining
 
@@ -132,11 +194,18 @@ def _auto_TObject_base(buffer) -> tuple[StreamHeader, ReadBuffer]:
     return itemheader, buffer
 
 
-T = TypeVar("T", bound="StreamedObject")
+@serializable
+class StreamedObject(ROOTSerializable):
+    """Base class for all streamed objects in ROOT."""
+
+    @classmethod
+    def read(cls, buffer: ReadBuffer):
+        members, buffer = _read_all_members(cls, buffer)
+        return cls(**members), buffer
 
 
 def _read_all_members(
-    cls: type[T], buffer: ReadBuffer, indent=0
+    cls: type[StreamedObject], buffer: ReadBuffer, indent=0
 ) -> tuple[Members, ReadBuffer]:
     start_position = buffer.relpos
     if cls.__name__ == "TObject" and indent > 0:
@@ -146,8 +215,8 @@ def _read_all_members(
     else:
         itemheader, buffer = StreamHeader.read(buffer)
         if itemheader.fByteCount == 0:
-            if cls.__name__ == "TH1D":
-                msg = "Suspicious TH1D object with fByteCount == 0 (e.g. uproot-issue-250.root)"
+            if cls.__name__ in ("TH1D", "RooLinkedList"):
+                msg = "Suspicious object with fByteCount == 0 (e.g. uproot-issue-250.root, uproot-issue49.root)"
                 raise NotImplementedError(msg)
             msg = "fByteCount is 0"
             raise ValueError(msg)
@@ -177,70 +246,3 @@ def _read_all_members(
         msg += f"\nBuffer: {buffer}"
         raise ValueError(msg)
     return members, buffer
-
-
-@serializable
-class StreamedObject(ROOTSerializable):
-    """Base class for all streamed objects in ROOT."""
-
-    @classmethod
-    def read(cls: type[T], buffer: ReadBuffer) -> tuple[T, ReadBuffer]:
-        members, buffer = _read_all_members(cls, buffer)
-        return cls(**members), buffer
-
-
-def _read_ref(buffer: ReadBuffer) -> tuple["Ref[StreamedObject]", ReadBuffer]:
-    # TODO: implement getting the ref from buffer.local_refs
-    return Ref(None), buffer[4:]
-
-
-class Ref(ROOTSerializable, Generic[T]):
-    """A class to hold a reference to an object.
-
-    We cannot use a dataclass here because its repr might end up
-    being cyclic and cause a stack overflow.
-    """
-
-    obj: Optional[T]
-    """The object that is referenced."""
-
-    def __init__(self, obj: Optional[T]):
-        self.obj = obj
-
-    def __repr__(self):
-        label = type(self.obj).__name__ if self.obj else "None"
-        return f"Ref({label})"
-
-    @classmethod
-    def read_as(cls, ftype: type[T], buffer: ReadBuffer):  # noqa: ARG003
-        (addr,), _ = buffer.unpack(">i")
-        if not addr:
-            buffer = buffer[4:]
-            return cls(None), buffer
-        if addr & 0x40000000:
-            # this isn't actually an address but an object
-            addr &= ~0x40000000
-            buffer = buffer[addr + 4 :]
-            return cls(None), buffer
-            # obj, buffer = ftype.read(buffer)
-            # TODO: register the object addr in the buffer local_refs
-            # return cls(obj), buffer
-        return _read_ref(buffer)
-
-
-class Pointer(MemberSerDe):
-    def build_reader(self, fname: str, ftype: type):
-        if (origin := get_origin(ftype)) is not Ref:
-            msg = f"Pointer() only can be used with Ref, got {origin}"
-            raise ValueError(msg)
-        (ftype,) = get_args(ftype)
-        if not issubclass(ftype, StreamedObject):
-            msg = f"Pointer() only can be used with Ref[StreamedObject], got {ftype}"
-            raise ValueError(msg)
-
-        def read(members: Members, buffer: ReadBuffer) -> tuple[Members, ReadBuffer]:
-            obj, buffer = Ref.read_as(ftype, buffer)
-            members[fname] = obj
-            return members, buffer
-
-        return read

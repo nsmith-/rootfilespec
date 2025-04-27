@@ -160,9 +160,9 @@ class ROOTFile(ROOTSerializable):
         if fVersion <= VersionInfo(6, 2, 2):
             header, buffer = ROOTFile_header_v302.read(buffer)
         elif not fVersion.large:
-            header, buffer = ROOTFile_header_v622_small.read(buffer)  # type: ignore[assignment]
+            header, buffer = ROOTFile_header_v622_small.read(buffer)
         else:
-            header, buffer = ROOTFile_header_v622_large.read(buffer)  # type: ignore[assignment]
+            header, buffer = ROOTFile_header_v622_large.read(buffer)
         padding, buffer = buffer.consume(header.fBEGIN - buffer.relpos)
         members["magic"] = magic
         members["fVersion"] = fVersion

@@ -66,8 +66,8 @@ class Uninterpreted(StreamedObject):
 
     @classmethod
     def read(cls, buffer: ReadBuffer):
-        header, buffer = StreamHeader.read(buffer)
-        data, buffer = buffer.consume(header.fByteCount - 4)
+        header, _ = StreamHeader.read(buffer)
+        data, buffer = buffer.consume(header.fByteCount + 4)
         return cls(header, data), buffer
 
     @classmethod

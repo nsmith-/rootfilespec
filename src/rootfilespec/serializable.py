@@ -41,7 +41,7 @@ class ROOTSerializable:
     """
 
     @classmethod
-    def read(cls: type[RT], buffer: ReadBuffer) -> tuple[RT, ReadBuffer]:
+    def read(cls, buffer: ReadBuffer):
         members: Members = {}
         # TODO: always loop through base classes? StreamedObject does this a special way
         members, buffer = cls.update_members(members, buffer)
@@ -66,7 +66,7 @@ class _ReadWrapper:
         return members, buffer
 
 
-class ContainerSerDe:
+class ContainerSerDe(ROOTSerializable):
     """A protocol for (De)serialization of generic container fields.
 
     The @serializable decorator will use these annotations to determine how to read
@@ -89,7 +89,7 @@ class ContainerSerDe:
         raise NotImplementedError(msg)
 
 
-class AssociativeContainerSerDe:
+class AssociativeContainerSerDe(ROOTSerializable):
     """A protocol for (De)serialization of generic associative container fields.
 
     The @serializable decorator will use these annotations to determine how to read

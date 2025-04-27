@@ -136,7 +136,7 @@ class TKey(ROOTSerializable):
             if dyntype is None:
                 msg = f"TKey.read_object: unknown type {typename}."
                 raise NotImplementedError(msg)
-            obj, buffer = dyntype.read(buffer)  # type: ignore[assignment]
+            obj, buffer = dyntype.read(buffer)
         # Some types we have to handle trailing bytes
         if typename == "TKeyList":
             # TODO: understand this padding
@@ -154,4 +154,5 @@ class TKey(ROOTSerializable):
             msg += f"\n{obj=}"
             msg += f"\nBuffer: {buffer}"
             raise ValueError(msg)
-        return obj
+        # mypy doesn't understand that we have obj: ObjType | ROOTSerializable here
+        return obj  # type: ignore[no-any-return]

@@ -33,8 +33,15 @@ class _ArrayReader:
         n = members[self.sizevar]
         if self.haspad:
             pad, buffer = buffer.consume(1)
-            if not ((n == 0 and pad == b"\x00") or (n > 0 and pad == b"\x01")):
+            if pad == b"\x00":
+                # This is the null pad byte that indicates an empty array (even if n > 0)
+                members[self.name] = np.array([], dtype=self.dtype)
+                return members, buffer
+            if pad != b"\x01":
                 msg = f"Expected null or 0x01 pad byte but got {pad!r} for size {n}"
+                raise ValueError(msg)
+            if n == 0:
+                msg = "Array size is 0 but pad byte is not null"
                 raise ValueError(msg)
         data, buffer = buffer.consume(n * self.dtype.itemsize)
         members[self.name] = np.frombuffer(data, dtype=self.dtype, count=n)
@@ -270,6 +277,6 @@ class StdPair(AssociativeContainerSerDe, Generic[K, V]):
         cls, key_reader: ReadObjMethod, value_reader: ReadObjMethod, buffer: ReadBuffer
     ):
         raise NotImplementedError
-        key, buffer = key_reader(buffer)
-        value, buffer = value_reader(buffer)
-        return cls((key, value)), buffer
+        # key, buffer = key_reader(buffer)
+        # value, buffer = value_reader(buffer)
+        # return cls((key, value)), buffer
