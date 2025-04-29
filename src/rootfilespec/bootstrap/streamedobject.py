@@ -88,8 +88,8 @@ class StreamHeader(ROOTSerializable):
                 fClassRef = (fClassInfo & ~_StreamConstants.kClassMask) - 2
                 fClassName = buffer.local_refs.get(fClassRef, None)
                 if fClassName is None:
-                    msg = f"ClassRef {fClassRef} not found in buffer local_refs"
-                    raise ValueError(msg)
+                    msg = f"ClassRef {fClassRef} not found in buffer local_refs (likely inside an uninterpreted object)"
+                    raise NotImplementedError(msg)
         return cls(fByteCount, fVersion, fClassName, fClassRef, memberwise), buffer
 
 

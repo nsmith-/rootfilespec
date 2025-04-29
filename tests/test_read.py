@@ -21,6 +21,9 @@ def _walk(
     depth=0,
     maxdepth=-1,
 ):
+    if dir.fSeekKeys == 0:
+        # empty directory
+        return
     keylist = dir.get_KeyList(fetch_data)
     for item in keylist.values():
         try:
