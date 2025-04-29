@@ -18,19 +18,6 @@ def normalize(s: bytes) -> str:
         .replace("<", "3c")
         .replace(">", "3e")
         .replace(",", "2c")
-        .replace(" ", "_")
+        .replace(" ", "20")
         .replace("*", "2a")
-    )
-
-
-def pyclass_to_cppname(pyclass: str) -> bytes:
-    """Convert the Python class name to a ROOT C++ class name."""
-    return (
-        pyclass.replace("*", "2a")
-        .replace(" ", "_")
-        .replace(",", "2c")
-        .replace(">", "3e")
-        .replace("<", "3c")
-        .replace(":", "3a")
-        .encode(ENCODING)
     )

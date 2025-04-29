@@ -48,8 +48,12 @@ class TList(TSeqCollection):
             # No idea why there is a null pad byte here
             pad, buffer = buffer.consume(1)
             if pad != b"\x00":
-                msg = f"Expected null pad byte but got {pad!r}"
-                raise ValueError(msg)
+                if pad == b"\x01":
+                    # TODO: understand this case (e.g. uproot-issue-350.root)
+                    (mystery,), buffer = buffer.unpack(">B")
+                else:
+                    msg = f"Unexpected pad byte in TList: {pad!r}"
+                    raise ValueError(msg)
             items.append(item)
         members["items"] = items
         return members, buffer

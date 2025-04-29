@@ -167,7 +167,7 @@ class StdVector(ContainerSerDe, Generic[T]):
         if hasheader:
             header, buffer = StreamHeader.read(buffer)
             # TODO: byte count check
-            if header.is_memberwise():
+            if header.memberwise:
                 msg = "Memberwise reading of StdVector not implemented"
                 raise NotImplementedError(msg)
         (n,), buffer = buffer.unpack(">i")
@@ -243,7 +243,7 @@ class StdMap(AssociativeContainerSerDe, Generic[K, V]):
         cls, key_reader: ReadObjMethod, value_reader: ReadObjMethod, buffer: ReadBuffer
     ):
         header, buffer = StreamHeader.read(buffer)
-        if header.is_memberwise():
+        if header.memberwise:
             msg = "Suspicious map with memberwise reading, incorrect length seen in uproot-issue465-flat.root"
             raise NotImplementedError(msg)
         (n,), buffer = buffer.unpack(">i")

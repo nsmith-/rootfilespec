@@ -23,9 +23,9 @@ which can be rendered with lark using `python -m lark.tools.standalone cpptype.l
 """
 
 import re
-from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Optional
+from enum import IntEnum
+from typing import Optional, Protocol
 
 from rootfilespec.dispatch import normalize
 
@@ -53,22 +53,48 @@ _cpp_templates: dict[bytes, tuple[str, int]] = {
 }
 
 
-_tokenize = re.compile(rb"([\w:]+)|([<>,\*])|(?:\s+)")
-_Token = tuple[bytes, bytes]
-_ignored_terminals: set[_Token] = {
-    (b"", b""),
-    (b"const", b""),
-    (b"", b"*"),
-    # Workaround for Pypy bug https://github.com/pypy/pypy/issues/5265
-    ("", ""),  # type: ignore[arg-type]
-    (b"const", ""),  # type: ignore[arg-type]
-    ("", b"*"),  # type: ignore[arg-type]
-}
+_tokenize = re.compile(rb"([\w:]+|<| ?>|, ?| ?\*| )")
+
+
+class _TokenType(IntEnum):
+    NAME = 0
+    TEMPLATE_START = 1
+    TEMPLATE_END = 2
+    COMMA = 3
+    POINTER = 4
+    SPACE = 5
+
+
+class _Token:
+    type: _TokenType
+    value: bytes
+
+    def __init__(self, match: bytes):
+        self.value = match
+        if match == b"<":
+            self.type = _TokenType.TEMPLATE_START
+        elif match.endswith(b">"):
+            self.type = _TokenType.TEMPLATE_END
+        elif match.startswith(b","):
+            self.type = _TokenType.COMMA
+        elif match.endswith(b"*"):
+            self.type = _TokenType.POINTER
+        elif match == b" ":
+            self.type = _TokenType.SPACE
+        else:
+            self.type = _TokenType.NAME
+
+    def __repr__(self) -> str:
+        return f"_Token(type={self.type.name}, value={self.value!r})"
 
 
 class _TokenStream:
-    def __init__(self, tokens: Iterable[_Token]):
-        self._tokens = iter(tokens)
+    def __init__(self, input: bytes):
+        split = _tokenize.split(input)
+        if any(split[::2]):
+            msg = f"Unexpected token in C++ type name {input!r}"
+            raise ValueError(msg)
+        self._tokens = iter(_Token(match) for match in split[1::2])
         self._current = next(self._tokens, None)
 
     def peek(self) -> Optional[_Token]:
@@ -79,39 +105,69 @@ class _TokenStream:
         return token
 
 
+NameWithDependencies = tuple[str, set[str]]
+
+
+class _CppTypeAstNode(Protocol):
+    def cppname(self) -> bytes:
+        """Return the C++ name of the type."""
+        ...
+
+    def to_pytype(self) -> NameWithDependencies:
+        """Convert C++ type name to Python type name."""
+        ...
+
+
 @dataclass
-class _CppTypeAstNode:
+class _CppTypeAstName(_CppTypeAstNode):
     name: bytes
 
-    def to_pytype(self) -> tuple[str, set[str]]:
+    def cppname(self) -> bytes:
+        return self.name
+
+    def to_pytype(self) -> NameWithDependencies:
         """Convert C++ type name to Python type name."""
         if self.name in _cpp_primitives:
-            return _cpp_primitives[self.name], set()
+            deps: set[str] = set()
+            return _cpp_primitives[self.name], deps
         pyname = normalize(self.name)
         return pyname, {pyname}
 
 
 @dataclass
-class _CppTypeAstTemplate(_CppTypeAstNode):
+class _CppTypeAstTemplate(_CppTypeAstName):
     args: tuple[_CppTypeAstNode, ...]
 
-    def to_pytype(self):
+    def cppname(self) -> bytes:
+        args = b",".join(arg.cppname() for arg in self.args)
+        close = b">"
+        if isinstance(self.args[-1], _CppTypeAstTemplate):
+            close = b" >"
+        return self.name + b"<" + args + close
+
+    def to_pytype(self) -> NameWithDependencies:
         """Convert C++ type name to Python type name."""
-        if self.name in _cpp_templates:
-            pyname, nargs = _cpp_templates[self.name]
-        elif self.name == b"bitset":
+        deps: set[str] = set()
+        if self.name == b"bitset":
             argn, *rest = self.args
             if rest:
                 msg = "bitset template has too many arguments"
                 raise ValueError(msg)
+            if not isinstance(argn, _CppTypeAstName):
+                msg = "bitset template argument must be a name"
+                raise ValueError(msg)
             n = int(argn.name)
             pyname = f"Annotated[int, StdBitset({n})]"
-            return pyname, set()
-        else:
-            msg = f"Template type {self.name!r} not implemented"
-            raise NotImplementedError(msg)
+            return pyname, deps
+        if self.name not in _cpp_templates:
+            # This is probably a templated data member and not a container type
+            # So it should be in the dictionary and we just have to normalize the name
+            # TODO: is there any way to tell when we have a container or not?
+            pyname = normalize(self.cppname())
+            return pyname, {pyname}
+        # This is a C++ template type we know how to handle
+        pyname, nargs = _cpp_templates[self.name]
         args = []
-        deps: set[str] = set()
         if len(self.args) > nargs:
             # TODO: warn when we have extra arguments?
             # these can be e.g. the comparison argument in std::map (defaults to std::less<Key>)
@@ -123,6 +179,18 @@ class _CppTypeAstTemplate(_CppTypeAstNode):
         return f"{pyname}[{', '.join(args)}]", deps
 
 
+@dataclass
+class _CppTypeAstPointer(_CppTypeAstNode):
+    arg: _CppTypeAstName
+
+    def cppname(self) -> bytes:
+        return self.arg.cppname() + b"*"
+
+    def to_pytype(self) -> NameWithDependencies:
+        arg, deps = self.arg.to_pytype()
+        return f"Ref[{arg}]", deps
+
+
 def _template_args(stream: _TokenStream) -> tuple[_CppTypeAstNode, ...]:
     token = stream.next()
     args: tuple[_CppTypeAstNode, ...] = ()
@@ -131,10 +199,10 @@ def _template_args(stream: _TokenStream) -> tuple[_CppTypeAstNode, ...]:
         if not token:
             msg = "Unexpected end of stream"
             raise ValueError(msg)
-        if token[1] == b">":
+        if token.type == _TokenType.TEMPLATE_END:
             stream.next()
             break
-        if token[1] == b",":
+        if token.type == _TokenType.COMMA:
             stream.next()
             continue
         arg = _value(stream)
@@ -147,33 +215,56 @@ def _value(stream: _TokenStream) -> _CppTypeAstNode:
     if not token:
         msg = "Unexpected end of stream"
         raise ValueError(msg)
-    if token[1]:
+    if token.type != _TokenType.NAME:
         msg = f"Unexpected token {token}"
         raise ValueError(msg)
-    name = token[0]
+    name = token.value
     token = stream.peek()
-    if not token or token[1] in (b">", b","):
+    if not token or token.type in (
+        _TokenType.TEMPLATE_END,
+        _TokenType.COMMA,
+        _TokenType.POINTER,
+    ):
         # we are in a simple type
-        return _CppTypeAstNode(name)
-    if token[1] == b"<":
+        arg = _CppTypeAstName(name)
+        if token and token.type == _TokenType.POINTER:
+            # wrap arg in a pointer type
+            stream.next()
+            return _CppTypeAstPointer(arg)
+        return arg
+    if token.type == _TokenType.TEMPLATE_START:
         # we are in template rule
         return _CppTypeAstTemplate(name, _template_args(stream))
-    if not token[1]:
+    if token.type in (_TokenType.NAME, _TokenType.SPACE):
         # we are in typeid
-        while (token := stream.peek()) and not token[1]:
-            name += b" " + token[0]
+        while (token := stream.peek()) and token.type in (
+            _TokenType.NAME,
+            _TokenType.SPACE,
+        ):
+            name += token.value
             stream.next()
-        return _CppTypeAstNode(name)
+        return _CppTypeAstName(name)
     msg = f"Unexpected token {token}"
     raise ValueError(msg)
 
 
-def cpptype_to_pytype(cppname: bytes) -> tuple[str, set[str]]:
+def parse_cpptype(cppname: bytes) -> _CppTypeAstNode:
+    stream = _TokenStream(cppname)
+    return _value(stream)
+
+
+def normalize_cpptype(cppname: bytes) -> bytes:
+    """Normalize C++ type name
+    Any spaces in templates will be elided.
+    """
+    ast = parse_cpptype(cppname)
+    return ast.cppname()
+
+
+def cpptype_to_pytype(cppname: bytes) -> NameWithDependencies:
     """Convert C++ type name to Python type name.
 
     This uses a very simple parser that only handles the types we need.
     """
-    alltokens: list[_Token] = _tokenize.findall(cppname)
-    stream = _TokenStream(t for t in alltokens if t not in _ignored_terminals)
-    ast = _value(stream)
+    ast = parse_cpptype(cppname)
     return ast.to_pytype()

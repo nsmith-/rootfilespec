@@ -28,6 +28,27 @@ class TStreamerInfo(TNamed):
         """Get the class name of this streamer info."""
         return normalize(self.fName.fString)
 
+    def check_classname(self) -> None:
+        """We will use normalize(self.fName.fString) to lookup the class name during reading.
+
+        But other types may be templated containers of this type so we need to ensure cpptype_to_pytype
+        returns the same class name.
+        """
+        if (
+            self.fObjects.fSize == 1
+            and isinstance(self.fObjects.objects[0], TStreamerSTL)
+            and self.fObjects.objects[0].fName.fString == b"This"
+        ):
+            # TODO: understand the purpose of these intermediate member types
+            return
+        if self.fName.fString.startswith(b"pair<") and self.fObjects.fSize == 2:
+            return
+        clsname = self.class_name()
+        typename, _ = cpptype_to_pytype(self.fName.fString)
+        if clsname != typename:
+            msg = f"Class name mismatch: {clsname} != {typename} (raw: {self.fName.fString!r})"
+            raise ValueError(msg)
+
     def base_classes(self) -> list[str]:
         """Get the base classes of this streamer info."""
         bases: list[str] = []
@@ -40,6 +61,7 @@ class TStreamerInfo(TNamed):
 
     def class_definition(self) -> ClassDef:
         """Get the class definition code of this streamer info."""
+        self.check_classname()
         bases = self.base_classes()
         # TODO: f"_VERSION = {self.fClassVersion}"
         members: list[tuple[str, str]] = []
@@ -66,7 +88,7 @@ class TStreamerInfo(TNamed):
         for mdef, mdoc in members:
             lines.append("    " + mdef)
             if mdoc:
-                lines.append(f'    """{mdoc}"""')
+                lines.append(f'    r"""{mdoc}"""')
         if not members:
             lines.append("    pass")
         lines.append("\n")
@@ -548,11 +570,7 @@ class TStreamerSTL(TStreamerElement):
     def member_definition(self, parent: TStreamerInfo):  # noqa: ARG002
         if STLType.kOffsetP <= self.fSTLtype < STLType.kOffsetP + STLType.kSTLend:
             assert self.fTypeName.fString.endswith(b"*")
-            typename, dependencies = cpptype_to_pytype(
-                self.fTypeName.fString.removesuffix(b"*")
-            )
-        else:
-            typename, dependencies = cpptype_to_pytype(self.fTypeName.fString)
+        typename, dependencies = cpptype_to_pytype(self.fTypeName.fString)
         return f"{self.member_name()}: {typename}", list(dependencies)
 
 

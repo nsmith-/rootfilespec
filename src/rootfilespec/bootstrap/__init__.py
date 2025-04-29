@@ -16,7 +16,6 @@ from rootfilespec.bootstrap.array import (
 )
 from rootfilespec.bootstrap.assumed import (
     RooLinkedList,
-    ROOT3a3aTIOFeatures,
     TAtt3D,
     TVirtualIndex,
     Uninterpreted,
@@ -52,7 +51,6 @@ __all__ = [
     "RCompressed",
     "RCompressionHeader",
     "ROOT3a3aRNTuple",
-    "ROOT3a3aTIOFeatures",
     "ROOTFile",
     "Ref",
     "RooLinkedList",

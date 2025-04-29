@@ -44,10 +44,8 @@ class StreamHeader(ROOTSerializable):
     """Class name of object, if first instance of class in buffer"""
     fClassRef: Optional[int]
     """Position in buffer of class name if not specified here"""
-
-    def is_memberwise(self) -> bool:
-        """Check if the object is memberwise streamed"""
-        return bool((self.fVersion or 0) & _StreamConstants.kStreamedMemberwise)
+    memberwise: bool
+    """If the object is memberwise streamed"""
 
     @classmethod
     def read(cls, buffer: ReadBuffer):
@@ -56,11 +54,19 @@ class StreamHeader(ROOTSerializable):
             fByteCount &= ~_StreamConstants.kByteCountMask
         else:
             # This is a reference to another object in the buffer
-            return cls(0, None, None, fByteCount), buffer
-        fVersion, fClassName, fClassRef = None, None, None
+            return cls(0, None, None, fByteCount, False), buffer
+        fVersion, fClassName, fClassRef, memberwise = None, None, None, False
         (tmp1,), buffer = buffer.unpack(">H")
         if not (tmp1 & _StreamConstants.kNotAVersion):
             fVersion = tmp1
+            if fVersion & _StreamConstants.kStreamedMemberwise:
+                fVersion &= ~_StreamConstants.kStreamedMemberwise
+                memberwise = True
+            elif fVersion == 0 and fByteCount >= 6:
+                # This class is versioned by its streamer checksum instead
+                (checksum,), buffer = buffer.unpack(">I")
+                fVersion = checksum
+            # TODO: understand fVersion == 0 when fByteCount == 2 (uproot-issue-222.root)
         else:
             fVersion = None
             (tmp2,), buffer = buffer.unpack(">H")
@@ -84,7 +90,7 @@ class StreamHeader(ROOTSerializable):
                 if fClassName is None:
                     msg = f"ClassRef {fClassRef} not found in buffer local_refs"
                     raise ValueError(msg)
-        return cls(fByteCount, fVersion, fClassName, fClassRef), buffer
+        return cls(fByteCount, fVersion, fClassName, fClassRef, memberwise), buffer
 
 
 @dataclass
@@ -191,7 +197,7 @@ def _auto_TObject_base(buffer) -> tuple[StreamHeader, ReadBuffer]:
     """
     (version,), _ = buffer.unpack(">h")
     if version < 0x40:
-        itemheader = StreamHeader(0, version, None, None)
+        itemheader = StreamHeader(0, version, None, None, False)
     else:
         itemheader, buffer = StreamHeader.read(buffer)
     return itemheader, buffer
@@ -214,12 +220,12 @@ def _read_all_members(
     if cls.__name__ == "TObject" and indent > 0:
         itemheader, buffer = _auto_TObject_base(buffer)
     elif indent > 0 and getattr(cls, "_SkipHeader", False):
-        itemheader = StreamHeader(0, None, None, None)
+        itemheader = StreamHeader(0, None, None, None, False)
     else:
         itemheader, buffer = StreamHeader.read(buffer)
         if itemheader.fByteCount == 0:
-            if cls.__name__ in ("TH1D", "RooLinkedList"):
-                msg = "Suspicious object with fByteCount == 0 (e.g. uproot-issue-250.root, uproot-issue49.root)"
+            if cls.__name__ in ("TH1D"):
+                msg = "Suspicious object with fByteCount == 0 (e.g. uproot-issue-250.root)"
                 raise NotImplementedError(msg)
             msg = "fByteCount is 0"
             raise ValueError(msg)
