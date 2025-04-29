@@ -27,11 +27,7 @@ def _get_annotations(cls: type) -> dict[str, Any]:
         from inspect import get_annotations
 
         return get_annotations(cls)
-    return {
-        field: ann
-        for field, ann in cls.__dict__.get("__annotations__", {}).items()
-        if not field.startswith("_") and field != "self"
-    }
+    return dict(cls.__dict__.get("__annotations__", {}).items())
 
 
 @dataclasses.dataclass
