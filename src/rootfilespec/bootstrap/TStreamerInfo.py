@@ -6,7 +6,7 @@ from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TList import TObjArray
 from rootfilespec.bootstrap.TObject import TNamed
 from rootfilespec.cpptype import cpptype_to_pytype
-from rootfilespec.dispatch import DICTIONARY, normalize
+from rootfilespec.dispatch import DICTIONARY, ENCODING, normalize
 from rootfilespec.serializable import serializable
 from rootfilespec.structutil import Fmt
 
@@ -42,7 +42,7 @@ class TStreamerInfo(TNamed):
         """Get the class definition code of this streamer info."""
         bases = self.base_classes()
         # TODO: f"_VERSION = {self.fClassVersion}"
-        members: list[str] = []
+        members: list[tuple[str, str]] = []
         dependencies: list[str] = []
         for element in self.fObjects.objects:
             if not isinstance(element, (TStreamerElement, TStreamerSTLstring)):
@@ -52,15 +52,21 @@ class TStreamerInfo(TNamed):
                 continue
             mdef, dep = element.member_definition(parent=self)
             dependencies.extend(dep)
-            members.append(mdef)
+            mdoc = element.fTitle.fString.decode(ENCODING).strip()
+            # Prevent a syntax error from four consecutive double quotes
+            if mdoc.endswith('"'):
+                mdoc += " "
+            members.append((mdef, mdoc))
         clsname = self.class_name()
         basestr = ", ".join(reversed(bases))
         lines: list[str] = []
         lines.append(f"# Generated for {self}")
         lines.append("@serializable")
         lines.append(f"class {clsname}({basestr}):")
-        for member in members:
-            lines.append("    " + member)
+        for mdef, mdoc in members:
+            lines.append("    " + mdef)
+            if mdoc:
+                lines.append(f'    """{mdoc}"""')
         if not members:
             lines.append("    pass")
         lines.append("\n")
