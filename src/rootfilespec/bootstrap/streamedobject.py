@@ -157,6 +157,9 @@ def read_streamed_item(
                 # https://github.com/scikit-hep/uproot3/issues/413
                 # Likely groot-v0.21.0 (Go ROOT file implementation) did not write the streamers for TLeaf
                 raise NotImplementedError(msg)
+            if clsname == "RooRealVar":
+                msg = "RooRealVar not declared in the StreamerInfo, e.g. uproot-issue49.root"
+                raise NotImplementedError(msg)
             msg = f"Unknown class name: {itemheader.fClassName}"
             msg += f"\nStreamHeader: {itemheader}"
             raise ValueError(msg)

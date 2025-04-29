@@ -15,6 +15,7 @@ from rootfilespec.bootstrap.array import (
     TArrayS,
 )
 from rootfilespec.bootstrap.assumed import (
+    RooLinkedList,
     ROOT3a3aTIOFeatures,
     TAtt3D,
     TVirtualIndex,
@@ -54,6 +55,7 @@ __all__ = [
     "ROOT3a3aTIOFeatures",
     "ROOTFile",
     "Ref",
+    "RooLinkedList",
     "STLString",
     "StreamedObject",
     "TArrayC",

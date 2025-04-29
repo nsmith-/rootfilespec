@@ -5,12 +5,18 @@ TBasket and TArray* are also examples of this, but they are
 implemented in their own files.
 """
 
-from typing import Optional
+from typing import Annotated, Optional
 
-from rootfilespec.bootstrap.streamedobject import StreamedObject, StreamHeader
+from rootfilespec.bootstrap.streamedobject import (
+    StreamedObject,
+    StreamHeader,
+    read_streamed_item,
+)
+from rootfilespec.bootstrap.TObject import TObject
 from rootfilespec.buffer import ReadBuffer
 from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.serializable import Members, serializable
+from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.structutil import Fmt
 
 
 @serializable
@@ -74,3 +80,31 @@ class Uninterpreted(StreamedObject):
     def update_members(cls, members: Members, buffer: ReadBuffer):  # noqa: ARG003
         msg = "Logic error"
         raise RuntimeError(msg)
+
+
+@serializable
+class RooLinkedList(TObject):
+    """The streamer for RooLinkedList (v3) appears to be incorrect"""
+
+    _hashThresh: Annotated[int, Fmt(">h")]
+    """Size threshold for hashing"""
+    fSize: Annotated[int, Fmt(">i")]
+    """Current size of list"""
+    objects: tuple[ROOTSerializable, ...]
+
+    @classmethod
+    def read(cls, buffer: ReadBuffer):
+        members, buffer = cls.update_members({}, buffer)
+        return cls(**members), buffer
+
+    @classmethod
+    def update_members(cls, members: Members, buffer: ReadBuffer):
+        members, buffer = TObject.update_members(members, buffer)
+        (members["_hashThresh"], members["fSize"]), buffer = buffer.unpack(">hi")
+        fSize: int = members["fSize"]
+        objects: list[ROOTSerializable] = []
+        for _ in range(fSize):
+            item, buffer = read_streamed_item(buffer)
+            objects.append(item)
+        members["objects"] = tuple(objects)
+        return members, buffer

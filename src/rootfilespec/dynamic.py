@@ -64,7 +64,10 @@ def streamerinfo_to_classes(streamerinfo: bootstrap.TList) -> str:
                 warning_log.append(
                     f"    Class {classdef.name} depends on {dep} which is missing"
                 )
-                lines.append(f"class {dep}(Uninterpreted):\n    pass\n")
+                lines.append(
+                    f"class {dep}(Uninterpreted):\n    pass\nDICTIONARY['{dep}'] = {dep}\n"
+                )
+                declared.add(dep)
         lines.append(classdef.code)
         declared.add(classdef.name)
 
