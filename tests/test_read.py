@@ -13,12 +13,23 @@ from rootfilespec.dynamic import streamerinfo_to_classes
 TESTABLE_FILES = [f for f in known_files if f.endswith(".root")]
 
 
-def _walk(dir: TDirectory, fetch_data: DataFetcher, depth=0, maxdepth=-1):
+def _walk(
+    dir: TDirectory,
+    fetch_data: DataFetcher,
+    failures: list[str],
+    *,
+    depth=0,
+    maxdepth=-1,
+):
     keylist = dir.get_KeyList(fetch_data)
     for item in keylist.values():
-        obj = item.read_object(fetch_data)
+        try:
+            obj = item.read_object(fetch_data)
+        except NotImplementedError as ex:
+            failures.append(str(ex))
+            continue
         if isinstance(obj, TDirectory) and (maxdepth < 0 or depth < maxdepth):
-            _walk(obj, fetch_data, depth + 1)
+            _walk(obj, fetch_data, failures, depth=depth + 1)
 
 
 @pytest.mark.parametrize("filename", TESTABLE_FILES)
@@ -43,11 +54,16 @@ def test_read_file(filename: str):
 
         rootdir = file.get_TFile(fetch_cached).rootdir
 
+        # List to collect NotImplementedError messages
+        failures: list[str] = []
+
         # Read all StreamerInfo (class definitions) from the file
         streamerinfo = file.get_StreamerInfo(fetch_data)
         if not streamerinfo:
             # Try to read all objects anyway
-            _walk(rootdir, fetch_data)
+            _walk(rootdir, fetch_data, failures)
+            if failures:
+                return pytest.xfail(reason=",".join(set(failures)))
             return None
 
         # Render the class definitions into python code
@@ -64,7 +80,9 @@ def test_read_file(filename: str):
             exec(classes, module.__dict__)
 
             # Read all objects from the file
-            return _walk(rootdir, fetch_data)
+            _walk(rootdir, fetch_data, failures)
+            if failures:
+                return pytest.xfail(reason=",".join(set(failures)))
         except NotImplementedError as ex:
             return pytest.xfail(reason=str(ex))
         finally:

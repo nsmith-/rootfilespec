@@ -134,7 +134,7 @@ class TKey(ROOTSerializable):
             typename = normalize(self.fClassName.fString)
             dyntype = DICTIONARY.get(typename)
             if dyntype is None:
-                msg = f"TKey.read_object: unknown type {typename}."
+                msg = f"TKey.read_object: unknown type {typename}"
                 raise NotImplementedError(msg)
             obj, buffer = dyntype.read(buffer)
         # Some types we have to handle trailing bytes

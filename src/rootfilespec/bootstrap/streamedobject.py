@@ -158,7 +158,7 @@ def read_streamed_item(
         clsname = normalize(itemheader.fClassName)
         if clsname not in DICTIONARY:
             if clsname == "TLeafI":
-                msg = "TLeafI not declared in StreamerInfo perhaps? e.g. uproot-issue413.root"
+                msg = "TLeafI not declared in StreamerInfo, e.g. uproot-issue413.root"
                 # (84 other test files have it, e.g. uproot-issue121.root)
                 # https://github.com/scikit-hep/uproot3/issues/413
                 # Likely groot-v0.21.0 (Go ROOT file implementation) did not write the streamers for TLeaf
@@ -224,8 +224,8 @@ def _read_all_members(
     else:
         itemheader, buffer = StreamHeader.read(buffer)
         if itemheader.fByteCount == 0:
-            if cls.__name__ in ("TH1D"):
-                msg = "Suspicious object with fByteCount == 0 (e.g. uproot-issue-250.root)"
+            if cls.__name__ in ("TH1D", "TH2D"):
+                msg = "Suspicious THx with fByteCount == 0 (e.g. uproot-issue-250.root)"
                 raise NotImplementedError(msg)
             msg = "fByteCount is 0"
             raise ValueError(msg)
