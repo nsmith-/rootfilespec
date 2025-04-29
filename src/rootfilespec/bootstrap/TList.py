@@ -1,49 +1,61 @@
-from rootfilespec.bootstrap.streamedobject import read_streamed_item
+from typing import Annotated, Union
+
+from rootfilespec.bootstrap.streamedobject import Ref, read_streamed_item
 from rootfilespec.bootstrap.strings import TString
-from rootfilespec.bootstrap.TObject import TObject, TObjectBits
+from rootfilespec.bootstrap.TObject import TObject
 from rootfilespec.buffer import ReadBuffer
 from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.structutil import Fmt
 
 
 @serializable
-class TList(TObject):
+class TCollection(TObject):
+    _SkipHeader = True
+    fName: TString
+    fSize: Annotated[int, Fmt(">i")]
+
+
+DICTIONARY["TCollection"] = TCollection
+
+
+@serializable
+class TSeqCollection(TCollection):
+    _SkipHeader = True
+
+
+DICTIONARY["TSeqCollection"] = TSeqCollection
+
+
+@serializable
+class TList(TSeqCollection):
     """TList container class.
     Reference: https://root.cern/doc/master/streamerinfo.html (TList section)
     """
 
-    fName: TString
-    """Name of the list."""
-    fN: int
-    """Number of objects in the list."""
-    items: tuple[TObject, ...]
+    items: list[Union[TObject, Ref[TObject]]]
     """List of objects."""
 
     @classmethod
     def update_members(cls, members: Members, buffer: ReadBuffer):
-        base_tobject = TObject(**members)
-        if base_tobject.fVersion == 1 << 14 and (
-            base_tobject.fBits & TObjectBits.kNotSure
-        ):
-            # This looks like schema evolution data
-            raise ValueError()
-        fName, buffer = TString.read(buffer)
-        (fN,), buffer = buffer.unpack(">i")
-        items: list[TObject] = []
-        for _ in range(fN):
+        items: list[Union[TObject, Ref[TObject]]] = []
+        fSize: int = members["fSize"]
+        for _ in range(fSize):
             item, buffer = read_streamed_item(buffer)
-            if not isinstance(item, TObject):
+            if not (isinstance(item, (TObject, Ref))):
                 msg = f"Expected TObject but got {item!r}"
                 raise ValueError(msg)
             # No idea why there is a null pad byte here
             pad, buffer = buffer.consume(1)
             if pad != b"\x00":
-                msg = f"Expected null pad byte but got {pad!r}"
-                raise ValueError(msg)
+                if pad == b"\x01":
+                    # TODO: understand this case (e.g. uproot-issue-350.root)
+                    (mystery,), buffer = buffer.unpack(">B")
+                else:
+                    msg = f"Unexpected pad byte in TList: {pad!r}"
+                    raise ValueError(msg)
             items.append(item)
-        members["fName"] = fName
-        members["fN"] = fN
-        members["items"] = tuple(items)
+        members["items"] = items
         return members, buffer
 
 
@@ -51,13 +63,9 @@ DICTIONARY["TList"] = TList
 
 
 @serializable
-class TObjArray(TObject):
+class TObjArray(TSeqCollection):
     """TObjArray container class."""
 
-    fName: TString
-    """Name of the array."""
-    nObjects: int
-    """Number of objects in the array."""
     fLowerBound: int
     """Lower bound of the array."""
     objects: tuple[ROOTSerializable, ...]
@@ -65,15 +73,12 @@ class TObjArray(TObject):
 
     @classmethod
     def update_members(cls, members: Members, buffer: ReadBuffer):
-        fName, buffer = TString.read(buffer)
-        (nObjects, fLowerBound), buffer = buffer.unpack(">ii")
+        (members["fLowerBound"],), buffer = buffer.unpack(">i")
+        fSize: int = members["fSize"]
         objects: list[ROOTSerializable] = []
-        for _ in range(nObjects):
+        for _ in range(fSize):
             item, buffer = read_streamed_item(buffer)
             objects.append(item)
-        members["fName"] = fName
-        members["nObjects"] = nObjects
-        members["fLowerBound"] = fLowerBound
         members["objects"] = tuple(objects)
         return members, buffer
 

@@ -1,7 +1,10 @@
 from datetime import datetime
+from typing import Annotated
+
+from rootfilespec.structutil import Fmt
 
 
-def fDatime_to_datetime(fDatime: int) -> datetime:
+def TDatime_to_datetime(fDatime: int) -> datetime:
     """Convert fDatime to datetime
 
     Using the ROOT file convention
@@ -21,3 +24,7 @@ def fDatime_to_datetime(fDatime: int) -> datetime:
         minute=(fDatime >> 6) & 0x3F,
         second=(fDatime & 0x3F),
     )
+
+
+# TODO: convert to datetime through a MemberSerDe
+TDatime = Annotated[int, Fmt(">I")]

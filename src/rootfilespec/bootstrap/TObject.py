@@ -1,4 +1,4 @@
-from enum import IntEnum
+from enum import IntFlag
 from typing import Annotated, Optional
 
 from rootfilespec.bootstrap.streamedobject import StreamedObject
@@ -9,23 +9,58 @@ from rootfilespec.serializable import Members, serializable
 from rootfilespec.structutil import Fmt
 
 
-class TObjectBits(IntEnum):
-    """Bits for TObject class."""
+class TObjFlag(IntFlag):
+    """Bits for TObject class.
+
+    https://github.com/root-project/root/blob/b5ac9cdad06a41a4a3e18d568b4198872f388e92/core/base/inc/TObject.h#L63C12-L63C77
+
+    Global bits (can be set for any object and should not be reused).
+    Bits 0 - 13 are reserved as global bits. Bits 14 - 23 can be used in different class hierarchies
+    (make sure there is no overlap in any given hierarchy).
+    """
+
+    # Private bits
+    kIsOnHeap = 0x01000000
+    """If object is on Heap."""
+    kNotDeleted = 0x02000000
+    """If object has not been deleted."""
+    kZombie = 0x04000000
+    """If object constructor failed."""
+    kInconsistent = 0x08000000
+    """If class overloads Hash but does not call RecursiveRemove in destructor."""
 
     kCanDelete = 0x00000001
     """If object in a list can be deleted."""
-    kIsOnHeap = 0x01000000
-    """If object is on Heap."""
-    kIsReferenced = 0x00000010
-    """If object is referenced by pointer to persistent object."""
     kMustCleanup = 0x00000008
     """If other objects may need to be deleted when this one is."""
-    kNotDeleted = 0x02000000
-    """If object has not been deleted."""
-    kZombie = 0x00002000
-    """If object ctor succeeded but object shouldn't be used."""
-    kNotSure = 0x00010000
+    kIsReferenced = 0x00000010
+    """If object is referenced by pointer to persistent object."""
+    kHasUUID = 0x00000020
+    """If object has a TUUID (its fUniqueID=UUIDNumber)"""
+    kCannotPick = 0x00000040
+    """If object in a pad cannot be picked"""
+    # 7 is taken by TAxis and TClass.
+    kNotSure = 0x10000
     """If object is not sure if it is on heap or not."""
+    kMysteryStreamer = 0x20000
+    """Appears in some TStreamerElement"""
+    kMysteryStreamer2 = 0x1000
+    """Appears in some TStreamerElement"""
+    kDoNotDelete = 0x2000
+    """TStreamerElement status bit or kInvalidObject"""
+
+    # TODO: validate on initialization that no bits are set that are not defined in this class
+    def __repr__(self):
+        setbits: list[str] = []
+        val = int(self)
+        for bit in TObjFlag:
+            if val & bit:
+                setbits.append(self.__class__.__name__ + "." + (bit.name or "UNKNOWN"))
+                val &= ~bit
+        if val:
+            msg = f"Invalid bits set in {self.__class__.__name__}: {val:#x}"
+            raise ValueError(msg)
+        return f"{self.__class__.__name__}({'|'.join(setbits)})"
 
 
 @serializable
@@ -38,7 +73,7 @@ class TObject(StreamedObject):
     """Version of the class."""
     fUniqueID: Annotated[int, Fmt(">i")]
     """Unique ID of the object."""
-    fBits: Annotated[int, Fmt(">i")]
+    fBits: Annotated[TObjFlag, Fmt(">i")]
     """Bit mask for the object."""
     pidf: Optional[int]
     """An identifier of the TProcessID record for the process that wrote the object.
@@ -52,8 +87,9 @@ class TObject(StreamedObject):
         cls, members: Members, buffer: ReadBuffer
     ) -> tuple[Members, ReadBuffer]:
         (fVersion, fUniqueID, fBits), buffer = buffer.unpack(">hii")
+        fBits = TObjFlag(fBits)
         pidf = None
-        if fBits & TObjectBits.kIsReferenced:
+        if fBits & TObjFlag.kIsReferenced:
             (pidf,), buffer = buffer.unpack(">H")
         members["fVersion"] = fVersion
         members["fUniqueID"] = fUniqueID

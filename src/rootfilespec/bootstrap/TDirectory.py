@@ -1,9 +1,9 @@
 from collections.abc import Mapping
 from typing import Annotated, Optional
 
+from rootfilespec.bootstrap.TDatime import TDatime, TDatime_to_datetime
 from rootfilespec.bootstrap.TKey import TKey
 from rootfilespec.bootstrap.TUUID import TUUID
-from rootfilespec.bootstrap.util import fDatime_to_datetime
 from rootfilespec.buffer import DataFetcher, ReadBuffer
 from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.serializable import Members, ROOTSerializable, serializable
@@ -35,9 +35,9 @@ class TDirectory_header_v622(ROOTSerializable):
 
     fVersion: Annotated[int, Fmt(">h")]
     """TDirectory class version identifier"""
-    fDatimeC: Annotated[int, Fmt(">I")]
+    fDatimeC: TDatime
     """Date and time when directory was created"""
-    fDatimeM: Annotated[int, Fmt(">I")]
+    fDatimeM: TDatime
     """Date and time when directory was last modified"""
     fNbytesKeys: Annotated[int, Fmt(">i")]
     """Number of bytes in the associated KeysList record"""
@@ -54,11 +54,11 @@ class TDirectory_header_v622(ROOTSerializable):
 
     def create_time(self):
         """Date and time when directory was created"""
-        return fDatime_to_datetime(self.fDatimeC)
+        return TDatime_to_datetime(self.fDatimeC)
 
     def modify_time(self):
         """Date and time when directory was last modified"""
-        return fDatime_to_datetime(self.fDatimeM)
+        return TDatime_to_datetime(self.fDatimeM)
 
 
 @serializable
