@@ -351,7 +351,7 @@ DICTIONARY["TStreamerBasicType"] = TStreamerBasicType
 class TStreamerString(TStreamerElement):
     def member_definition(self, parent: TStreamerInfo):  # noqa: ARG002
         if self.fArrayLength > 0:
-            msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
+            msg = f"Array length not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
         return f"{self.member_name()}: TString", []
 
@@ -375,7 +375,7 @@ class TStreamerBasicPointer(TStreamerElement):
 
     def member_definition(self, parent: TStreamerInfo):
         if self.fArrayLength > 0:
-            msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
+            msg = f"Array length not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
 
         fmt = ElementType(self.fType - ElementType.kOffsetP).as_fmt()
@@ -401,7 +401,7 @@ DICTIONARY["TStreamerBasicPointer"] = TStreamerBasicPointer
 class TStreamerObject(TStreamerElement):
     def member_definition(self, parent: TStreamerInfo):
         if self.fArrayLength > 0:
-            msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
+            msg = f"Array length not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
         typename = self.type_name()
         dependencies = []
@@ -422,15 +422,15 @@ DICTIONARY["TStreamerObject"] = TStreamerObject
 class TStreamerObjectPointer(TStreamerElement):
     def member_definition(self, parent: TStreamerInfo):
         if self.fArrayLength > 0:
-            msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
+            msg = f"Array length not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
         assert self.fTypeName.fString.endswith(b"*")
-        typename = normalize(self.fTypeName.fString.removesuffix(b"*"))
-        dependencies = {typename}
-        if typename == parent.class_name():
-            dependencies.remove(typename)
-            typename = f'"{typename}"'
-        mdef = f"{self.member_name()}: Ref[{typename}]"
+        typename, dependencies = cpptype_to_pytype(self.fTypeName.fString)
+        this = parent.class_name()
+        if this in dependencies:
+            dependencies.remove(this)
+            typename = typename.replace(this, f'"{this}"')
+        mdef = f"{self.member_name()}: {typename}"
         return mdef, list(dependencies)
 
 
@@ -459,7 +459,7 @@ DICTIONARY["TStreamerLoop"] = TStreamerLoop
 class TStreamerObjectAny(TStreamerElement):
     def member_definition(self, parent: TStreamerInfo):
         if self.fArrayLength > 0:
-            msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
+            msg = f"Array length not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
         if self.type_name() == parent.class_name():
             typename = f'"{self.type_name()}"'
@@ -477,7 +477,7 @@ DICTIONARY["TStreamerObjectAny"] = TStreamerObjectAny
 class TStreamerObjectAnyPointer(TStreamerElement):
     def member_definition(self, parent: TStreamerInfo):
         if self.fArrayLength > 0:
-            msg = f"Array length {self.fArrayLength} not implemented for {self.__class__.__name__}"
+            msg = f"Array length not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
         assert self.fTypeName.fString.endswith(b"*")
         typename, dependencies = cpptype_to_pytype(

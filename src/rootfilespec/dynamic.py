@@ -61,9 +61,11 @@ def streamerinfo_to_classes(streamerinfo: bootstrap.TList) -> str:
             if depdef is not None:
                 write(depdef)
             elif dep not in declared:
-                warning_log.append(
-                    f"    Class {classdef.name} depends on {dep} which is missing"
-                )
+                if dep == classdef.name:
+                    msg = f"Class {classdef.name} depends on itself, which is not allowed (likely an unimplemented container type)"
+                else:
+                    msg = f"Class {classdef.name} depends on {dep} which is missing"
+                warning_log.append("    " + msg)
                 lines.append(
                     f"class {dep}(Uninterpreted):\n    pass\nDICTIONARY['{dep}'] = {dep}\n"
                 )

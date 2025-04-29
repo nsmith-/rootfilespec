@@ -13,7 +13,7 @@ one proves too simple. The grammar this implements should be equivalent to:
 %import common.CNAME
 
 start: value
-?value: ["const"] (template | typeid) ["*"]
+?value: ["const"] (template | typeid) "*"?
 template: template_name "<" template_args ">"
 template_name: CNAME
 template_args: value ("," value)*
@@ -40,6 +40,7 @@ _cpp_primitives = {
     b"Long64_t": "Annotated[int, Fmt('>q')]",
     b"long": "Annotated[int, Fmt('>q')]",
     b"unsigned long": "Annotated[int, Fmt('>Q')]",
+    b"ULong64_t": "Annotated[int, Fmt('>Q')]",
     b"float": "Annotated[float, Fmt('>f')]",
     b"double": "Annotated[float, Fmt('>d')]",
 }
@@ -53,7 +54,7 @@ _cpp_templates: dict[bytes, tuple[str, int]] = {
 }
 
 
-_tokenize = re.compile(rb"([\w:]+|<| ?>|, ?| ?\*| )")
+_tokenize = re.compile(rb"(const |[\w:]+|<| ?>|, ?| ?\*| )")
 
 
 class _TokenType(IntEnum):
@@ -63,6 +64,8 @@ class _TokenType(IntEnum):
     COMMA = 3
     POINTER = 4
     SPACE = 5
+    CONSTQUAL = 6
+    """Const qualifier should be ignorable in serialization"""
 
 
 class _Token:
@@ -81,6 +84,8 @@ class _Token:
             self.type = _TokenType.POINTER
         elif match == b" ":
             self.type = _TokenType.SPACE
+        elif match == b"const ":
+            self.type = _TokenType.CONSTQUAL
         else:
             self.type = _TokenType.NAME
 
@@ -92,7 +97,7 @@ class _TokenStream:
     def __init__(self, input: bytes):
         split = _tokenize.split(input)
         if any(split[::2]):
-            msg = f"Unexpected token in C++ type name {input!r}"
+            msg = f"Failed to split: unexpected token(s) in C++ type name {input!r}"
             raise ValueError(msg)
         self._tokens = iter(_Token(match) for match in split[1::2])
         self._current = next(self._tokens, None)
@@ -215,6 +220,12 @@ def _value(stream: _TokenStream) -> _CppTypeAstNode:
     if not token:
         msg = "Unexpected end of stream"
         raise ValueError(msg)
+    if token.type == _TokenType.CONSTQUAL:
+        # Ignore const qualifier
+        token = stream.next()
+        if not token:
+            msg = "Unexpected end of stream after const"
+            raise ValueError(msg)
     if token.type != _TokenType.NAME:
         msg = f"Unexpected token {token}"
         raise ValueError(msg)
