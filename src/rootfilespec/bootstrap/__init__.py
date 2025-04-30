@@ -17,6 +17,7 @@ from rootfilespec.bootstrap.array import (
 from rootfilespec.bootstrap.assumed import (
     RooLinkedList,
     TAtt3D,
+    TFormula,
     TVirtualIndex,
     Uninterpreted,
 )
@@ -67,6 +68,7 @@ __all__ = [
     "TDatime",
     "TDirectory",
     "TFile",
+    "TFormula",
     "TKey",
     "TKeyList",
     "TList",

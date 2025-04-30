@@ -1,6 +1,6 @@
 import dataclasses
 from collections.abc import Hashable
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, Union, get_args, get_origin
 
 import numpy as np
 
@@ -13,6 +13,7 @@ from rootfilespec.serializable import (
     MemberSerDe,
     MemberType,
     ReadObjMethod,
+    _build_read,
     _ObjectReader,
 )
 
@@ -125,6 +126,52 @@ class FixedSizeArray(MemberSerDe):
             msg = f"Unimplemented format {self.fmt}"
             raise NotImplementedError(msg)
         return _FixedSizeArrayReader(fname, np.dtype(self.fmt), self.size)
+
+
+@dataclasses.dataclass
+class _ObjectArrayReader:
+    """Array that has its length at the beginning of the array and has no pad byte"""
+
+    name: str
+    size: Union[int, str]
+    inner_reader: ReadObjMethod
+
+    def __call__(
+        self, members: Members, buffer: ReadBuffer
+    ) -> tuple[Members, ReadBuffer]:
+        if isinstance(self.size, int):
+            n = self.size
+        else:
+            n = members[self.size]
+            header, buffer = StreamHeader.read(buffer)
+            if header.memberwise:
+                msg = "Memberwise reading of ObjectArray not implemented"
+                raise NotImplementedError(msg)
+        items: list[MemberType] = []
+        for _ in range(n):
+            obj, buffer = self.inner_reader(buffer)
+            items.append(obj)
+        members[self.name] = items
+        return members, buffer
+
+
+@dataclasses.dataclass
+class ObjectArray(MemberSerDe):
+    """A class to hold an array of objects of a given type."""
+
+    size: Union[int, str]
+    """Either a fixed size or the name of a member that holds the size of the array."""
+
+    def build_reader(self, fname: str, ftype: type):
+        assert get_origin(ftype) is list, "ObjectArray must be used with a list type"
+        inner_type, *_ = get_args(ftype)
+        inner_reader = _build_read(inner_type)
+        if isinstance(inner_reader, _ObjectReader) and isinstance(
+            inner_reader.membermethod, _StdVectorReader
+        ):
+            # TODO: likely all nested StdVector have no header
+            inner_reader.membermethod.hasheader = False
+        return _ObjectArrayReader(fname, self.size, inner_reader)
 
 
 T = TypeVar("T", bound=MemberType)

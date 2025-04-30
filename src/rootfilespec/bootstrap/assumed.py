@@ -7,13 +7,20 @@ implemented in their own files.
 
 from typing import Annotated
 
+import numpy as np
+
 from rootfilespec.bootstrap.streamedobject import (
+    Ref,
     StreamedObject,
     StreamHeader,
     read_streamed_item,
 )
-from rootfilespec.bootstrap.TObject import TObject
+from rootfilespec.bootstrap.strings import TString
+from rootfilespec.bootstrap.TList import TObjArray
+from rootfilespec.bootstrap.TObject import TNamed, TObject
 from rootfilespec.buffer import ReadBuffer
+from rootfilespec.container import BasicArray, ObjectArray
+from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.serializable import Members, ROOTSerializable, serializable
 from rootfilespec.structutil import Fmt
 
@@ -87,3 +94,49 @@ class RooLinkedList(TObject):
             objects.append(item)
         members["objects"] = tuple(objects)
         return members, buffer
+
+
+@serializable
+class TFormula(TNamed):
+    """TFormula
+
+    This is v8 as extracted from uproot-issue-181.root
+    There is a v7 stored in the same file in a TProfile named b'meanetruevseest'
+    """
+
+    fNdim: Annotated[int, Fmt(">i")]
+    r"""Dimension of function (1=1-Dim, 2=2-Dim,etc)"""
+    fNpar: Annotated[int, Fmt(">i")]
+    r"""Number of parameters"""
+    fNoper: Annotated[int, Fmt(">i")]
+    r"""Number of operators"""
+    fNconst: Annotated[int, Fmt(">i")]
+    r"""Number of constants"""
+    fNumber: Annotated[int, Fmt(">i")]
+    r"""formula number identifier"""
+    fNval: Annotated[int, Fmt(">i")]
+    r"""Number of different variables in expression"""
+    fNstring: Annotated[int, Fmt(">i")]
+    r"""Number of different constants character strings"""
+    fExpr: Annotated[list[Ref[TString]], ObjectArray("fNoper")]
+    r"""[fNoper] List of expressions"""
+    fOper: Annotated[np.ndarray, BasicArray(">i", "fNoper")]
+    r"""[fNoper] List of operators. (See documentation for changes made at version 7)"""
+    fConst: Annotated[np.ndarray, BasicArray(">d", "fNconst")]
+    r"""[fNconst] Array of fNconst formula constants"""
+    fParams: Annotated[np.ndarray, BasicArray(">d", "fNpar")]
+    r"""[fNpar] Array of fNpar parameters"""
+    fNames: Annotated[list[Ref[TString]], ObjectArray("fNpar")]
+    r"""[fNpar] Array of parameter names"""
+    fFunctions: TObjArray
+    r"""Array of function calls to make"""
+    fLinearParts: TObjArray
+    r"""Linear parts if the formula is linear (contains '|' or "++")"""
+
+    @classmethod
+    def update_members(cls, members: Members, buffer: ReadBuffer):
+        msg = "TFormula.update_members is not implemented"
+        raise NotImplementedError(msg)
+
+
+DICTIONARY["TFormula"] = TFormula

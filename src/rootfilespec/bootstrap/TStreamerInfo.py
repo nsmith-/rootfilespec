@@ -62,6 +62,7 @@ class TStreamerInfo(TNamed):
     def class_definition(self) -> ClassDef:
         """Get the class definition code of this streamer info."""
         self.check_classname()
+        clsname = self.class_name()
         bases = self.base_classes()
         # TODO: f"_VERSION = {self.fClassVersion}"
         members: list[tuple[str, str]] = []
@@ -79,10 +80,18 @@ class TStreamerInfo(TNamed):
             if mdoc.endswith('"'):
                 mdoc += " "
             members.append((mdef, mdoc))
-        clsname = self.class_name()
         basestr = ", ".join(reversed(bases))
         lines: list[str] = []
         lines.append(f"# Generated for {self}")
+        if self.fCheckSum == 0:
+            # TODO: emit warning
+            lines.append(
+                "# No checksum: almost certainly a custom streamer, will be left uninterpreted"
+            )
+            lines.append(
+                f"class {clsname}(Uninterpreted):\n    pass\nDICTIONARY['{clsname}'] = {clsname}\n"
+            )
+            return ClassDef(self.class_name(), [], "\n".join(lines))
         lines.append("@serializable")
         lines.append(f"class {clsname}({basestr}):")
         for mdef, mdoc in members:
@@ -244,7 +253,7 @@ class ElementType(IntEnum):
             self.kChar: ">b",
             self.kShort: ">h",
             self.kInt: ">i",
-            self.kLong: ">l",
+            self.kLong: ">q",  # uproot-issue283.root for example of kLong
             self.kFloat: ">f",
             self.kDouble: ">d",
             self.kUChar: ">B",
@@ -400,17 +409,14 @@ DICTIONARY["TStreamerBasicPointer"] = TStreamerBasicPointer
 @serializable
 class TStreamerObject(TStreamerElement):
     def member_definition(self, parent: TStreamerInfo):
-        if self.fArrayLength > 0:
-            msg = f"Array length not implemented for {self.__class__.__name__}"
-            raise NotImplementedError(msg)
         typename = self.type_name()
         dependencies = []
         if typename == parent.class_name():
             typename = f'"{typename}"'
-        # elif typename == "TObjArray":
-        #     typename = "TObjArray_v3"
         else:
             dependencies = [typename]
+        if self.fArrayLength > 0:
+            typename = f"Annotated[list[{typename}], ObjectArray({self.fArrayLength})]"
         mdef = f"{self.member_name()}: {typename}"
         return mdef, dependencies
 
@@ -451,6 +457,26 @@ class TStreamerLoop(TStreamerElement):
     fCountName: TString
     fCountClass: TString
 
+    def member_definition(self, parent: TStreamerInfo):
+        if self.fArrayLength > 0:
+            msg = f"Array length not implemented for {self.__class__.__name__}"
+            raise NotImplementedError(msg)
+
+        if not (
+            self.fCountClass == parent.fName
+            or normalize(self.fCountClass.fString) in parent.base_classes()
+        ):
+            msg = f"fCountClass {self.fCountClass} != parent.fName {parent.fName}"
+            raise ValueError(msg)
+
+        countname = normalize(self.fCountName.fString)
+        atype = f"ObjectArray({countname!r})"
+        itemtype, dependencies = cpptype_to_pytype(self.fTypeName.fString)
+        return (
+            f"{self.member_name()}: Annotated[list[{itemtype}], {atype}]",
+            list(dependencies),
+        )
+
 
 DICTIONARY["TStreamerLoop"] = TStreamerLoop
 
@@ -458,15 +484,14 @@ DICTIONARY["TStreamerLoop"] = TStreamerLoop
 @serializable
 class TStreamerObjectAny(TStreamerElement):
     def member_definition(self, parent: TStreamerInfo):
-        if self.fArrayLength > 0:
-            msg = f"Array length not implemented for {self.__class__.__name__}"
-            raise NotImplementedError(msg)
         if self.type_name() == parent.class_name():
             typename = f'"{self.type_name()}"'
             return f"{self.member_name()}: {typename}", []
         # This may be a non-trivial type, e.g. vector<double>
         # or vector<TLorentzVector>
         typename, dependencies = cpptype_to_pytype(self.fTypeName.fString)
+        if self.fArrayLength > 0:
+            typename = f"Annotated[list[{typename}], ObjectArray({self.fArrayLength})]"
         return f"{self.member_name()}: {typename}", list(dependencies)
 
 

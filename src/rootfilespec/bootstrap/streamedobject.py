@@ -62,7 +62,9 @@ class StreamHeader(ROOTSerializable):
             if fVersion & _StreamConstants.kStreamedMemberwise:
                 fVersion &= ~_StreamConstants.kStreamedMemberwise
                 memberwise = True
-            elif fVersion == 0 and fByteCount >= 6:
+                msg = "Memberwise streaming not implemented"
+                raise NotImplementedError(msg)
+            if fVersion == 0 and fByteCount >= 6:
                 # This class is versioned by its streamer checksum instead
                 (checksum,), buffer = buffer.unpack(">I")
                 fVersion = checksum

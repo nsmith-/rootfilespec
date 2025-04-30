@@ -18,6 +18,7 @@ from rootfilespec.bootstrap import *
 from rootfilespec.container import (
     BasicArray,
     FixedSizeArray,
+    ObjectArray,
     StdVector,
     StdSet,
     StdDeque,
