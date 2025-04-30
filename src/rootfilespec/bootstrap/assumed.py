@@ -120,11 +120,11 @@ class TFormula(TNamed):
     r"""Number of different constants character strings"""
     fExpr: Annotated[list[Ref[TString]], ObjectArray("fNoper")]
     r"""[fNoper] List of expressions"""
-    fOper: Annotated[np.ndarray, BasicArray(">i", "fNoper")]
+    fOper: Annotated[np.typing.NDArray[np.int32], BasicArray(">i", "fNoper")]
     r"""[fNoper] List of operators. (See documentation for changes made at version 7)"""
-    fConst: Annotated[np.ndarray, BasicArray(">d", "fNconst")]
+    fConst: Annotated[np.typing.NDArray[np.float64], BasicArray(">d", "fNconst")]
     r"""[fNconst] Array of fNconst formula constants"""
-    fParams: Annotated[np.ndarray, BasicArray(">d", "fNpar")]
+    fParams: Annotated[np.typing.NDArray[np.float64], BasicArray(">d", "fNpar")]
     r"""[fNpar] Array of fNpar parameters"""
     fNames: Annotated[list[Ref[TString]], ObjectArray("fNpar")]
     r"""[fNpar] Array of parameter names"""
