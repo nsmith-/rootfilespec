@@ -92,7 +92,7 @@ class FooterEnvelope(REnvelope):
         members["clusterGroups"] = clusterGroups
         return members, buffer
 
-    def get_pagelist(self, fetch_data: DataFetcher) -> list[PageListEnvelope]:
+    def get_pagelists(self, fetch_data: DataFetcher) -> list[PageListEnvelope]:
         """Get the RNTuple Page List Envelopes from the Footer Envelope.
 
         Page List Envelope Links are stored in the Cluster Group Record Frames in the Footer Envelope Payload.

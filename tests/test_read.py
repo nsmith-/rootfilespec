@@ -15,9 +15,9 @@ TESTABLE_FILES = [f for f in known_files if f.endswith(".root")]
 
 def _walk_RNTuple(anchor: ROOT3a3aRNTuple, fetch_data: DataFetcher):
     footer = anchor.get_footer(fetch_data)
-    pagelist = footer.get_pagelist(fetch_data)
-    for page in pagelist:
-        page.get_pages(fetch_data)
+    pagelists = footer.get_pagelists(fetch_data)
+    for page_locations in pagelists:
+        page_locations.get_pages(fetch_data)
 
 
 def _walk(

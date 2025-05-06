@@ -106,7 +106,7 @@ if __name__ == "__main__":
                 # footer.print_info()
 
                 ### Get the RNTuple Page List Envelopes from the Footer Envelope
-                page_location_lists = footer.get_pagelist(fetch_data)
+                page_location_lists = footer.get_pagelists(fetch_data)
 
                 # Print attributes of the RNTuple Page List Envelopes
                 for i, page_location_list in enumerate(page_location_lists):
