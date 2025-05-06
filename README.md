@@ -25,3 +25,13 @@
 [rtd-link]:                 https://rootfilespec.readthedocs.io/en/latest/?badge=latest
 
 <!-- prettier-ignore-end -->
+
+The rootfilespec package is designed to efficiently parse ROOT file binary data
+into python datastructures. It does not drive I/O and expects materialized bytes
+buffers as input. It also does not return any types beyond python dataclasses of
+primitive types (and numpy arrays thereof). The goal of the project is to
+provide a stable and feature-complete read/write backend for packages such as
+uproot.
+
+Further details on the design decisions can be found in
+[docs/design.md](docs/design.md).
