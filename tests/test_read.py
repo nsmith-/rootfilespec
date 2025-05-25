@@ -1,6 +1,7 @@
 import sys
 import types
 from pathlib import Path
+from typing import Callable
 
 import pytest
 from skhep_testdata import data_path, known_files  # type: ignore[import-not-found]
@@ -23,10 +24,11 @@ def _walk_RNTuple(anchor: ROOT3a3aRNTuple, fetch_data: DataFetcher):
 def _walk(
     dir: TDirectory,
     fetch_data: DataFetcher,
-    failures: list[str],
+    notimplemented_callback: Callable[[bytes, NotImplementedError], None],
     *,
     depth=0,
     maxdepth=-1,
+    path=b"",
 ):
     if dir.fSeekKeys == 0:
         # empty directory
@@ -34,12 +36,19 @@ def _walk(
     keylist = dir.get_KeyList(fetch_data)
     for item in keylist.values():
         try:
+            print(f"Reading {item.fName} of type {item.fClassName}")
             obj = item.read_object(fetch_data)
         except NotImplementedError as ex:
-            failures.append(str(ex))
+            notimplemented_callback(path, ex)
             continue
         if isinstance(obj, TDirectory) and (maxdepth < 0 or depth < maxdepth):
-            _walk(obj, fetch_data, failures, depth=depth + 1)
+            _walk(
+                obj,
+                fetch_data,
+                notimplemented_callback,
+                depth=depth + 1,
+                path=path + b"/" + item.fName.fString,
+            )
         elif isinstance(obj, ROOT3a3aRNTuple):
             _walk_RNTuple(obj, fetch_data)
 
@@ -68,12 +77,15 @@ def test_read_file(filename: str):
 
         # List to collect NotImplementedError messages
         failures: list[str] = []
+        def fail_cb(_: bytes, ex: NotImplementedError):
+            print(f"NotImplementedError: {ex}")
+            failures.append(str(ex))
 
         # Read all StreamerInfo (class definitions) from the file
         streamerinfo = file.get_StreamerInfo(fetch_data)
         if not streamerinfo:
             # Try to read all objects anyway
-            _walk(rootdir, fetch_data, failures)
+            _walk(rootdir, fetch_data, fail_cb)
             if failures:
                 return pytest.xfail(reason=",".join(set(failures)))
             return None
@@ -92,7 +104,7 @@ def test_read_file(filename: str):
             exec(classes, module.__dict__)
 
             # Read all objects from the file
-            _walk(rootdir, fetch_data, failures)
+            _walk(rootdir, fetch_data, fail_cb)
             if failures:
                 return pytest.xfail(reason=",".join(set(failures)))
         except NotImplementedError as ex:
