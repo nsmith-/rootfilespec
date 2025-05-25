@@ -121,11 +121,6 @@ class RCompressedChunk(ROOTSerializable):
         members["payload"] = payload
         return members, buffer
 
-    def decompress(self) -> memoryview:
-        out = memoryview(bytes(self.header.uncompressed_size()))
-        self.decompress_into(out)
-        return out
-
     def decompress_into(self, out: memoryview):
         if self.checksum is not None:
             import xxhash  # type: ignore[import-not-found]
