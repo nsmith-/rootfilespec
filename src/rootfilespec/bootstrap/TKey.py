@@ -106,18 +106,13 @@ class TKey(ROOTSerializable):
         buffer = buffer[self.header.fKeylen :]
 
         compressed = None
-        # fObjlen is the number of bytes of uncompressed data
         # The length of the buffer is the number of bytes of compressed data
         if len(buffer) != self.header.fObjlen:
             # This is a compressed object
             compressed, buffer = RCompressed.read(buffer)
-            if compressed.header.uncompressed_size() != self.header.fObjlen:
+            if compressed.uncompressed_size() != self.header.fObjlen:
                 msg = "TKey.read_object: uncompressed size mismatch. "
-                msg += (
-                    f"{compressed.header.uncompressed_size()} != {self.header.fObjlen}"
-                )
-                msg += "\nThis might be expected for very large TBaskets"
-
+                msg += f"{compressed.uncompressed_size()} != {self.header.fObjlen}"
                 raise ValueError(msg)
             if buffer:
                 msg = f"TKey.read_object: buffer not empty after reading compressed object. {buffer=}"

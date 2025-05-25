@@ -1,10 +1,28 @@
+from functools import partial
 from typing import Annotated, Optional, Protocol
 
 import cramjam  # type: ignore[import-not-found]
 
 from rootfilespec.buffer import ReadBuffer
-from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.serializable import (
+    Members,
+    MemberSerDe,
+    ROOTSerializable,
+    serializable,
+)
 from rootfilespec.structutil import Fmt
+
+
+def _read3byte(name: str, members: Members, buffer: ReadBuffer):
+    thebytes, buffer = buffer.unpack("3B")
+    members[name] = sum(s << (8 * i) for i, s in enumerate(thebytes))
+    return members, buffer
+
+
+class ThreeByteSize(MemberSerDe):
+    def build_reader(self, fname: str, ftype: type):
+        assert ftype is int
+        return partial(_read3byte, fname)
 
 
 @serializable
@@ -26,41 +44,53 @@ class RCompressionHeader(ROOTSerializable):
 
     fAlgorithm: Annotated[bytes, Fmt("2s")]
     fVersion: Annotated[int, Fmt("B")]
-    # TODO: Make this a 3-byte integer using a custom MemberSerDe
-    fCompressedSize: Annotated[bytes, Fmt("3s")]
-    fUncompressedSize: Annotated[bytes, Fmt("3s")]
+    fCompressedSize: Annotated[int, ThreeByteSize()]
+    fUncompressedSize: Annotated[int, ThreeByteSize()]
 
     def compressed_size(self) -> int:
-        out = sum(s << (8 * i) for i, s in enumerate(self.fCompressedSize))
         if self.fAlgorithm == b"L4":
-            #  LZ4 doesn't account for the checksum, so we need to subtract that
-            out -= 8
-        return out
+            # LZ4 has a checksum before the content, so we need to subtract that
+            return self.fCompressedSize - 8
+        return self.fCompressedSize
 
     def uncompressed_size(self) -> int:
-        return sum(s << (8 * i) for i, s in enumerate(self.fUncompressedSize))
+        return self.fUncompressedSize
 
 
 class Decompressor(Protocol):
-    def __call__(self, data: memoryview, output_len: Optional[int] = None) -> bytes: ...
+    @staticmethod
+    def __call__(input: memoryview, output: memoryview) -> int:
+        """Signature of cramjam decompress_into
+
+        Returns the number of bytes written to output.
+        May raise cramjam.DecompressionError if decompression fails.
+        """
+        ...
+
+
+def _lz4_decompress_into(input: memoryview, output: memoryview) -> int:
+    # Workaround for https://github.com/milesgranger/cramjam/issues/216
+    tmp = cramjam.lz4.decompress_block(input, output_len=len(output))
+    output[: len(tmp)] = tmp
+    return len(tmp)
 
 
 def get_decompressor(algorithm: bytes) -> Decompressor:
     if algorithm == b"ZL":
-        return cramjam.zlib.decompress  # type: ignore[no-any-return]
+        return cramjam.zlib.decompress_into  # type: ignore[no-any-return]
     if algorithm == b"XZ":
-        return cramjam.xz.decompress  # type: ignore[no-any-return]
+        return cramjam.xz.decompress_into  # type: ignore[no-any-return]
     if algorithm == b"L4":
-        return cramjam.lz4.decompress_block  # type: ignore[no-any-return]
+        return _lz4_decompress_into
     if algorithm == b"ZS":
-        return cramjam.zstd.decompress  # type: ignore[no-any-return]
+        return cramjam.zstd.decompress_into  # type: ignore[no-any-return]
     msg = f"Unknown compression algorithm {algorithm!r}"
     raise NotImplementedError(msg)
 
 
 @serializable
-class RCompressed(ROOTSerializable):
-    """A compressed data payload.
+class RCompressedChunk(ROOTSerializable):
+    """A compressed data payload chunk
 
     Attributes:
         header: The header of the compressed data payload.
@@ -78,8 +108,11 @@ class RCompressed(ROOTSerializable):
         header, buffer = RCompressionHeader.read(buffer)
         if header.fAlgorithm == b"L4":
             checksum, buffer = buffer.consume(8)
-        else:
+        elif header.fAlgorithm in (b"ZL", b"XZ", b"ZS"):
             checksum = None
+        else:
+            msg = f"Unknown compression algorithm {header.fAlgorithm!r}"
+            raise NotImplementedError(msg)
         # Not using .consume() to avoid copying the payload
         nbytes = header.compressed_size()
         payload, buffer = buffer.consume_view(nbytes)
@@ -89,6 +122,11 @@ class RCompressed(ROOTSerializable):
         return members, buffer
 
     def decompress(self) -> memoryview:
+        out = memoryview(bytes(self.header.uncompressed_size()))
+        self.decompress_into(out)
+        return out
+
+    def decompress_into(self, out: memoryview):
         if self.checksum is not None:
             import xxhash  # type: ignore[import-not-found]
 
@@ -97,5 +135,37 @@ class RCompressed(ROOTSerializable):
                 msg = f"Checksum mismatch: {checksum!r} != {self.checksum!r}"
                 raise ValueError(msg)
         decompressor = get_decompressor(self.header.fAlgorithm)
-        out = decompressor(self.payload, output_len=self.header.uncompressed_size())
-        return memoryview(out)
+        n = decompressor(self.payload, out)
+        if n != self.header.uncompressed_size():
+            msg = "Did not read enough"
+            raise ValueError(msg)
+
+
+@serializable
+class RCompressed(ROOTSerializable):
+    chunks: tuple[RCompressedChunk, ...]
+
+    @classmethod
+    def update_members(cls, members: Members, buffer: ReadBuffer):
+        chunks: list[RCompressedChunk] = []
+        while buffer:
+            chunk, buffer = RCompressedChunk.read(buffer)
+            chunks.append(chunk)
+        members["chunks"] = tuple(chunks)
+        return members, buffer
+
+    def compressed_size(self) -> int:
+        return sum(chunk.header.compressed_size() for chunk in self.chunks)
+
+    def uncompressed_size(self) -> int:
+        return sum(chunk.header.uncompressed_size() for chunk in self.chunks)
+
+    def decompress(self):
+        out = memoryview(bytearray(self.uncompressed_size()))
+        start = 0
+        for chunk in self.chunks:
+            length = chunk.header.uncompressed_size()
+            chunk.decompress_into(out[start : start + length])
+            start += length
+        assert start == len(out)
+        return out
