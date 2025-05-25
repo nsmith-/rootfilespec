@@ -48,6 +48,8 @@ class TObjFlag(IntFlag):
     """Appears in some TStreamerElement"""
     kDoNotDelete = 0x2000
     """TStreamerElement status bit or kInvalidObject"""
+    kListOfRules = 0x4000
+    """The schema evolution rules stored at the end of the streamer info"""
 
     # TODO: validate on initialization that no bits are set that are not defined in this class
     def __repr__(self):
