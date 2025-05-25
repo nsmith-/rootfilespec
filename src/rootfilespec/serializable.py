@@ -15,7 +15,7 @@ from typing_extensions import dataclass_transform
 from rootfilespec.buffer import ReadBuffer
 
 RT = TypeVar("RT", bound="ROOTSerializable")
-MemberType = Any
+MemberType = Any  # Union[int, float, bytes, str, bool, "ROOTSerializable"]
 Members = dict[str, MemberType]
 ReadObjMethod = Callable[[ReadBuffer], tuple[MemberType, ReadBuffer]]
 ReadMembersMethod = Callable[[Members, ReadBuffer], tuple[Members, ReadBuffer]]
