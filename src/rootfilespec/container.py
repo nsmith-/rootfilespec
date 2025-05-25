@@ -233,27 +233,33 @@ class StdSet(ContainerSerDe, Generic[T]):
     """The items in the set."""
 
     @classmethod
-    def build_reader(cls, fname: str, inner_reader: ReadObjMethod):  # noqa: ARG003
+    def build_reader(cls, fname: str, inner_reader: ReadObjMethod):
         def update_members(members: Members, buffer: ReadBuffer):
-            msg = "StdSet not implemented"
-            raise NotImplementedError(msg)
-            # (n,), buffer = buffer.unpack(">i")
-            # items: set[T] = set()
-            # for _ in range(n):
-            #     obj, buffer = inner_reader(buffer)
-            #     items.add(obj)
-            # members[fname] = items
-            # return members, buffer
+            members[fname], buffer = cls.read_as(inner_reader, buffer)
+            return members, buffer
 
         return update_members
+
+    @classmethod
+    def read_as(cls, inner_reader: ReadObjMethod, buffer: ReadBuffer):
+        header, buffer = StreamHeader.read(buffer)
+        if header.memberwise:
+            msg = "Set with memberwise reading"
+            raise NotImplementedError(msg)
+        (n,), buffer = buffer.unpack(">i")
+        items: set[T] = set()
+        for _ in range(n):
+            item, buffer = inner_reader(buffer)
+            items.add(item)
+        return cls(items), buffer
 
 
 @dataclasses.dataclass
 class StdDeque(ContainerSerDe, Generic[T]):
-    """A class to represent a std::set<T>."""
+    """A class to represent a std::deque<T>."""
 
-    items: set[T]
-    """The items in the set."""
+    items: tuple[T]
+    """The items in the dequeue."""
 
     @classmethod
     def build_reader(cls, fname: str, inner_reader: ReadObjMethod):  # noqa: ARG003
