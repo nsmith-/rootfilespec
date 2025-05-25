@@ -108,6 +108,10 @@ class _RefReader:
 T = TypeVar("T", bound=MemberType)
 
 
+class Some:
+    """Placeholder to indicate the referred object exists"""
+
+
 class Ref(ContainerSerDe, Generic[T]):
     """A class to hold a reference to an object.
 
@@ -155,7 +159,7 @@ def read_streamed_item(
             return Ref(None), buffer
         # TODO: fetch the referenced object from the buffer.instance_refs
         _, buffer = buffer.consume(4)
-        return Ref(None), buffer
+        return Ref(Some()), buffer
     if itemheader.fClassName:
         clsname = normalize(itemheader.fClassName)
         if clsname not in DICTIONARY:
