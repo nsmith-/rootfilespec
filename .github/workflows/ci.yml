@@ -41,9 +41,11 @@ jobs:
         python-version: ["3.9", "3.13"]
         runs-on: [ubuntu-latest, windows-latest, macos-14]
 
-        include:
-          - python-version: "pypy-3.10"
-            runs-on: ubuntu-latest
+        # Pypy disabled for now due to https://github.com/milesgranger/cramjam/issues/142
+        # (no way to decompress into a memoryview)
+        # include:
+        #   - python-version: "pypy-3.10"
+        #     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
