@@ -17,7 +17,6 @@ from rootfilespec.buffer import ReadBuffer
 RT = TypeVar("RT", bound="ROOTSerializable")
 MemberType = Any  # Union[int, float, bytes, str, bool, "ROOTSerializable"]
 Members = dict[str, MemberType]
-ReadObjMethod = Callable[[ReadBuffer], tuple[MemberType, ReadBuffer]]
 ReadMembersMethod = Callable[[Members, ReadBuffer], tuple[Members, ReadBuffer]]
 
 
@@ -60,6 +59,21 @@ class _ReadWrapper:
         obj, buffer = self.objtype.read(buffer)
         members[self.fname] = obj
         return members, buffer
+
+
+@dataclasses.dataclass
+class ReadObjMethod:
+    """A wrapper to read a whole object from a buffer.
+
+    Some containers will inspect the member method to determine how to read the
+    object, for example, sometimes the StreamHeader will not be present
+    """
+
+    membermethod: ReadMembersMethod
+
+    def __call__(self, buffer: ReadBuffer) -> tuple[MemberType, ReadBuffer]:
+        members, buffer = self.membermethod({}, buffer)
+        return members[""], buffer
 
 
 class ContainerSerDe(ROOTSerializable):
@@ -124,18 +138,9 @@ class MemberSerDe:
         raise NotImplementedError(msg)
 
 
-@dataclasses.dataclass
-class _ObjectReader:
-    membermethod: ReadMembersMethod
-
-    def __call__(self, buffer: ReadBuffer) -> tuple[MemberType, ReadBuffer]:
-        members, buffer = self.membermethod({}, buffer)
-        return members[""], buffer
-
-
 def _build_read(ftype: type[MemberType]) -> ReadObjMethod:
     membermethod = _build_update_members("", ftype)
-    return _ObjectReader(membermethod)
+    return ReadObjMethod(membermethod)
 
 
 def _build_update_members(fname: str, ftype: Any) -> ReadMembersMethod:
