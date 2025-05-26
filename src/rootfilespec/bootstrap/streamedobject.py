@@ -62,8 +62,6 @@ class StreamHeader(ROOTSerializable):
             if fVersion & _StreamConstants.kStreamedMemberwise:
                 fVersion &= ~_StreamConstants.kStreamedMemberwise
                 memberwise = True
-                msg = "Memberwise streaming not implemented"
-                raise NotImplementedError(msg)
             if fVersion == 0 and fByteCount >= 6:
                 # This class is versioned by its streamer checksum instead
                 (checksum,), buffer = buffer.unpack(">I")
@@ -206,6 +204,9 @@ def _auto_TObject_base(buffer) -> tuple[StreamHeader, ReadBuffer]:
         itemheader = StreamHeader(0, version, None, None, False)
     else:
         itemheader, buffer = StreamHeader.read(buffer)
+        if itemheader.memberwise:
+            msg = "Memberwise streaming not implemented for TObject base class"
+            raise NotImplementedError(msg)
     return itemheader, buffer
 
 

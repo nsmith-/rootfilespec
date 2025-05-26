@@ -35,11 +35,11 @@ def _walk(
         return
     keylist = dir.get_KeyList(fetch_data)
     for item in keylist.values():
+        itempath = path + b"/" + item.fName.fString
         try:
-            print(f"Reading {item.fName} of type {item.fClassName}")
             obj = item.read_object(fetch_data)
         except NotImplementedError as ex:
-            notimplemented_callback(path, ex)
+            notimplemented_callback(itempath, ex)
             continue
         if isinstance(obj, TDirectory) and (maxdepth < 0 or depth < maxdepth):
             _walk(
@@ -47,7 +47,7 @@ def _walk(
                 fetch_data,
                 notimplemented_callback,
                 depth=depth + 1,
-                path=path + b"/" + item.fName.fString,
+                path=itempath,
             )
         elif isinstance(obj, ROOT3a3aRNTuple):
             _walk_RNTuple(obj, fetch_data)
@@ -77,6 +77,7 @@ def test_read_file(filename: str):
 
         # List to collect NotImplementedError messages
         failures: list[str] = []
+
         def fail_cb(_: bytes, ex: NotImplementedError):
             print(f"NotImplementedError: {ex}")
             failures.append(str(ex))

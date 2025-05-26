@@ -296,11 +296,25 @@ class StdMap(AssociativeContainerSerDe, Generic[K, V]):
         cls, key_reader: ReadObjMethod, value_reader: ReadObjMethod, buffer: ReadBuffer
     ):
         header, buffer = StreamHeader.read(buffer)
-        if header.memberwise:
-            msg = "Suspicious map with memberwise reading, incorrect length seen in uproot-issue465-flat.root"
-            raise NotImplementedError(msg)
-        (n,), buffer = buffer.unpack(">i")
         items: dict[K, V] = {}
+        if header.memberwise:
+            # member version info precedes the member lists
+            # there should only be one member, the std::pair<K, V> type
+            (mversion, mchecksum, n), buffer = buffer.unpack(">hIi")
+            assert mversion == 0, f"Unexpected member version {mversion}"
+            # TODO: lookup deserializer for the checksum?
+            # e.g. uproot-issue465-flat.root (has length but incorrect?)
+            if n > 1:
+                msg = "Map with memberwise reading and more than one element"
+                raise NotImplementedError(msg)
+            for _ in range(n):
+                keyheader, buffer = StreamHeader.read(buffer)
+                key, buffer = key_reader(buffer)
+                valueheader, buffer = StreamHeader.read(buffer)
+                value, buffer = value_reader(buffer)
+                items[key] = value
+            return cls(items), buffer
+        (n,), buffer = buffer.unpack(">i")
         for _ in range(n):
             key, buffer = key_reader(buffer)
             value, buffer = value_reader(buffer)
