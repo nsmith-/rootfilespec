@@ -217,10 +217,34 @@ class StdVector(ContainerSerDe, Generic[T]):
                 raise ValueError(msg)
             # TODO: byte count check
             if header.memberwise:
+                if isinstance(inner_reader.membermethod, _StdPairReader):
+                    # as seen in uproot-issue38c.root TEfficiency fBeta_bin_params std::pair<double, double>
+                    (dunno, dunno2, n), buffer = buffer.unpack(">hIi")
+                    assert dunno == 0, f"Unexpected member version {dunno}"
+                    assert dunno2 == 0xD7BED2, f"Unexpected member checksum {dunno2}"
+                    firsts = []
+                    for _ in range(n):
+                        first, buffer = inner_reader.membermethod.key_reader(buffer)
+                        firsts.append(first)
+                    seconds = []
+                    for _ in range(n):
+                        second, buffer = inner_reader.membermethod.value_reader(buffer)
+                        seconds.append(second)
+                    return cls(list(zip(firsts, seconds))), buffer  # type: ignore[arg-type]
                 msg = "Memberwise reading of StdVector not implemented"
                 raise NotImplementedError(msg)
         (n,), buffer = buffer.unpack(">i")
         items: list[T] = []
+        if isinstance(inner_reader.membermethod, _FmtReader):
+            # if the inner reader is a format reader, we can read faster
+            fmt = inner_reader.membermethod.fmt
+            itemsize = np.dtype(fmt).itemsize
+            data, buffer = buffer.consume(n * itemsize)
+            items = [
+                inner_reader.membermethod.outtype(x)
+                for x in np.frombuffer(data, dtype=fmt, count=n)
+            ]
+            return cls(items), buffer
         for _ in range(n):
             obj, buffer = inner_reader(buffer)
             items.append(obj)
@@ -311,7 +335,7 @@ class StdMap(AssociativeContainerSerDe, Generic[K, V]):
                 # empty map, no keys or values
                 return cls(items), buffer
             end_position = None
-            if not isinstance(value_reader.membermethod, _FmtReader):
+            if not isinstance(key_reader.membermethod, _FmtReader):
                 start_position = buffer.relpos
                 keyheader, buffer = StreamHeader.read(buffer)
                 end_position = start_position + keyheader.fByteCount + 4
