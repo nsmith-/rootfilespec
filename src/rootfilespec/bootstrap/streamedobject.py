@@ -63,6 +63,11 @@ class StreamHeader(ROOTSerializable):
             if fVersion & _StreamConstants.kStreamedMemberwise:
                 fVersion &= ~_StreamConstants.kStreamedMemberwise
                 memberwise = True
+                if fVersion != 9:
+                    # It seems all STL collections are v9?
+                    # These are the only ones we know how to read memberwise so far
+                    msg = f"Memberwise streaming not implemented for version {fVersion}"
+                    raise NotImplementedError(msg)
             if fVersion == 0 and fByteCount >= 6:
                 # This class is versioned by its streamer checksum instead
                 (checksum,), buffer = buffer.unpack(">I")

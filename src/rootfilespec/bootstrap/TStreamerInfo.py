@@ -249,6 +249,7 @@ class ElementType(IntEnum):
 
     def as_fmt(self) -> str:
         """Get the format character for this element type."""
+        # TODO: just return Fmt() type
         fmtmap = {
             self.kChar: ">b",
             self.kShort: ">h",
