@@ -1,6 +1,6 @@
 """TBasket seems to be assumed in ROOT files and is not in the TStreamerInfo"""
 
-from typing import Annotated
+from typing import Annotated, Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -40,13 +40,17 @@ class TBasket(TKey):
     bheader: TBasket_header
     fEntryOffset: NDArray[np.int32]  #  BasicArray(np.dtype(">i"), "fNevBuf")
     "Offset of entries in fBuffer(TKey)"
-    fBuffer: bytes
+    fBuffer: Optional[memoryview]
     "Buffer if the basket owns it"
 
     @classmethod
     def update_members(cls, members: Members, buffer: ReadBuffer):
         start_position = buffer.relpos
-        sheader, buffer = StreamHeader.read(buffer)
+        sheader, tmp = StreamHeader.read(buffer)
+        if sheader.fByteCount > 0:
+            # We seem to have stream headers when the basket is embedded in the TTree object
+            # but not when dereferencing TBranch addresses
+            buffer = tmp
         members, buffer = TKey.update_members(members, buffer)
         base_tkey = TKey(**members)
         bheader, buffer = TBasket_header.read(buffer)
@@ -54,13 +58,17 @@ class TBasket(TKey):
         fEntryOffset: NDArray[np.int32] = np.full(
             bheader.fNevBuf, -1, dtype=np.dtype(">i")
         )
-        fBuffer = b""
+        fBuffer = None
         # TODO: full flag handling
         # https://github.com/root-project/root/blob/0e6282a641b65bdf5ad832882e547ca990e8f1a5/tree/tree/src/TBasket.cxx#L993-L1027
-        if bheader.flag not in (11, 12):
+        if bheader.flag == 0:
+            fBuffer, buffer = buffer.consume_view(
+                base_tkey.header.fNbytes - base_tkey.header.fKeylen
+            )
+        elif bheader.flag not in (11, 12):
             msg = f"TBasket header flag {bheader.flag} not supported"
             raise ValueError(msg)
-        if bheader.fNevBuf > 0 and bheader.flag % 10 != 2:
+        elif bheader.fNevBuf > 0 and bheader.flag % 10 != 2:
             # TODO: refactor this to use BasicArray
             (n,), buffer = buffer.unpack(">i")
             assert n == bheader.fNevBuf
@@ -72,7 +80,7 @@ class TBasket(TKey):
             )  # TODO: worth checking consistency?
             _, buffer = TBasket_header.read(buffer)
             end_position = start_position + sheader.fByteCount + 4
-            fBuffer, buffer = buffer.consume(end_position - buffer.relpos)
+            fBuffer, buffer = buffer.consume_view(end_position - buffer.relpos)
         members["bheader"] = bheader
         members["fEntryOffset"] = fEntryOffset
         members["fBuffer"] = fBuffer

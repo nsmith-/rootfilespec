@@ -56,7 +56,14 @@ class TStreamerInfo(TNamed):
             if isinstance(element, TStreamerBase):
                 bases.append(element.member_name())
         if not bases:
-            bases.append("StreamedObject")
+            if self.fObjects.fSize == 1 and isinstance(
+                self.fObjects.objects[0], TStreamerSTL
+            ):
+                # This is a templated container, e.g. vector<TLorentzVector>
+                # No stream header needed
+                bases.append("ROOTSerializable")
+            else:
+                bases.append("StreamedObject")
         return bases
 
     def class_definition(self) -> ClassDef:
