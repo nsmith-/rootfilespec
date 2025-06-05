@@ -14,7 +14,8 @@ from rootfilespec.rntuple.RPage import RPage
 if __name__ == "__main__":
     initial_read_size = 512
     # path = Path("../TTToSemiLeptonic_UL18JMENanoAOD-zstd.root")
-    path = Path(data_path("rntviewer-testfile-uncomp-single-rntuple-v1-0-0-0.root"))
+    # path = Path(data_path("rntviewer-testfile-uncomp-single-rntuple-v1-0-0-0.root"))
+    path = Path(data_path("rntviewer-testfile-multiple-rntuples-v1-0-0-0.root"))
     print(f"\033[1;36mReading '{path}'...\n\033[0m")
     with path.open("rb") as filehandle:
 
@@ -115,6 +116,7 @@ if __name__ == "__main__":
                     # page_location_list.print_info()
                 ### Get the RNTuple Pages from the Page List Envelopes
 
+                ### Get the actual RNTuple Pages from the Page List Envelopes
                 cluster_column_page_lists: list[list[list[RPage]]] = []
                 for page_location_list in page_location_lists:
                     pages = page_location_list.get_pages(fetch_data)
