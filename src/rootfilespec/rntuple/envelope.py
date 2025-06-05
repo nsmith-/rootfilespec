@@ -3,6 +3,7 @@ from typing import Annotated, TypeVar
 
 from typing_extensions import Self
 
+from rootfilespec.bootstrap.compression import RCompressed
 from rootfilespec.buffer import DataFetcher, ReadBuffer
 from rootfilespec.rntuple.RLocator import RLocator
 from rootfilespec.serializable import Members, ROOTSerializable, serializable
@@ -129,26 +130,33 @@ class REnvelopeLink(ROOTSerializable):
         envtype: type[EnvType],
     ) -> EnvType:
         """Reads an REnvelope from the given buffer."""
-        # Load the (possibly compressed) envelope into the buffer
-        # This should load exactly the envelope bytes (no more, no less)
-        # buffer = fetch_data(self.offset, self.size)
-
+        #### Load the (possibly compressed) envelope into the buffer
         buffer = self.locator.get_buffer(fetch_data)
 
-        # If compressed, decompress the envelope
-        # compressed = None
-
-        if self.locator.size != self.length:
-            msg = f"Compressed envelopes are not yet supported: {self.locator}"
-            raise NotImplementedError(msg)
-            # TODO: Implement compressed envelopes
-
+        #### If compressed, decompress the envelope
+        compressed = None
+        # The length of the buffer is the number of bytes of compressed data
+        if len(buffer) != self.length:
+            # This is a compressed object
+            compressed, buffer = RCompressed.read(buffer)
+            if compressed.uncompressed_size() != self.length:
+                msg = "REnvelopeLink.read_envelope: uncompressed size mismatch. "
+                msg += f"{compressed.uncompressed_size()} != {self.length}"
+                raise ValueError(msg)
+            if buffer:
+                msg = f"REnvelopeLink.read_envelope: buffer not empty after reading compressed object. {buffer=}"
+                raise ValueError(msg)
+            buffer = ReadBuffer(
+                compressed.decompress(),
+                abspos=None,
+                relpos=self.length,
+            )
         # Now the envelope is uncompressed
 
         #### Read the envelope
         envelope, buffer = envtype.read(buffer)
 
-        # check that buffer is empty
+        #### Check that buffer is empty
         if buffer:
             msg = (
                 "REnvelopeLink.read_envelope: buffer not empty after reading envelope."
