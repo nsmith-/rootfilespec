@@ -180,7 +180,7 @@ def serializable(cls: type[RT]) -> type[RT]:
     The class must have type hints for its fields, and the fields must be of types that
     either have a read method or are subscripted with a Fmt object.
     """
-    cls = dataclasses.dataclass(eq=False)(cls)
+    cls = dataclasses.dataclass(eq=True)(cls)
 
     # if the class already has a update_members method, don't overwrite it
     readmethod = getattr(cls, "update_members", None)
