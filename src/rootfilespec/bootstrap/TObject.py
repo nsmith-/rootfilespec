@@ -50,6 +50,10 @@ class TObjFlag(IntFlag):
     """TStreamerElement status bit or kInvalidObject"""
     kListOfRules = 0x4000
     """The schema evolution rules stored at the end of the streamer info"""
+    kMysteryCanvas1 = 0x100000
+    """Appears in some TCanvas objects, not sure what it means."""
+    kMysteryCanvas2 = 0x200000
+    """Appears in some TCanvas objects, not sure what it means."""
 
     # TODO: validate on initialization that no bits are set that are not defined in this class
     def __repr__(self):

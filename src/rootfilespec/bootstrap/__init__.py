@@ -18,6 +18,7 @@ from rootfilespec.bootstrap.assumed import (
     RooLinkedList,
     TAtt3D,
     TFormula,
+    TQObject,
     TVirtualIndex,
     Uninterpreted,
 )
@@ -75,6 +76,7 @@ __all__ = [
     "TNamed",
     "TObjArray",
     "TObject",
+    "TQObject",
     "TSeqCollection",
     "TStreamerBase",
     "TStreamerBasicPointer",
