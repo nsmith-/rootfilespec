@@ -54,6 +54,13 @@ class TObjFlag(IntFlag):
     """Appears in some TCanvas objects, not sure what it means."""
     kMysteryCanvas2 = 0x200000
     """Appears in some TCanvas objects, not sure what it means."""
+    kMysteryPad1 = 0x200
+    """Appears in some TCanvas objects, not sure what it means."""
+    kMysteryPad2 = 0x400
+    """Appears in some TCanvas objects, not sure what it means."""
+    kMysteryPad3 = 0x800
+    """Appears in some TCanvas objects, not sure what it means."""
+    # TODO: there are too many of these mystery bits, we should remove invalid bit checks
 
     # TODO: validate on initialization that no bits are set that are not defined in this class
     def __repr__(self):
