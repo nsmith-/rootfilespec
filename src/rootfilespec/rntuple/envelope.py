@@ -58,7 +58,7 @@ class REnvelope(ROOTSerializable):
     """The length of the envelope (including the envelope header)."""
     checksum: int
     """The checksum of the envelope."""
-    _unknown: bytes = field(init=False, repr=False)
+    _unknown: bytes = field(init=False, repr=False, compare=False)
     """Unknown bytes at the end of the envelope."""
 
     @classmethod
