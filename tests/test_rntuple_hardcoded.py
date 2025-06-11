@@ -19,6 +19,7 @@ from rootfilespec.rntuple.RLocator import StandardLocator
 # TODO: Add hardcoded representation of Header Envelope once implemented
 # TODO: Add hardcoded representation of RPages once implemented
 
+
 def test_read_contributors():
     filename = "rntviewer-testfile-uncomp-single-rntuple-v1-0-0-0.root"
     path = Path(data_path(filename))
@@ -59,8 +60,8 @@ def test_read_contributors():
             featureFlags=RFeatureFlags(flags=0),
             headerChecksum=9346497350689737328,
             schemaExtension=SchemaExtension(
-                fSize=56, 
-                _unknown=b'\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00'
+                fSize=56,
+                _unknown=b"\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00",
             ),
             clusterGroups=ListFrame(
                 fSize=60,
@@ -87,7 +88,12 @@ def test_read_contributors():
                 checksum=12340257838343085244,
                 headerChecksum=9346497350689737328,
                 clusterSummaries=ListFrame(
-                    fSize=36, items=[ClusterSummary(fSize=24, fFirstEntryNumber=0, fNEntriesAndFeatureFlag=22)]
+                    fSize=36,
+                    items=[
+                        ClusterSummary(
+                            fSize=24, fFirstEntryNumber=0, fNEntriesAndFeatureFlag=22
+                        )
+                    ],
                 ),
                 pageLocations=ClusterLocations(
                     fSize=184,
@@ -97,25 +103,53 @@ def test_read_contributors():
                             items=[
                                 PageLocations(
                                     fSize=40,
-                                    items=[RPageDescription(fNElements=-22, locator=StandardLocator(size=176, offset=620))],
+                                    items=[
+                                        RPageDescription(
+                                            fNElements=-22,
+                                            locator=StandardLocator(
+                                                size=176, offset=620
+                                            ),
+                                        )
+                                    ],
                                     elementoffset=0,
                                     compressionsettings=0,
                                 ),
                                 PageLocations(
                                     fSize=40,
-                                    items=[RPageDescription(fNElements=-178, locator=StandardLocator(size=178, offset=804))],
+                                    items=[
+                                        RPageDescription(
+                                            fNElements=-178,
+                                            locator=StandardLocator(
+                                                size=178, offset=804
+                                            ),
+                                        )
+                                    ],
                                     elementoffset=0,
                                     compressionsettings=0,
                                 ),
                                 PageLocations(
                                     fSize=40,
-                                    items=[RPageDescription(fNElements=-22, locator=StandardLocator(size=176, offset=990))],
+                                    items=[
+                                        RPageDescription(
+                                            fNElements=-22,
+                                            locator=StandardLocator(
+                                                size=176, offset=990
+                                            ),
+                                        )
+                                    ],
                                     elementoffset=0,
                                     compressionsettings=0,
                                 ),
                                 PageLocations(
                                     fSize=40,
-                                    items=[RPageDescription(fNElements=-193, locator=StandardLocator(size=193, offset=1174))],
+                                    items=[
+                                        RPageDescription(
+                                            fNElements=-193,
+                                            locator=StandardLocator(
+                                                size=193, offset=1174
+                                            ),
+                                        )
+                                    ],
                                     elementoffset=0,
                                     compressionsettings=0,
                                 ),
@@ -127,6 +161,7 @@ def test_read_contributors():
         ]
 
         # TODO: Add hardcoded representation of RPages once implemented
+
 
 def test_read_multiple_rntuples():
     filename = "rntviewer-testfile-multiple-rntuples-v1-0-0-0.root"
@@ -165,8 +200,8 @@ def test_read_multiple_rntuples():
             featureFlags=RFeatureFlags(flags=0),
             headerChecksum=1772847515747675522,
             schemaExtension=SchemaExtension(
-                fSize=56, 
-                _unknown=b'\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00'
+                fSize=56,
+                _unknown=b"\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00",
             ),
             clusterGroups=ListFrame(
                 fSize=60,
@@ -192,7 +227,12 @@ def test_read_multiple_rntuples():
                 checksum=748677678342101309,
                 headerChecksum=1772847515747675522,
                 clusterSummaries=ListFrame(
-                    fSize=36, items=[ClusterSummary(fSize=24, fFirstEntryNumber=0, fNEntriesAndFeatureFlag=100)]
+                    fSize=36,
+                    items=[
+                        ClusterSummary(
+                            fSize=24, fFirstEntryNumber=0, fNEntriesAndFeatureFlag=100
+                        )
+                    ],
                 ),
                 pageLocations=ClusterLocations(
                     fSize=64,
@@ -202,7 +242,14 @@ def test_read_multiple_rntuples():
                             items=[
                                 PageLocations(
                                     fSize=40,
-                                    items=[RPageDescription(fNElements=-100, locator=StandardLocator(size=138, offset=409))],
+                                    items=[
+                                        RPageDescription(
+                                            fNElements=-100,
+                                            locator=StandardLocator(
+                                                size=138, offset=409
+                                            ),
+                                        )
+                                    ],
                                     elementoffset=0,
                                     compressionsettings=505,
                                 )
@@ -236,8 +283,8 @@ def test_read_multiple_rntuples():
             featureFlags=RFeatureFlags(flags=0),
             headerChecksum=14068653553654343426,
             schemaExtension=SchemaExtension(
-                fSize=56, 
-                _unknown=b'\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\0'
+                fSize=56,
+                _unknown=b"\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\0",
             ),
             clusterGroups=ListFrame(
                 fSize=60,
@@ -254,7 +301,7 @@ def test_read_multiple_rntuples():
                 ],
             ),
         )
-        
+
         page_location_lists_b = footer_b.get_pagelists(fetch_data)
         assert page_location_lists_b == [
             PageListEnvelope(
@@ -263,7 +310,12 @@ def test_read_multiple_rntuples():
                 checksum=674435399773528910,
                 headerChecksum=14068653553654343426,
                 clusterSummaries=ListFrame(
-                    fSize=36, items=[ClusterSummary(fSize=24, fFirstEntryNumber=0, fNEntriesAndFeatureFlag=100)]
+                    fSize=36,
+                    items=[
+                        ClusterSummary(
+                            fSize=24, fFirstEntryNumber=0, fNEntriesAndFeatureFlag=100
+                        )
+                    ],
                 ),
                 pageLocations=ClusterLocations(
                     fSize=64,
@@ -273,7 +325,14 @@ def test_read_multiple_rntuples():
                             items=[
                                 PageLocations(
                                     fSize=40,
-                                    items=[RPageDescription(fNElements=-100, locator=StandardLocator(size=164, offset=1695))],
+                                    items=[
+                                        RPageDescription(
+                                            fNElements=-100,
+                                            locator=StandardLocator(
+                                                size=164, offset=1695
+                                            ),
+                                        )
+                                    ],
                                     elementoffset=0,
                                     compressionsettings=505,
                                 )
@@ -283,4 +342,3 @@ def test_read_multiple_rntuples():
                 ),
             )
         ]
-
