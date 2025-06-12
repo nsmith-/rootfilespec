@@ -1,10 +1,287 @@
-from rootfilespec.rntuple.envelope import ENVELOPE_TYPE_MAP, REnvelope
-from rootfilespec.serializable import serializable
+from typing import Annotated, Union
+
+from rootfilespec.bootstrap.strings import RString
+from rootfilespec.buffer import ReadBuffer
+from rootfilespec.rntuple.envelope import ENVELOPE_TYPE_MAP, REnvelope, RFeatureFlags
+from rootfilespec.rntuple.RFrame import ListFrame, RecordFrame
+from rootfilespec.serializable import Members, serializable
+from rootfilespec.structutil import Fmt
+
+
+@serializable
+class FieldDescription(RecordFrame):
+    """A class representing an RNTuple Field Description Record Frame.
+    This Record Frame is found in a List Frame in the Header Envelope of an RNTuple.
+    It describes a field in the RNTuple schema."""
+
+    fFieldVersion: Annotated[int, Fmt("<I")]
+    """The version of the field. Used for schema evolution."""
+    fTypeVersion: Annotated[int, Fmt("<I")]
+    """The version of the field type. Used for schema evolution."""
+    fParentFieldID: Annotated[int, Fmt("<I")]
+    # abbott TODO: verify docstring is correct
+    """The ID of the parent field, if this field is a sub-field.
+        Top-level fields have their own field ID set as parent ID."""
+    fStructuralRole: Annotated[int, Fmt("<H")]
+    """The structural role of the field; can have one of the following values:
+        - Value: Meaning
+        - 0x00:  Leaf field in the schema tree
+        - 0x01:  The field is the parent of a collection (e.g., a vector)
+        - 0x02:  The field is the parent of a record (e.g., a struct)
+        - 0x03:  The field is the parent of a variant
+        - 0x04:  The field stores objects serialized with the ROOT streamer"""
+    fFlags: Annotated[int, Fmt("<H")]
+    """The flags for the field; can have any of the following bits set:
+        - Bit:   Meaning
+        - 0x01:  Repetitive field, i.e. for every entry n copies of the field are stored
+        - 0x02:  Projected field
+        - 0x04:  Has ROOT type checksum as reported by TClass"""
+    fFieldName: RString
+    """The name of the field."""
+    fTypeName: RString
+    """The name of the field type."""
+    fTypeAlias: RString
+    """The alias of the field type, if any."""
+    fFieldDescription: RString
+    """The description of the field, if any."""
+    fArraySize: Union[Annotated[int, Fmt("<Q")], None]
+    """The size of the array for the field. Present only if flag 0x01 is set (repetitive field)."""
+    fSourceFieldID: Union[Annotated[int, Fmt("<I")], None]
+    """The ID of the source field. Present only if flag 0x02 is set (projected field)."""
+    fTypeChecksum: Union[Annotated[int, Fmt("<I")], None]
+    """The ROOT type checksum for the field. Present only if flag 0x04 is set (has ROOT type checksum)."""
+
+    @classmethod
+    def update_members(cls, members: Members, buffer: ReadBuffer):
+        # Read the field version, type version, parent field ID, structural role, and flags
+        (
+            (fFieldVersion, fTypeVersion, fParentFieldID, fStructuralRole, fFlags),
+            buffer,
+        ) = buffer.unpack("<IIIHH")
+
+        # Read the field name, type name, type alias, and field description
+        fFieldName, buffer = RString.read(buffer)
+        fTypeName, buffer = RString.read(buffer)
+        fTypeAlias, buffer = RString.read(buffer)
+        fFieldDescription, buffer = RString.read(buffer)
+
+        # Read the array size, source field ID, and type checksum (if present)
+        fArraySize = None
+        if fFlags & 0x01:  # If the field is repetitive
+            (fArraySize,), buffer = buffer.unpack("<Q")
+        fSourceFieldID = None
+        if fFlags & 0x02:  # If the field is projected
+            (fSourceFieldID,), buffer = buffer.unpack("<I")
+        fTypeChecksum = None
+        if fFlags & 0x04:  # If the field has a ROOT type checksum
+            (fTypeChecksum,), buffer = buffer.unpack("<I")
+
+        members["fFieldVersion"] = fFieldVersion
+        members["fTypeVersion"] = fTypeVersion
+        members["fParentFieldID"] = fParentFieldID
+        members["fStructuralRole"] = fStructuralRole
+        members["fFlags"] = fFlags
+        members["fFieldName"] = fFieldName
+        members["fTypeName"] = fTypeName
+        members["fTypeAlias"] = fTypeAlias
+        members["fFieldDescription"] = fFieldDescription
+        members["fArraySize"] = fArraySize
+        members["fSourceFieldID"] = fSourceFieldID
+        members["fTypeChecksum"] = fTypeChecksum
+        return members, buffer
+
+
+@serializable
+class ColumnDescription(RecordFrame):
+    """A class representing an RNTuple Column Description Record Frame.
+    This Record Frame is found in a List Frame in the Header Envelope of an RNTuple.
+    It describes a column in the RNTuple schema."""
+
+    """ abbott TODO: read this when not sick and understand it
+    Future versions of the file format may introduce additional column types without
+    changing the minimum version of the header or introducing a feature flag.
+    Old readers need to ignore these columns and fields constructed from such columns.
+    Old readers can, however, figure out the number of elements stored in such unknown columns.
+    """
+
+    fColumnType: Annotated[int, Fmt("<H")]
+    """The type of the column; can have one of the following values:
+
+    ====  =====  ============  ====================================================
+    Type  Bits   Name          Contents
+    ====  =====  ============  ====================================================
+    0x00  1      Bit           Boolean value
+    0x01  8      Byte          An uninterpreted byte, e.g. part of a blob
+    0x02  8      Char          ASCII character
+    0x03  8      Int8          Two's complement, 1-byte signed integer
+    0x04  8      UInt8         1 byte unsigned integer
+    0x05  16     Int16         Two's complement, little-endian 2-byte signed integer
+    0x06  16     UInt16        Little-endian 2-byte unsigned integer
+    0x07  32     Int32         Two's complement, little-endian 4-byte signed integer
+    0x08  32     UInt32        Little-endian 4-byte unsigned integer
+    0x09  64     Int64         Two's complement, little-endian 8-byte signed integer
+    0x0A  64     UInt64        Little-endian 8-byte unsigned integer
+    0x0B  16     Real16        IEEE-754 half precision float
+    0x0D  64     Real64        IEEE-754 double precision float
+    0x0C  32     Real32        IEEE-754 single precision float
+    0x0E  32     Index32       Parent columns of (nested) collections, counting is relative to the cluster
+    0x0F  64     Index64       Parent columns of (nested) collections, counting is relative to the cluster
+    0x10  96     Switch        Tuple of a kIndex64 value followed by a 32 bits dispatch tag to a column ID
+    0x11  16     SplitInt16    Like Int16 but in split + zigzag encoding
+    0x12  16     SplitUInt16   Like UInt16 but in split encoding
+    0x13  32     SplitInt32    Like Int32 but in split + zigzag encoding
+    0x14  32     SplitUInt32   Like UInt32 but in split encoding
+    0x15  64     SplitInt64    Like Int64 but in split + zigzag encoding
+    0x16  64     SplitUInt64   Like UInt64 but in split encoding
+    0x17  16     SplitReal16   Like Real16 but in split encoding
+    0x18  32     SplitReal32   Like Real32 but in split encoding
+    0x19  64     SplitReal64   Like Real64 but in split encoding
+    0x1A  32     SplitIndex32  Like Index32 but pages are stored in split + delta encoding
+    0x1B  64     SplitIndex64  Like Index64 but pages are stored in split + delta encoding
+    0x1C  10-31  Real32Trunc   IEEE-754 single precision float with truncated mantissa
+    0x1D  1-32   Real32Quant   Real value contained in a specified range with an underlying quantized integer representation
+    ====  =====  ============  ===================================================="""
+    fBitsStorage: Annotated[int, Fmt("<H")]
+    """The number of bits used to store the column value."""
+    fFieldID: Annotated[int, Fmt("<I")]
+    """The ID of the field that this column belongs to.
+    The field ID is the zero-based index of the field in the serialized list of field descriptions in the Header Envelope."""
+    fFlags: Annotated[int, Fmt("<H")]
+    """The flags for the column; can have any of the following bits set:
+        - Bit:   Meaning
+        - 0x01:  Deferred column: index of first element in the column is not zero
+        - 0x02:  Column with a range of possible values"""
+    fRepresentationIndex: Annotated[int, Fmt("<H")]
+    # abbott TODO: verify docstring is correct
+    """The index of the representation of the column in the list of representations for the field."""
+    # abbott TODO: verify these are signed. make PR updating ROOT documentation if so (indicate signed bit in table)
+    fFirstElementIndex: Union[Annotated[int, Fmt("<q")], None]
+    """The index of the first element in the column. Present only if flag 0x01 is set (deferred column)."""
+    fMinValue: Union[Annotated[int, Fmt("<q")], None]
+    """The minimum value of the column. Present only if flag 0x02 is set (column with range of values)."""
+    fMaxValue: Union[Annotated[int, Fmt("<q")], None]
+    """The maximum value of the column. Present only if flag 0x02 is set (column with range of values)."""
+
+    @classmethod
+    def update_members(cls, members: Members, buffer: ReadBuffer):
+        # Read the column type, bits storage, field ID, and flags
+        (fColumnType, fBitsStorage, fFieldID, fFlags, fRepresentationIndex), buffer = (
+            buffer.unpack("<HHIHH")
+        )
+
+        # Read the first element index, min value, and max value (if present)
+        fFirstElementIndex = None
+        if fFlags & 0x01:
+            (fFirstElementIndex,), buffer = buffer.unpack("<q")
+        fMinValue = None
+        fMaxValue = None
+        if fFlags & 0x02:
+            (fMinValue,), buffer = buffer.unpack("<q")
+            (fMaxValue,), buffer = buffer.unpack("<q")
+
+        members["fColumnType"] = fColumnType
+        members["fBitsStorage"] = fBitsStorage
+        members["fFieldID"] = fFieldID
+        members["fFlags"] = fFlags
+        members["fRepresentationIndex"] = fRepresentationIndex
+        members["fFirstElementIndex"] = fFirstElementIndex
+        members["fMinValue"] = fMinValue
+        members["fMaxValue"] = fMaxValue
+        return members, buffer
+
+
+@serializable
+class AliasColumnDescription(RecordFrame):
+    """A class representing an RNTuple Alias Column Description Record Frame.
+    This Record Frame is found in a List Frame in the Header Envelope of an RNTuple.
+    It describes an alias column in the RNTuple schema."""
+
+    fPhysicalColumnID: Annotated[int, Fmt("<I")]
+    # abbott TODO: figure out what alias columns are when not sick
+    """The physical column ID of the alias column."""
+    fFieldID: Annotated[int, Fmt("<I")]
+    """The ID of the field that this alias column belongs to."""
+
+
+@serializable
+class ExtraTypeInformation(RecordFrame):
+    """A class representing an RNTuple Extra Type Information Record Frame.
+    This Record Frame is found in a List Frame in the Header Envelope of an RNTuple.
+    It provides additional type information for the RNTuple schema for certain field types."""
+
+    fContentIdentifier: Annotated[int, Fmt("<I")]
+    """The content identifier for the extra type information.
+
+    - Content identifier:  Meaning of content
+    - 0x00:	              Serialized ROOT streamer info
+
+    The serialized ROOT streamer info is not bound to a specific type.
+    It is the combined streamer information from all fields serialized by the ROOT streamer.
+    Writers set the version to zero and use an empty type name. Readers should ignore the type-specific information.
+    The format of the content is a ROOT streamed TList of TStreamerInfo objects."""
+    fTypeVersion: Annotated[int, Fmt("<I")]
+    """The version of the type for which this extra type information is provided."""
+    fTypeName: RString
+    """The name of the type for which this extra type information is provided."""
 
 
 @serializable
 class HeaderEnvelope(REnvelope):
     """A class representing the RNTuple Header Envelope payload structure"""
+
+    featureFlags: RFeatureFlags
+    """The RNTuple Feature Flags (verify this file can be read)"""
+    fName: RString
+    """The name of the RNTuple."""
+    fDescription: RString
+    """The description of the RNTuple."""
+    fLibrary: RString  # abbott TODO: return here and update field name once i understand what this is
+    """The library or program used to create the RNTuple."""
+    fieldDescritions: ListFrame[FieldDescription]
+    """The List Frame of Field Description Record Frames. Part of the RNTuple schema description.
+    The order of fields matters: every field gets an implicit field ID which is equal the zero-based
+    index of the field in the serialized list; subfields are ordered from smaller IDs to larger IDs.
+    Top-level fields have their own field ID set as parent ID."""
+    columnDescriptions: ListFrame[ColumnDescription]
+    """The List Frame of Column Description Record Frames. Part of the RNTuple schema description."""
+    aliasColumnDescriptions: ListFrame[AliasColumnDescription]
+    """The List Frame of Alias Column Description Record Frames. Part of the RNTuple schema description."""
+    extraTypeInformation: ListFrame[ExtraTypeInformation]
+    """The List Frame of Extra Type Information Record Frames. Part of the RNTuple schema description."""
+
+    @classmethod
+    def update_members(cls, members: Members, buffer: ReadBuffer):
+        # Read the feature flags
+        featureFlags, buffer = RFeatureFlags.read(buffer)
+
+        # Read the name, description, and library
+        fName, buffer = RString.read(buffer)
+        fDescription, buffer = RString.read(buffer)
+        fLibrary, buffer = RString.read(buffer)
+
+        # Read the field descriptions list frame
+        fieldDescritions, buffer = ListFrame.read_as(FieldDescription, buffer)
+
+        # Read the column descriptions list frame
+        columnDescriptions, buffer = ListFrame.read_as(ColumnDescription, buffer)
+
+        # Read the alias column descriptions list frame
+        aliasColumnDescriptions, buffer = ListFrame.read_as(
+            AliasColumnDescription, buffer
+        )
+
+        # Read the extra type information list frame
+        extraTypeInformation, buffer = ListFrame.read_as(ExtraTypeInformation, buffer)
+
+        members["featureFlags"] = featureFlags
+        members["fName"] = fName
+        members["fDescription"] = fDescription
+        members["fLibrary"] = fLibrary
+        members["fieldDescritions"] = fieldDescritions
+        members["columnDescriptions"] = columnDescriptions
+        members["aliasColumnDescriptions"] = aliasColumnDescriptions
+        members["extraTypeInformation"] = extraTypeInformation
+        return members, buffer
 
 
 ENVELOPE_TYPE_MAP[0x01] = "HeaderEnvelope"

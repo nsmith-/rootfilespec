@@ -58,3 +58,26 @@ class STLString(StreamedObject):
 
 
 DICTIONARY["STLString"] = STLString
+
+
+@serializable
+class RString(ROOTSerializable):
+    """A class representing an RString."""
+
+    fString: bytes
+    """The string data."""
+
+    def __hash__(self) -> int:
+        return hash(self.fString)
+
+    @classmethod
+    def update_members(cls, members: Members, buffer: ReadBuffer):
+        """Reads an RString from the given buffer.
+        RStrings are always prefixed with a 32bit unsigned integer indicating the length of the string.
+        String data are UTF-8 encoded.
+        """
+
+        (length,), buffer = buffer.unpack("<I")
+        data, buffer = buffer.consume(length)
+        members["fString"] = data
+        return members, buffer
