@@ -390,18 +390,21 @@ class TStreamerBasicPointer(TStreamerElement):
     fCountName: TString
     fCountClass: TString
 
-    def member_definition(self, parent: TStreamerInfo):
+    def member_definition(self, parent: TStreamerInfo):  # noqa: ARG002
         if self.fArrayLength > 0:
             msg = f"Array length not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
 
         fmt = ElementType(self.fType - ElementType.kOffsetP).as_fmt()
-        if not (
-            self.fCountClass == parent.fName
-            or normalize(self.fCountClass.fString) in parent.base_classes()
-        ):
-            msg = f"fCountClass {self.fCountClass} != parent.fName {parent.fName}"
-            raise ValueError(msg)
+        # TODO: to properly enumerate all base classes and ensure fCountClass
+        # exists in our streamer info, we have to be able to recurse through them,
+        # which requires the TStreamerInfo instances themselves to be linked
+        # if not (
+        #     self.fCountClass == parent.fName
+        #     or normalize(self.fCountClass.fString) in parent.base_classes()
+        # ):
+        #     msg = f"fCountClass {self.fCountClass} != parent.fName {parent.fName}"
+        #     raise ValueError(msg)
 
         countname = normalize(self.fCountName.fString)
         atype = f"BasicArray({fmt!r}, {countname!r})"
@@ -469,17 +472,13 @@ class TStreamerLoop(TStreamerElement):
     fCountName: TString
     fCountClass: TString
 
-    def member_definition(self, parent: TStreamerInfo):
+    def member_definition(self, parent: TStreamerInfo):  # noqa: ARG002
         if self.fArrayLength > 0:
             msg = f"Array length not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
 
-        if not (
-            self.fCountClass == parent.fName
-            or normalize(self.fCountClass.fString) in parent.base_classes()
-        ):
-            msg = f"fCountClass {self.fCountClass} != parent.fName {parent.fName}"
-            raise ValueError(msg)
+        # TODO: check fCountClass is in parent.base_classes()
+        # See TStreamerBasicPointer.member_definition
 
         countname = normalize(self.fCountName.fString)
         atype = f"ObjectArray({countname!r})"
