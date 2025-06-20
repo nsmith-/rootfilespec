@@ -140,3 +140,18 @@ class TFormula(TNamed):
 
 
 DICTIONARY["TFormula"] = TFormula
+
+
+@serializable
+class TQObject(ROOTSerializable):
+    """Qt object communication object for ROOT GUIs
+
+    Nothing is serialized
+    """
+
+    @classmethod
+    def update_members(cls, members: Members, buffer: ReadBuffer):
+        return members, buffer
+
+
+DICTIONARY["TQObject"] = TQObject
