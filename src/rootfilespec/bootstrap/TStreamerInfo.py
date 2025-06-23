@@ -349,6 +349,11 @@ class TStreamerBasicType(TStreamerElement):
             fmt = ElementType(self.fType - ElementType.kOffsetL).as_fmt()
             atype = f"FixedSizeArray({fmt!r}, {self.fArrayLength})"
             return f"{self.member_name()}: Annotated[np.ndarray, {atype}]", []
+        
+        # if double32, use double32serde
+        # add a breakpoint, use debug mode on pytest
+        # run "uproot-Event.root", "uproot-double32-float16.root", "uproot-issue-308.root"
+        
         fmt = self.fType.as_fmt()
         pytype = _structtype_to_pytype(fmt).__name__
         return f"{self.member_name()}: Annotated[{pytype}, Fmt({fmt!r})]", []

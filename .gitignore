@@ -157,3 +157,5 @@ Thumbs.db
 *~
 *.swp
 .vscode
+
+debug.py
