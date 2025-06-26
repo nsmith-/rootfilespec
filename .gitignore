@@ -159,3 +159,7 @@ Thumbs.db
 .vscode
 
 debug.py
+
+# uv
+
+uv.lock

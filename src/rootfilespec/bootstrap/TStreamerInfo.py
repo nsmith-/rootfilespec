@@ -10,6 +10,7 @@ from rootfilespec.dispatch import DICTIONARY, ENCODING, normalize
 from rootfilespec.serializable import serializable
 from rootfilespec.structutil import Fmt
 
+from rootfilespec.bootstrap.double32 import Double32Serde
 
 @dataclass
 class ClassDef:
@@ -350,9 +351,28 @@ class TStreamerBasicType(TStreamerElement):
             atype = f"FixedSizeArray({fmt!r}, {self.fArrayLength})"
             return f"{self.member_name()}: Annotated[np.ndarray, {atype}]", []
         
-        # if double32, use double32serde
-        # add a breakpoint, use debug mode on pytest
-        # run "uproot-Event.root", "uproot-double32-float16.root", "uproot-issue-308.root"
+        if self.fType == ElementType.kDouble32:
+
+            factor = None
+            xmin = None
+            nbits = None
+
+            if hasattr(self, 'GetFactor') and callable(self.GetFactor):
+                factor = self.GetFactor()
+            if hasattr(self, 'GetXmin') and callable(self.GetXmin):
+                xmin = self.GetXmin()
+            if factor in (0, None):
+                nbits = xmin if isinstance(xmin, int) else None
+
+            try:
+                fname = self.fName.fString.decode("utf-8") 
+            except Exception:
+                fname = str(self.fName)
+
+            return (
+                f"{fname}: Annotated[float, Double32Serde(factor={factor}, xmin={xmin}, nbits={nbits})]",
+                [Double32Serde.__name__],
+            )
         
         fmt = self.fType.as_fmt()
         pytype = _structtype_to_pytype(fmt).__name__

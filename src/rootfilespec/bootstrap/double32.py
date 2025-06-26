@@ -22,9 +22,15 @@ class Double32Reader:
     
 @dataclasses.dataclass
 class Double32Serde(MemberSerDe):
+
+    header = None
     factor: Optional[float] = None
     xmin: Optional[float] = None
+    xmax: Optional[float] = None
     nbits: Optional[int] = None
 
     def build_reader(self, fname: str, ftype: type):
         return Double32Reader(fname, self.factor, self.xmin, self.nbits)
+
+DICTIONARY["Double32_t"] = Double32Serde(factor=1.0, xmin=0.0, xmax=0.0, nbits=32)
+DICTIONARY["Double32Serde"] = Double32Serde

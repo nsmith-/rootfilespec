@@ -51,6 +51,10 @@ class Uninterpreted(StreamedObject):
     This is used for objects that are not recognized by the library.
     """
 
+    def __init__(self, **kwargs):
+        # Accept any keyword args to avoid errors
+        pass
+
     header: StreamHeader
     """The header of the object."""
     data: bytes
