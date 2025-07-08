@@ -1,73 +1,65 @@
-from rootfilespec.bootstrap.streamedobject import StreamedObject
-from rootfilespec.buffer import ReadBuffer
-from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.serializable import Members, ROOTSerializable, serializable
-from rootfilespec.serializable import MemberSerDe
-
-from typing import Optional
 import dataclasses
+from rootfilespec.buffer import ReadBuffer
+from rootfilespec.serializable import Members, MemberSerDe
 
 @dataclasses.dataclass
 class Double32Reader:
     fname: str
     factor: float
     xmin: float
+    xmax: float
     nbits: int
 
     def __call__(self, members: Members, buffer: ReadBuffer) -> tuple[Members, ReadBuffer]:
-        if self.factor is None or self.xmin is None or self.nbits is None:
-            # Uncompressed: read as float32
+        if self.xmin == 0.0 and self.factor == 1.0 and self.nbits == 32:
+            # read asfloat
             (val,), buffer = buffer.unpack(">f")
-            members[self.fname] = float(val)
         else:
-            # read as unsigned int and apply scaling
+            # read as integer and scale
             nbytes = (self.nbits + 7) // 8
-            (raw,), buffer = buffer.unpack(f">{'BHIQ'[(nbytes-1)//2]}")
-            members[self.fname] = float(self.xmin + self.factor * raw)
-        
+            fmt = "BHIQ"[(nbytes - 1) // 2]
+            (raw,), buffer = buffer.unpack(f">{fmt}")
+            val = self.xmin + self.factor * raw
+
+        members[self.fname] = float(val)
         return members, buffer
-    
+
 @dataclasses.dataclass
-class Double32Serde:
-    def __init__(self, factor, xmin, xmax, nbits):
-        self.factor = factor
-        self.xmin = xmin
-        self.xmax = xmax
-        self.nbits = nbits
+class Double32Serde(MemberSerDe):
+    factor: float
+    xmin: float
+    xmax: float
+    nbits: int
 
-    def build_reader(self, fname: str, ftype: type):
-        return Double32Reader(fname, self.factor, self.xmin, self.nbits)
-
-    def __repr__(self):
-        return (
-            f"Double32Serde(factor={self.factor}, "
-            f"xmin={self.xmin}, xmax={self.xmax}, "
-            f"nbits={self.nbits})"
-        )
-
-DICTIONARY["Double32_t"] = Double32Serde(factor=1.0, xmin=0.0, xmax=0.0, nbits=32)
-DICTIONARY["Double32Serde"] = Double32Serde
-
+    def build_reader(self, fname: str, itype: type) -> Double32Reader:
+        return Double32Reader(fname, self.factor, self.xmin, self.xmax, self.nbits)
+    
 def parse_double32_title(title: str):
     """
     Very basic parser for ROOT Double32_t-style titles: '[xmin,xmax,nbits]'.
     Returns a tuple: (xmin, xmax, nbits), or (None, None, None) if parsing fails.
     """
     title = title.strip()
-    
-    if not (title.startswith("[") and title.endswith("]")):
-        return None, None, None
 
-    content = title[1:-1]  # strip off the brackets
-    parts = content.split(",")
-    
-    if len(parts) != 3:
-        return None, None, None
+    # filter out floats - unspecificed xmin, xmax, nbits - from double32s
+    bracket_end = title.find(']')
+    if bracket_end == -1 or not title.startswith('['):
+        return 0, 0, 32
 
-    try:
-        xmin = float(parts[0].strip()) if parts[0].strip() else None
-        xmax = float(parts[1].strip()) if parts[1].strip() else None
-        nbits = int(parts[2].strip())
-        return xmin, xmax, nbits
-    except Exception:
-        return 0.0, 0.0, 32  # Return safe defaults on any error
+    tuple = title[1:bracket_end]
+    params = [p.strip() for p in tuple.split(',')]
+    title = title[bracket_end + 1:].strip()
+    
+    if not title:
+        raise ValueError("missing title")
+
+    # Parse coordinates
+    if len(params) == 2:
+        xmin, xmax = params
+        nbits = "32"
+    elif len(params) == 3:
+        xmin, xmax, nbits = params
+    else:
+        raise ValueError("expected 2 or 3 params in title")
+
+    return xmin, xmax, nbits

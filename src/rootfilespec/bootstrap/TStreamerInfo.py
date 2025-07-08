@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Annotated, Union
 
+from rootfilespec.bootstrap.double32 import parse_double32_title
 from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TList import TObjArray
 from rootfilespec.bootstrap.TObject import TNamed
@@ -10,7 +11,6 @@ from rootfilespec.dispatch import DICTIONARY, ENCODING, normalize
 from rootfilespec.serializable import serializable
 from rootfilespec.structutil import Fmt
 
-from rootfilespec.bootstrap.double32 import Double32Serde, parse_double32_title
 
 @dataclass
 class ClassDef:
@@ -355,29 +355,29 @@ class TStreamerBasicType(TStreamerElement):
         if self.fType == ElementType.kDouble32:
             fname = getattr(self.fName, "fString", b"<unknown>").decode("utf-8", errors="replace")
             title = getattr(self.fTitle, "fString", b"").decode("utf-8", errors="replace").strip()
-            
-            print(fname)
-            print(title)
-
+    
             xmin, xmax, nbits = parse_double32_title(title)
-            factor = None
-            
-            # Always pass all four parameters with safe defaults
-            factor = factor or 1.0
-            xmin = xmin or 0.0
-            xmax = xmax or 0.0
-            nbits = nbits or 32
+
+            xmin = float(xmin or 0.0)
+            xmax = float(xmax or 0.0)
+            nbits = int(nbits or 32)
+            if xmax != xmin:
+                factor = (xmax - xmin) / (2**nbits - 1)
+            else: 
+                factor = 1.0
 
             return (
                 f"{fname}: Annotated[float, Double32Serde(factor={factor}, xmin={xmin}, xmax={xmax}, nbits={nbits})]",
-                [Double32Serde.__name__],
+                [],
             )
 
         fmt = self.fType.as_fmt()
         pytype = _structtype_to_pytype(fmt).__name__
         return f"{self.member_name()}: Annotated[{pytype}, Fmt({fmt!r})]", []
 
+
 DICTIONARY["TStreamerBasicType"] = TStreamerBasicType
+
 
 @serializable
 class TStreamerString(TStreamerElement):

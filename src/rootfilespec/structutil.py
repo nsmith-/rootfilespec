@@ -2,7 +2,7 @@ import dataclasses
 
 from rootfilespec.buffer import ReadBuffer
 from rootfilespec.serializable import Members, MemberSerDe
-from rootfilespec.bootstrap.double32 import Double32Serde
+
 
 @dataclasses.dataclass
 class _FmtReader:
