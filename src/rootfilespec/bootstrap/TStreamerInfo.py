@@ -353,14 +353,11 @@ class TStreamerBasicType(TStreamerElement):
 
         # In TStreamerBasicType.member_definition
         if self.fType == ElementType.kDouble32:
-            fname = getattr(self.fName, "fString", b"<unknown>").decode(
-                "utf-8", errors="replace"
-            )
             title = self.fTitle.fString.decode("utf-8", errors="replace").strip()
             xmin, xmax, nbits, factor = parse_double32_title(title)
 
             return (
-                f"{fname}: Annotated[float, Double32Serde(factor={factor}, xmin={xmin}, xmax={xmax}, nbits={nbits})]",
+                f"{self.member_name()}: Annotated[float, Double32Serde(factor={factor}, xmin={xmin}, xmax={xmax}, nbits={nbits})]",
                 [],
             )
 
