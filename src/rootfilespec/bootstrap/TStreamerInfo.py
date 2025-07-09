@@ -353,18 +353,11 @@ class TStreamerBasicType(TStreamerElement):
 
         # In TStreamerBasicType.member_definition
         if self.fType == ElementType.kDouble32:
-            fname = getattr(self.fName, "fString", b"<unknown>").decode("utf-8", errors="replace")
-            title = getattr(self.fTitle, "fString", b"").decode("utf-8", errors="replace").strip()
-    
-            xmin, xmax, nbits = parse_double32_title(title)
-
-            xmin = float(xmin or 0.0)
-            xmax = float(xmax or 0.0)
-            nbits = int(nbits or 32)
-            if xmax != xmin:
-                factor = (xmax - xmin) / (2**nbits - 1)
-            else: 
-                factor = 1.0
+            fname = getattr(self.fName, "fString", b"<unknown>").decode(
+                "utf-8", errors="replace"
+            )
+            title = self.fTitle.fString.decode("utf-8", errors="replace").strip()
+            xmin, xmax, nbits, factor = parse_double32_title(title)
 
             return (
                 f"{fname}: Annotated[float, Double32Serde(factor={factor}, xmin={xmin}, xmax={xmax}, nbits={nbits})]",

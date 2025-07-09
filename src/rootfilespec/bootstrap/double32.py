@@ -1,6 +1,8 @@
 import dataclasses
+
 from rootfilespec.buffer import ReadBuffer
 from rootfilespec.serializable import Members, MemberSerDe
+
 
 @dataclasses.dataclass
 class Double32Reader:
@@ -10,7 +12,9 @@ class Double32Reader:
     xmax: float
     nbits: int
 
-    def __call__(self, members: Members, buffer: ReadBuffer) -> tuple[Members, ReadBuffer]:
+    def __call__(
+        self, members: Members, buffer: ReadBuffer
+    ) -> tuple[Members, ReadBuffer]:
         if self.xmin == 0.0 and self.factor == 1.0 and self.nbits == 32:
             # read asfloat
             (val,), buffer = buffer.unpack(">f")
@@ -24,6 +28,7 @@ class Double32Reader:
         members[self.fname] = float(val)
         return members, buffer
 
+
 @dataclasses.dataclass
 class Double32Serde(MemberSerDe):
     factor: float
@@ -32,8 +37,15 @@ class Double32Serde(MemberSerDe):
     nbits: int
 
     def build_reader(self, fname: str, itype: type) -> Double32Reader:
+        # itype not in use due to this reader being used only for Double32_t
+        # will be in use when we support other types, e.g. float16
+        if itype is not float:
+            msg = f"Double32Serde.build_reader expected type float, got {itype}"
+            raise ValueError(msg)
+
         return Double32Reader(fname, self.factor, self.xmin, self.xmax, self.nbits)
-    
+
+
 def parse_double32_title(title: str):
     """
     Very basic parser for ROOT Double32_t-style titles: '[xmin,xmax,nbits]'.
@@ -41,17 +53,18 @@ def parse_double32_title(title: str):
     """
     title = title.strip()
 
-    # filter out floats - unspecificed xmin, xmax, nbits - from double32s
-    bracket_end = title.find(']')
-    if bracket_end == -1 or not title.startswith('['):
-        return 0, 0, 32
+    # filter out floats - unspecified xmin, xmax, nbits - from double32s
+    bracket_end = title.find("]")
+    if bracket_end == -1 or not title.startswith("["):
+        return 0.0, 0.0, 32, 1.0
 
     tuple = title[1:bracket_end]
-    params = [p.strip() for p in tuple.split(',')]
-    title = title[bracket_end + 1:].strip()
-    
+    params = [p.strip() for p in tuple.split(",")]
+    title = title[bracket_end + 1 :].strip()
+
     if not title:
-        raise ValueError("missing title")
+        msg = "missing title after coordinates"
+        raise ValueError(msg)
 
     # Parse coordinates
     if len(params) == 2:
@@ -60,6 +73,12 @@ def parse_double32_title(title: str):
     elif len(params) == 3:
         xmin, xmax, nbits = params
     else:
-        raise ValueError("expected 2 or 3 params in title")
+        msg = "expected 2 or 3 params in title"
+        raise ValueError(msg)
 
-    return xmin, xmax, nbits
+    xmin_f = float(xmin)
+    xmax_f = float(xmax)
+    nbits_f = int(nbits)
+    factor = (xmax_f - xmin_f) / (2**nbits_f - 1) if xmax_f != xmin_f else 1.0
+
+    return xmin_f, xmax_f, nbits_f, factor
