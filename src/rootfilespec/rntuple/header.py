@@ -2,10 +2,9 @@ from enum import IntEnum
 from typing import Annotated, Optional
 
 from rootfilespec.bootstrap.strings import RString
-from rootfilespec.buffer import ReadBuffer
 from rootfilespec.rntuple.envelope import ENVELOPE_TYPE_MAP, REnvelope, RFeatureFlags
 from rootfilespec.rntuple.RFrame import ListFrame, RecordFrame
-from rootfilespec.serializable import Members, serializable
+from rootfilespec.serializable import serializable
 from rootfilespec.structutil import Fmt, OptionalField
 
 class ColumnType(IntEnum):
@@ -137,45 +136,6 @@ class FieldDescription(RecordFrame):
     fTypeChecksum: Annotated[Optional[int], OptionalField("<I", "fFlags", 0x04)]
     """The ROOT type checksum for the field. Present only if flag 0x04 is set (has ROOT type checksum)."""
 
-    @classmethod
-    def update_members(cls, members: Members, buffer: ReadBuffer):
-        # Read the field version, type version, parent field ID, structural role, and flags
-        (
-            (fFieldVersion, fTypeVersion, fParentFieldID, fStructuralRole, fFlags),
-            buffer,
-        ) = buffer.unpack("<IIIHH")
-
-        # Read the field name, type name, type alias, and field description
-        fFieldName, buffer = RString.read(buffer)
-        fTypeName, buffer = RString.read(buffer)
-        fTypeAlias, buffer = RString.read(buffer)
-        fFieldDescription, buffer = RString.read(buffer)
-
-        # Read the array size, source field ID, and type checksum (if present)
-        fArraySize = None
-        if fFlags & 0x01:  # If the field is repetitive
-            (fArraySize,), buffer = buffer.unpack("<Q")
-        fSourceFieldID = None
-        if fFlags & 0x02:  # If the field is projected
-            (fSourceFieldID,), buffer = buffer.unpack("<I")
-        fTypeChecksum = None
-        if fFlags & 0x04:  # If the field has a ROOT type checksum
-            (fTypeChecksum,), buffer = buffer.unpack("<I")
-
-        members["fFieldVersion"] = fFieldVersion
-        members["fTypeVersion"] = fTypeVersion
-        members["fParentFieldID"] = fParentFieldID
-        members["fStructuralRole"] = fStructuralRole
-        members["fFlags"] = fFlags
-        members["fFieldName"] = fFieldName
-        members["fTypeName"] = fTypeName
-        members["fTypeAlias"] = fTypeAlias
-        members["fFieldDescription"] = fFieldDescription
-        members["fArraySize"] = fArraySize
-        members["fSourceFieldID"] = fSourceFieldID
-        members["fTypeChecksum"] = fTypeChecksum
-        return members, buffer
-
 
 @serializable
 class ColumnDescription(RecordFrame):
@@ -213,32 +173,6 @@ class ColumnDescription(RecordFrame):
     fMaxValue: Annotated[Optional[int], OptionalField("<q", "fFlags", 0x02)]
     """The maximum value of the column. Present only if flag 0x02 is set (column with range of values)."""
 
-    @classmethod
-    def update_members(cls, members: Members, buffer: ReadBuffer):
-        # Read the column type, bits storage, field ID, and flags
-        (fColumnType, fBitsStorage, fFieldID, fFlags, fRepresentationIndex), buffer = (
-            buffer.unpack("<HHIHH")
-        )
-
-        # Read the first element index, min value, and max value (if present)
-        fFirstElementIndex = None
-        if fFlags & 0x01:
-            (fFirstElementIndex,), buffer = buffer.unpack("<q")
-        fMinValue = None
-        fMaxValue = None
-        if fFlags & 0x02:
-            (fMinValue,), buffer = buffer.unpack("<q")
-            (fMaxValue,), buffer = buffer.unpack("<q")
-
-        members["fColumnType"] = fColumnType
-        members["fBitsStorage"] = fBitsStorage
-        members["fFieldID"] = fFieldID
-        members["fFlags"] = fFlags
-        members["fRepresentationIndex"] = fRepresentationIndex
-        members["fFirstElementIndex"] = fFirstElementIndex
-        members["fMinValue"] = fMinValue
-        members["fMaxValue"] = fMaxValue
-        return members, buffer
 
 
 @serializable
@@ -299,40 +233,5 @@ class HeaderEnvelope(REnvelope):
     """The List Frame of Alias Column Description Record Frames. Part of the RNTuple schema description."""
     extraTypeInformation: ListFrame[ExtraTypeInformation]
     """The List Frame of Extra Type Information Record Frames. Part of the RNTuple schema description."""
-
-    @classmethod
-    def update_members(cls, members: Members, buffer: ReadBuffer):
-        # Read the feature flags
-        featureFlags, buffer = RFeatureFlags.read(buffer)
-
-        # Read the name, description, and library
-        fName, buffer = RString.read(buffer)
-        fDescription, buffer = RString.read(buffer)
-        fLibrary, buffer = RString.read(buffer)
-
-        # Read the field descriptions list frame
-        fieldDescritions, buffer = ListFrame.read_as(FieldDescription, buffer)
-
-        # Read the column descriptions list frame
-        columnDescriptions, buffer = ListFrame.read_as(ColumnDescription, buffer)
-
-        # Read the alias column descriptions list frame
-        aliasColumnDescriptions, buffer = ListFrame.read_as(
-            AliasColumnDescription, buffer
-        )
-
-        # Read the extra type information list frame
-        extraTypeInformation, buffer = ListFrame.read_as(ExtraTypeInformation, buffer)
-
-        members["featureFlags"] = featureFlags
-        members["fName"] = fName
-        members["fDescription"] = fDescription
-        members["fLibrary"] = fLibrary
-        members["fieldDescritions"] = fieldDescritions
-        members["columnDescriptions"] = columnDescriptions
-        members["aliasColumnDescriptions"] = aliasColumnDescriptions
-        members["extraTypeInformation"] = extraTypeInformation
-        return members, buffer
-
 
 ENVELOPE_TYPE_MAP[0x01] = "HeaderEnvelope"

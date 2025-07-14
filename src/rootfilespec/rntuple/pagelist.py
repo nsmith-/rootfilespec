@@ -5,7 +5,7 @@ from rootfilespec.rntuple.envelope import (
     ENVELOPE_TYPE_MAP,
     REnvelope,
 )
-from rootfilespec.rntuple.pagelocations import ClusterLocations
+from rootfilespec.rntuple.pagelocations import ClusterLocations, ColumnLocations, PageLocations, RPageDescription
 from rootfilespec.rntuple.RFrame import ListFrame, RecordFrame
 from rootfilespec.rntuple.RPage import RPage
 from rootfilespec.serializable import Members, serializable
@@ -54,25 +54,8 @@ class PageListEnvelope(REnvelope):
     """Checksum of the Header Envelope"""
     clusterSummaries: ListFrame[ClusterSummary]
     """The List Frame of Cluster Summary Record Frames"""
-    pageLocations: ClusterLocations
+    pageLocations: ListFrame[ListFrame[PageLocations[RPageDescription]]]
     """The Page Locations Triple Nested List Frame"""
-
-    @classmethod
-    def update_members(cls, members: Members, buffer: ReadBuffer):
-        """Reads the RNTuple Page List Envelope payload from the given buffer."""
-        # Read the header checksum
-        (headerChecksum,), buffer = buffer.unpack("<Q")
-
-        # Read the cluster summary list frame
-        clusterSummaries, buffer = ListFrame.read_as(ClusterSummary, buffer)
-
-        # Read the page locations
-        pageLocations, buffer = ClusterLocations.read(buffer)
-
-        members["headerChecksum"] = headerChecksum
-        members["clusterSummaries"] = clusterSummaries
-        members["pageLocations"] = pageLocations
-        return members, buffer
 
     def get_pages(self, fetch_data: DataFetcher):
         """Get the RNTuple Pages from the Page Locations Nested List Frame."""

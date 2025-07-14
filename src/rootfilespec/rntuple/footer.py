@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from rootfilespec.buffer import DataFetcher, ReadBuffer
+from rootfilespec.buffer import DataFetcher
 from rootfilespec.rntuple.envelope import (
     ENVELOPE_TYPE_MAP,
     REnvelope,
@@ -9,7 +9,7 @@ from rootfilespec.rntuple.envelope import (
 )
 from rootfilespec.rntuple.pagelist import PageListEnvelope
 from rootfilespec.rntuple.RFrame import ListFrame, RecordFrame
-from rootfilespec.serializable import Members, serializable
+from rootfilespec.serializable import serializable
 from rootfilespec.structutil import Fmt
 
 
@@ -57,6 +57,9 @@ class SchemaExtension(RecordFrame):
     Note that is it possible to extend existing fields by additional column representations.
         This means that columns of the extension header may point to fields of the regular header.
     """
+    # In practice, deferred columns only appear in the schema extension record frame (see Section Footer Envelope).
+
+
 
 
 @serializable
@@ -71,26 +74,6 @@ class FooterEnvelope(REnvelope):
     """The Schema Extension Record Frame"""
     clusterGroups: ListFrame[ClusterGroup]
     """The List Frame of Cluster Group Record Frames"""
-
-    @classmethod
-    def update_members(cls, members: Members, buffer: ReadBuffer):
-        # Read the feature flags
-        featureFlags, buffer = RFeatureFlags.read(buffer)
-
-        # Read the header checksum
-        (headerChecksum,), buffer = buffer.unpack("<Q")
-
-        # Read the schema extension record frame
-        schemaExtension, buffer = SchemaExtension.read(buffer)
-
-        # Read the cluster group list frame
-        clusterGroups, buffer = ListFrame.read_as(ClusterGroup, buffer)
-
-        members["featureFlags"] = featureFlags
-        members["headerChecksum"] = headerChecksum
-        members["schemaExtension"] = schemaExtension
-        members["clusterGroups"] = clusterGroups
-        return members, buffer
 
     def get_pagelists(self, fetch_data: DataFetcher) -> list[PageListEnvelope]:
         """Get the RNTuple Page List Envelopes from the Footer Envelope.
