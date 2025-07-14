@@ -3,9 +3,12 @@ from typing import Annotated, Union
 from rootfilespec.bootstrap.streamedobject import Ref, read_streamed_item
 from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TObject import TObject
-from rootfilespec.buffer import ReadBuffer
-from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.serializable import (
+    Members,
+    ReadBuffer,
+    ROOTSerializable,
+    serializable,
+)
 from rootfilespec.structutil import Fmt
 
 
@@ -16,15 +19,9 @@ class TCollection(TObject):
     fSize: Annotated[int, Fmt(">i")]
 
 
-DICTIONARY["TCollection"] = TCollection
-
-
 @serializable
 class TSeqCollection(TCollection):
     _SkipHeader = True
-
-
-DICTIONARY["TSeqCollection"] = TSeqCollection
 
 
 @serializable
@@ -59,9 +56,6 @@ class TList(TSeqCollection):
         return members, buffer
 
 
-DICTIONARY["TList"] = TList
-
-
 @serializable
 class TObjArray(TSeqCollection):
     """TObjArray container class."""
@@ -81,6 +75,3 @@ class TObjArray(TSeqCollection):
             objects.append(item)
         members["objects"] = tuple(objects)
         return members, buffer
-
-
-DICTIONARY["TObjArray"] = TObjArray

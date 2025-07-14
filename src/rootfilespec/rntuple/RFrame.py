@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Generic, TypeVar
 
-from rootfilespec.buffer import ReadBuffer
-from rootfilespec.serializable import Members, ROOTSerializable
+from rootfilespec.serializable import Members, ReadBuffer, ROOTSerializable
 
 Item = TypeVar("Item", bound=ROOTSerializable)
 

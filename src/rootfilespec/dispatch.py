@@ -1,7 +1,3 @@
-from rootfilespec.serializable import ROOTSerializable
-
-DICTIONARY: dict[str, type[ROOTSerializable]] = {}
-
 # TODO: is this encoding correct?
 ENCODING = "utf-8"
 

@@ -6,8 +6,13 @@ from rootfilespec.bootstrap.TDirectory import TDirectory
 from rootfilespec.bootstrap.TKey import TKey
 from rootfilespec.bootstrap.TList import TList
 from rootfilespec.bootstrap.TUUID import TUUID
-from rootfilespec.buffer import DataFetcher, ReadBuffer
-from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.serializable import (
+    DataFetcher,
+    Members,
+    ReadBuffer,
+    ROOTSerializable,
+    serializable,
+)
 from rootfilespec.structutil import Fmt
 
 

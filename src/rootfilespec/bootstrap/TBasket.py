@@ -7,9 +7,12 @@ from numpy.typing import NDArray
 
 from rootfilespec.bootstrap.streamedobject import StreamHeader
 from rootfilespec.bootstrap.TKey import TKey
-from rootfilespec.buffer import ReadBuffer
-from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.serializable import (
+    Members,
+    ReadBuffer,
+    ROOTSerializable,
+    serializable,
+)
 from rootfilespec.structutil import Fmt
 
 
@@ -85,6 +88,3 @@ class TBasket(TKey):
         members["fEntryOffset"] = fEntryOffset
         members["fBuffer"] = fBuffer
         return members, buffer
-
-
-DICTIONARY["TBasket"] = TBasket

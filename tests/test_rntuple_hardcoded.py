@@ -2,8 +2,7 @@ from pathlib import Path
 
 from skhep_testdata import data_path  # type: ignore[import-not-found]
 
-from rootfilespec.bootstrap import ROOT3a3aRNTuple, ROOTFile
-from rootfilespec.buffer import ReadBuffer
+from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT, ROOT3a3aRNTuple, ROOTFile
 from rootfilespec.rntuple.envelope import REnvelopeLink, RFeatureFlags
 from rootfilespec.rntuple.footer import ClusterGroup, FooterEnvelope, SchemaExtension
 from rootfilespec.rntuple.pagelist import ClusterSummary, PageListEnvelope
@@ -15,6 +14,7 @@ from rootfilespec.rntuple.pagelocations import (
 )
 from rootfilespec.rntuple.RFrame import ListFrame
 from rootfilespec.rntuple.RLocator import StandardLocator
+from rootfilespec.serializable import BufferContext, ReadBuffer
 
 # TODO: Add hardcoded representation of Header Envelope once implemented
 # TODO: Add hardcoded representation of RPages once implemented
@@ -27,7 +27,12 @@ def test_read_contributors():
 
         def fetch_data(seek: int, size: int):
             filehandle.seek(seek)
-            return ReadBuffer(memoryview(filehandle.read(size)), seek, 0)
+            return ReadBuffer(
+                memoryview(filehandle.read(size)),
+                0,
+                BOOTSTRAP_CONTEXT,
+                BufferContext(abspos=seek),
+            )
 
         buffer = fetch_data(0, 512)
         file, _ = ROOTFile.read(buffer)
@@ -166,7 +171,12 @@ def test_read_multiple_rntuples():
 
         def fetch_data(seek: int, size: int):
             filehandle.seek(seek)
-            return ReadBuffer(memoryview(filehandle.read(size)), seek, 0)
+            return ReadBuffer(
+                memoryview(filehandle.read(size)),
+                0,
+                BOOTSTRAP_CONTEXT,
+                BufferContext(abspos=seek),
+            )
 
         buffer = fetch_data(0, 512)
         file, _ = ROOTFile.read(buffer)

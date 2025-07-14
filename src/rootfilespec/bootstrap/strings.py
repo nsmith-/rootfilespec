@@ -1,7 +1,10 @@
 from rootfilespec.bootstrap.streamedobject import StreamedObject
-from rootfilespec.buffer import ReadBuffer
-from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.serializable import (
+    Members,
+    ReadBuffer,
+    ROOTSerializable,
+    serializable,
+)
 
 
 @serializable
@@ -34,11 +37,7 @@ class TString(ROOTSerializable):
         return members, buffer
 
 
-# No examples so far of TString being streamed but it is in most StreamerInfo
-DICTIONARY["TString"] = TString
-
 string = TString
-DICTIONARY["string"] = TString
 
 
 @serializable
@@ -55,6 +54,3 @@ class STLString(StreamedObject):
         data, buffer = buffer.consume(length)
         members["value"] = data
         return members, buffer
-
-
-DICTIONARY["STLString"] = STLString

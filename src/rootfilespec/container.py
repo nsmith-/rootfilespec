@@ -5,13 +5,13 @@ from typing import Any, Generic, TypeVar, Union, get_args, get_origin
 import numpy as np
 
 from rootfilespec.bootstrap.streamedobject import StreamHeader
-from rootfilespec.buffer import ReadBuffer
 from rootfilespec.serializable import (
     AssociativeContainerSerDe,
     ContainerSerDe,
     Members,
     MemberSerDe,
     MemberType,
+    ReadBuffer,
     ReadObjMethod,
     _build_read,
 )
