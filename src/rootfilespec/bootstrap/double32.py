@@ -21,7 +21,7 @@ class Double32Reader:
             nbytes = (self.nbits + 7) // 8
             fmt = "BHIQ"[(nbytes - 1) // 2]
             (raw,), buffer = buffer.unpack(f">{fmt}")
-            val = self.xmin + self.factor * raw
+            val = min(self.xmin + self.factor * raw, self.xmax)
 
         members[self.fname] = float(val)
         return members, buffer
@@ -40,12 +40,6 @@ class Double32Serde(MemberSerDe):
             msg = f"Double32Serde.build_reader expected type float, got {itype}"
             raise ValueError(msg)
 
-        # itype not in use due to this reader being used only for Double32_t
-        # will be in use when we support other types, e.g. float16
-        if itype is not float:
-            msg = f"Double32Serde.build_reader expected type float, got {itype}"
-            raise ValueError(msg)
-
         return Double32Reader(fname, self.factor, self.xmin, self.xmax, self.nbits)
 
 def parse_double32_title(title: str):
@@ -54,16 +48,10 @@ def parse_double32_title(title: str):
     Returns (xmin, xmax, nbits, factor), or (0, 0, 32, 1) if parsing fails.
     """
     title = title.strip()
-
     # filter out floats - unspecified xmin, xmax, nbits - from double32s
     bracket_end = title.find("]")
     if bracket_end == -1 or not title.startswith("["):
         return 0.0, 0.0, 32, 1.0
-    # filter out floats - unspecified xmin, xmax, nbits - from double32s
-    bracket_end = title.find("]")
-    if bracket_end == -1 or not title.startswith("["):
-        return 0.0, 0.0, 32, 1.0
-
     tuple = title[1:bracket_end]
     params = [p.strip() for p in tuple.split(",")]
 
