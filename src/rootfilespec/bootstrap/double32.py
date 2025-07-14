@@ -1,6 +1,8 @@
 import dataclasses
+
 from rootfilespec.buffer import ReadBuffer
 from rootfilespec.serializable import Members, MemberSerDe
+
 
 @dataclasses.dataclass
 class Double32Reader:
@@ -26,6 +28,7 @@ class Double32Reader:
         members[self.fname] = float(val)
         return members, buffer
 
+
 @dataclasses.dataclass
 class Double32Serde(MemberSerDe):
     factor: float
@@ -41,6 +44,7 @@ class Double32Serde(MemberSerDe):
             raise ValueError(msg)
 
         return Double32Reader(fname, self.factor, self.xmin, self.xmax, self.nbits)
+
 
 def parse_double32_title(title: str):
     """
