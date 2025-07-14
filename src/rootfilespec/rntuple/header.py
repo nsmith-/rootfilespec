@@ -1,12 +1,97 @@
-from typing import Annotated, Union
+from enum import IntEnum
 
 from rootfilespec.bootstrap.strings import RString
 from rootfilespec.buffer import ReadBuffer
 from rootfilespec.rntuple.envelope import ENVELOPE_TYPE_MAP, REnvelope, RFeatureFlags
 from rootfilespec.rntuple.RFrame import ListFrame, RecordFrame
 from rootfilespec.serializable import Members, serializable
-from rootfilespec.structutil import Fmt
+from rootfilespec.structutil import Fmt, OptionalField
 
+class ColumnType(IntEnum):
+    """The type of the column.
+
+    The "split encoding" columns apply a byte transformation encoding to all pages of 
+    that column and in addition, depending on the column type, delta or zigzag encoding:
+
+    - Split (only) : Rearranges the bytes of elements: All the first bytes first, then all the second bytes, etc.
+    - Delta + split : The first element is stored unmodified, all other elements store the delta to the previous element. 
+        Followed by split encoding.
+    - Zigzag + split : Used on signed integers only; it maps `x` to `2x` if `x` is positive and to `-(2x+1)` if `x` is negative.
+        Followed by split encoding.
+    Note: these encodings always happen within each page, thus decoding should be done page-wise, not cluster-wise.
+
+    The Real32Trunc type column is a variable-sized floating point column with lower precision than Real32 and SplitReal32. 
+        It is an IEEE-754 single precision float with some of the mantissa's least significant bits truncated.
+    The Real32Quant type column is a variable-sized real column that is internally represented as an integer within 
+        a specified range of values. For this column type, flag 0x02 (column with range) is always set.
+    Future versions of the file format may introduce additional column types without changing the minimum version 
+        of the header or introducing a feature flag. Old readers need to ignore these columns and fields constructed 
+        from such columns. Old readers can, however, figure out the number of elements stored in such unknown columns."""
+
+    kBit = 0x00
+    "Boolean value"
+    kByte = 0x01
+    "An uninterpreted byte, e.g. part of a blob"
+    kChar = 0x02
+    "ASCII character"
+    kInt8 = 0x03
+    "Two's complement, 1-byte signed integer"
+    kUInt8 = 0x04
+    "1 byte unsigned integer"
+    kInt16 = 0x05
+    "Two's complement, little-endian 2-byte signed integer"
+    kUInt16 = 0x06
+    "Little-endian 2-byte unsigned integer"
+    kInt32 = 0x07
+    "Two's complement, little-endian 4-byte signed integer"
+    kUInt32 = 0x08
+    "Little-endian 4-byte unsigned integer"
+    kInt64 = 0x09
+    "Two's complement, little-endian 8-byte signed integer"
+    kUInt64 = 0x0A
+    "Little-endian 8-byte unsigned integer"
+    kReal16 = 0x0B
+    "IEEE-754 half precision float"
+    kReal32 = 0x0C
+    "IEEE-754 single precision float"
+    kReal64 = 0x0D
+    "IEEE-754 double precision float"
+    kIndex32 = 0x0E
+    "Parent columns of (nested) collections, counting is relative to the cluster"
+    kIndex64 = 0x0F
+    "Parent columns of (nested) collections, counting is relative to the cluster"
+    kSwitch = 0x10
+    "Tuple of a kIndex64 value followed by a 32 bits dispatch tag to a column ID"
+    kSplitInt16 = 0x11
+    "Like Int16 but in split + zigzag encoding"
+    kSplitUInt16 = 0x12
+    "Like UInt16 but in split encoding"
+    kSplitInt32 = 0x13
+    "Like Int32 but in split + zigzag encoding"
+    kSplitUInt32 = 0x14
+    "Like UInt32 but in split encoding"
+    kSplitInt64 = 0x15
+    "Like Int64 but in split + zigzag encoding"
+    kSplitUInt64 = 0x16
+    "Like UInt64 but in split encoding"
+    kSplitReal16 = 0x17
+    "Like Real16 but in split encoding"
+    kSplitReal32 = 0x18
+    "Like Real32 but in split encoding"
+    kSplitReal64 = 0x19
+    "Like Real64 but in split encoding"
+    kSplitIndex32 = 0x1A
+    "Like Index32 but pages are stored in split + delta encoding"
+    kSplitIndex64 = 0x1B
+    "Like Index64 but pages are stored in split + delta encoding"
+    kReal32Trunc = 0x1C
+    "IEEE-754 single precision float with truncated mantissa"
+    kReal32Quant = 0x1D
+    "Real value contained in a specified range with an underlying quantized integer representation"
+
+    def __repr__(self) -> str:
+        """Get a string representation of this element type."""
+        return f"{self.__class__.__name__}.{self.name}"
 
 @serializable
 class FieldDescription(RecordFrame):
@@ -104,43 +189,7 @@ class ColumnDescription(RecordFrame):
     Old readers can, however, figure out the number of elements stored in such unknown columns.
     """
 
-    fColumnType: Annotated[int, Fmt("<H")]
-    """The type of the column; can have one of the following values:
-
-    ====  =====  ============  ====================================================
-    Type  Bits   Name          Contents
-    ====  =====  ============  ====================================================
-    0x00  1      Bit           Boolean value
-    0x01  8      Byte          An uninterpreted byte, e.g. part of a blob
-    0x02  8      Char          ASCII character
-    0x03  8      Int8          Two's complement, 1-byte signed integer
-    0x04  8      UInt8         1 byte unsigned integer
-    0x05  16     Int16         Two's complement, little-endian 2-byte signed integer
-    0x06  16     UInt16        Little-endian 2-byte unsigned integer
-    0x07  32     Int32         Two's complement, little-endian 4-byte signed integer
-    0x08  32     UInt32        Little-endian 4-byte unsigned integer
-    0x09  64     Int64         Two's complement, little-endian 8-byte signed integer
-    0x0A  64     UInt64        Little-endian 8-byte unsigned integer
-    0x0B  16     Real16        IEEE-754 half precision float
-    0x0D  64     Real64        IEEE-754 double precision float
-    0x0C  32     Real32        IEEE-754 single precision float
-    0x0E  32     Index32       Parent columns of (nested) collections, counting is relative to the cluster
-    0x0F  64     Index64       Parent columns of (nested) collections, counting is relative to the cluster
-    0x10  96     Switch        Tuple of a kIndex64 value followed by a 32 bits dispatch tag to a column ID
-    0x11  16     SplitInt16    Like Int16 but in split + zigzag encoding
-    0x12  16     SplitUInt16   Like UInt16 but in split encoding
-    0x13  32     SplitInt32    Like Int32 but in split + zigzag encoding
-    0x14  32     SplitUInt32   Like UInt32 but in split encoding
-    0x15  64     SplitInt64    Like Int64 but in split + zigzag encoding
-    0x16  64     SplitUInt64   Like UInt64 but in split encoding
-    0x17  16     SplitReal16   Like Real16 but in split encoding
-    0x18  32     SplitReal32   Like Real32 but in split encoding
-    0x19  64     SplitReal64   Like Real64 but in split encoding
-    0x1A  32     SplitIndex32  Like Index32 but pages are stored in split + delta encoding
-    0x1B  64     SplitIndex64  Like Index64 but pages are stored in split + delta encoding
-    0x1C  10-31  Real32Trunc   IEEE-754 single precision float with truncated mantissa
-    0x1D  1-32   Real32Quant   Real value contained in a specified range with an underlying quantized integer representation
-    ====  =====  ============  ===================================================="""
+    fColumnType: Annotated[ColumnType, Fmt("<H")]
     fBitsStorage: Annotated[int, Fmt("<H")]
     """The number of bits used to store the column value."""
     fFieldID: Annotated[int, Fmt("<I")]
