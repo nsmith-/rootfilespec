@@ -112,8 +112,8 @@ class ReadBuffer:
         """Get a string representation of the buffer."""
         return (
             f"ReadBuffer size {len(self.data)} at relpos={self.relpos}"
-            "\n  File context: {self.context}"
-            "\n  Local context: {self.local_context}"
+            f"\n  File context: {self.file_context}"
+            f"\n  Local context: {self.context}"
             "\n  data[:0x100]: "
             + "".join(
                 f"\n    0x{i:03x} | "
