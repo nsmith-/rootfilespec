@@ -112,7 +112,7 @@ class DynamicFileContext(FileContext):
         del sys.modules[self.module.__name__]
 
 
-def build_context(streamerinfo: bootstrap.TList) -> DynamicFileContext:
+def build_file_context(streamerinfo: bootstrap.TList) -> DynamicFileContext:
     # First, calculate a hash of the streamerinfo to define a unique context name
     # The list should have all TStreamerInfo objects, which have checksums,
     # except for one TList of schema evolution data, which we use the dataclass repr

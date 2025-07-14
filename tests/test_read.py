@@ -19,7 +19,7 @@ from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TList import TObjArray
 from rootfilespec.container import _CArrayReader
 from rootfilespec.dispatch import normalize
-from rootfilespec.dynamic import build_context
+from rootfilespec.dynamic import build_file_context
 from rootfilespec.serializable import (
     BufferContext,
     DataFetcher,
@@ -235,7 +235,7 @@ def test_read_file(filename: str):
 
         # Render the class definitions into python code
         try:
-            file_context = build_context(streamerinfo)
+            file_context = build_file_context(streamerinfo)
         except NotImplementedError as ex:
             return pytest.xfail(reason=str(ex))
 
