@@ -39,6 +39,10 @@ class RFeatureFlags(ROOTSerializable):
             raise NotImplementedError(msg)
         members["flags"] = flags
         return members, buffer
+    
+    def __or__(self, other: "RFeatureFlags") -> "RFeatureFlags":
+        """Returns a new RFeatureFlags object with the combined flags."""
+        return RFeatureFlags(self.flags | other.flags)
 
 
 @dataclass
