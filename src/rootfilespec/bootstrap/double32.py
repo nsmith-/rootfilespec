@@ -48,8 +48,8 @@ class Double32Serde(MemberSerDe):
 
 def parse_double32_title(title: str):
     """
-    Very basic parser for ROOT Double32_t-style titles: '[xmin,xmax,nbits]'.
-    Returns a tuple: (xmin, xmax, nbits), or (None, None, None) if parsing fails.
+    Very basic parser for ROOT Double32_t-style titles: '[xmin,xmax,nbits] title'
+    Returns (xmin, xmax, nbits, factor), or (0, 0, 32, 1) if parsing fails.
     """
     title = title.strip()
 
@@ -60,12 +60,7 @@ def parse_double32_title(title: str):
 
     tuple = title[1:bracket_end]
     params = [p.strip() for p in tuple.split(",")]
-    title = title[bracket_end + 1 :].strip()
-
-    if not title:
-        msg = "missing title after coordinates"
-        raise ValueError(msg)
-
+        
     # Parse coordinates
     if len(params) == 2:
         xmin, xmax = params
@@ -76,8 +71,8 @@ def parse_double32_title(title: str):
         msg = "expected 2 or 3 params in title"
         raise ValueError(msg)
 
-    xmin_f = float(xmin)
-    xmax_f = float(xmax)
+    xmin_f = float(xmin.replace("pi", "3.141592653589793"))
+    xmax_f = float(xmax.replace("pi", "3.141592653589793"))
     nbits_f = int(nbits)
     factor = (xmax_f - xmin_f) / (2**nbits_f - 1) if xmax_f != xmin_f else 1.0
 
