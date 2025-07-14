@@ -18,10 +18,13 @@ from rootfilespec.bootstrap.streamedobject import (
 from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TList import TObjArray
 from rootfilespec.bootstrap.TObject import TNamed, TObject
-from rootfilespec.buffer import ReadBuffer
 from rootfilespec.container import BasicArray, ObjectArray
-from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.serializable import (
+    Members,
+    ReadBuffer,
+    ROOTSerializable,
+    serializable,
+)
 from rootfilespec.structutil import Fmt
 
 
@@ -137,6 +140,3 @@ class TFormula(TNamed):
     def update_members(cls, members: Members, buffer: ReadBuffer):
         msg = "TFormula.update_members is not implemented"
         raise NotImplementedError(msg)
-
-
-DICTIONARY["TFormula"] = TFormula

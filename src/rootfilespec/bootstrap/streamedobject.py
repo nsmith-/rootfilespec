@@ -2,12 +2,12 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Generic, Optional, TypeVar, overload
 
-from rootfilespec.buffer import ReadBuffer
-from rootfilespec.dispatch import DICTIONARY, normalize
+from rootfilespec.dispatch import normalize
 from rootfilespec.serializable import (
     ContainerSerDe,
     Members,
     MemberType,
+    ReadBuffer,
     ReadObjMethod,
     ROOTSerializable,
     _ReadWrapper,
@@ -89,10 +89,10 @@ class StreamHeader(ROOTSerializable):
                 if not fClassName.decode("ascii").isprintable():
                     msg = f"Class name {fClassName!r} is not valid ASCII"
                     raise ValueError(msg)
-                buffer.local_refs[fClassRef] = fClassName
+                buffer.context.type_refs[fClassRef] = fClassName
             else:
                 fClassRef = (fClassInfo & ~_StreamConstants.kClassMask) - 2
-                fClassName = buffer.local_refs.get(fClassRef, None)
+                fClassName = buffer.context.type_refs.get(fClassRef, None)
                 if fClassName is None:
                     msg = f"ClassRef {fClassRef} not found in buffer local_refs (likely inside an uninterpreted object)"
                     raise NotImplementedError(msg)
@@ -166,20 +166,7 @@ def read_streamed_item(
         return Ref(Some()), buffer
     if itemheader.fClassName:
         clsname = normalize(itemheader.fClassName)
-        if clsname not in DICTIONARY:
-            if clsname == "TLeafI":
-                msg = "TLeafI not declared in StreamerInfo, e.g. uproot-issue413.root"
-                # (84 other test files have it, e.g. uproot-issue121.root)
-                # https://github.com/scikit-hep/uproot3/issues/413
-                # Likely groot-v0.21.0 (Go ROOT file implementation) did not write the streamers for TLeaf
-                raise NotImplementedError(msg)
-            if clsname == "RooRealVar":
-                msg = "RooRealVar not declared in the StreamerInfo, e.g. uproot-issue49.root"
-                raise NotImplementedError(msg)
-            msg = f"Unknown class name: {itemheader.fClassName}"
-            msg += f"\nStreamHeader: {itemheader}"
-            raise ValueError(msg)
-        dynmethod = DICTIONARY[clsname].read
+        dynmethod = buffer.file_context.type_by_name(clsname).read
     elif method is not None:
         clsname = f"Ref ({method})"
         if (

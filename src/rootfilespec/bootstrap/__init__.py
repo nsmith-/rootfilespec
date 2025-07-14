@@ -7,7 +7,11 @@ object references (TKey and TBasket)
 These types generally hold big-endian encoded primitive types.
 """
 
+import dataclasses
+from typing import Optional
+
 from rootfilespec.bootstrap.array import (
+    TArray,
     TArrayC,
     TArrayD,
     TArrayF,
@@ -27,11 +31,11 @@ from rootfilespec.bootstrap.streamedobject import Ref, StreamedObject
 from rootfilespec.bootstrap.strings import STLString, TString, string
 from rootfilespec.bootstrap.TBasket import TBasket
 from rootfilespec.bootstrap.TDatime import TDatime
-from rootfilespec.bootstrap.TDirectory import TDirectory, TKeyList
+from rootfilespec.bootstrap.TDirectory import TDirectory, TDirectoryFile, TKeyList
 from rootfilespec.bootstrap.TFile import ROOTFile, TFile
 from rootfilespec.bootstrap.TKey import TKey
 from rootfilespec.bootstrap.TList import TCollection, TList, TObjArray, TSeqCollection
-from rootfilespec.bootstrap.TObject import TNamed, TObject
+from rootfilespec.bootstrap.TObject import TNamed, TObject, TObjString
 from rootfilespec.bootstrap.TStreamerInfo import (
     TStreamerBase,
     TStreamerBasicPointer,
@@ -47,8 +51,33 @@ from rootfilespec.bootstrap.TStreamerInfo import (
     TStreamerSTLstring,
     TStreamerString,
 )
+from rootfilespec.serializable import FileContext, ROOTSerializable
+
+
+@dataclasses.dataclass
+class _BootstrapContext(FileContext):
+    types: dict[str, type[ROOTSerializable]]
+
+    def type_by_name(
+        self, name: str, expect_version: Optional[int] = None
+    ) -> type[ROOTSerializable]:
+        cls = self.types.get(name)
+        if cls is None:
+            msg = f"Cannot find type {name} (expected version {expect_version})"
+            raise KeyError(msg)
+        return cls
+
+
+BOOTSTRAP_CONTEXT = _BootstrapContext(
+    types={
+        name: cls
+        for name, cls in globals().items()
+        if isinstance(cls, type) and issubclass(cls, ROOTSerializable)
+    }
+)
 
 __all__ = [
+    "BOOTSTRAP_CONTEXT",
     "RCompressed",
     "RCompressionHeader",
     "ROOT3a3aRNTuple",
@@ -57,6 +86,7 @@ __all__ = [
     "RooLinkedList",
     "STLString",
     "StreamedObject",
+    "TArray",
     "TArrayC",
     "TArrayD",
     "TArrayF",
@@ -67,6 +97,7 @@ __all__ = [
     "TCollection",
     "TDatime",
     "TDirectory",
+    "TDirectoryFile",
     "TFile",
     "TFormula",
     "TKey",
@@ -74,6 +105,7 @@ __all__ = [
     "TList",
     "TNamed",
     "TObjArray",
+    "TObjString",
     "TObject",
     "TSeqCollection",
     "TStreamerBase",

@@ -1,7 +1,6 @@
 import dataclasses
 
-from rootfilespec.buffer import ReadBuffer
-from rootfilespec.serializable import Members, MemberSerDe
+from rootfilespec.serializable import Members, MemberSerDe, ReadBuffer
 
 
 @dataclasses.dataclass

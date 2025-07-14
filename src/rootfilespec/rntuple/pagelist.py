@@ -1,6 +1,5 @@
 from typing import Annotated
 
-from rootfilespec.buffer import DataFetcher, ReadBuffer
 from rootfilespec.rntuple.envelope import (
     ENVELOPE_TYPE_MAP,
     REnvelope,
@@ -8,7 +7,7 @@ from rootfilespec.rntuple.envelope import (
 from rootfilespec.rntuple.pagelocations import ClusterLocations
 from rootfilespec.rntuple.RFrame import ListFrame, RecordFrame
 from rootfilespec.rntuple.RPage import RPage
-from rootfilespec.serializable import Members, serializable
+from rootfilespec.serializable import DataFetcher, Members, ReadBuffer, serializable
 from rootfilespec.structutil import Fmt
 
 

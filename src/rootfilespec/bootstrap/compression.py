@@ -3,10 +3,10 @@ from typing import Annotated, Optional, Protocol
 
 import cramjam  # type: ignore[import-not-found]
 
-from rootfilespec.buffer import ReadBuffer
 from rootfilespec.serializable import (
     Members,
     MemberSerDe,
+    ReadBuffer,
     ROOTSerializable,
     serializable,
 )

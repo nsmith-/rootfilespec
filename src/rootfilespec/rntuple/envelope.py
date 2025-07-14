@@ -4,9 +4,15 @@ from typing import Annotated, TypeVar
 from typing_extensions import Self
 
 from rootfilespec.bootstrap.compression import RCompressed
-from rootfilespec.buffer import DataFetcher, ReadBuffer
 from rootfilespec.rntuple.RLocator import RLocator
-from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.serializable import (
+    BufferContext,
+    DataFetcher,
+    Members,
+    ReadBuffer,
+    ROOTSerializable,
+    serializable,
+)
 from rootfilespec.structutil import Fmt
 
 # Map of envelope type to string for printing
@@ -148,8 +154,9 @@ class REnvelopeLink(ROOTSerializable):
                 raise ValueError(msg)
             buffer = ReadBuffer(
                 compressed.decompress(),
-                abspos=None,
                 relpos=self.length,
+                file_context=buffer.file_context,
+                context=BufferContext(abspos=None),
             )
         # Now the envelope is uncompressed
 
