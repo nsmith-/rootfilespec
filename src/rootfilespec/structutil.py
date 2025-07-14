@@ -1,4 +1,5 @@
 import dataclasses
+from typing import get_args
 
 from rootfilespec.buffer import ReadBuffer
 from rootfilespec.serializable import Members, MemberSerDe
@@ -30,6 +31,37 @@ class Fmt(MemberSerDe):
     def build_reader(self, fname: str, ftype: type):
         return _FmtReader(fname, self.fmt, ftype)
 
+@dataclasses.dataclass
+class _OptionalFieldReader:
+    """A class to read an optional field from a buffer."""
+    
+    fname: str
+    fmt: str
+    flagname: str
+    flagvalue: int
+    ftype: type
+
+    def __call__(self, members: Members, buffer: ReadBuffer) -> tuple[Members, ReadBuffer]:
+        if members[self.flagname] & self.flagvalue:
+            tup, buffer = buffer.unpack(self.fmt)
+            members[self.fname] = self.ftype(*tup)
+        else:
+            members[self.fname] = None
+        return members, buffer
+
+@dataclasses.dataclass
+class OptionalField(MemberSerDe):
+    """A class to hold an optional field format.
+    Optional fields are fields that may or may not be present in the data.
+    They are only read if the value of the flag from flagname matches flagvalue."""
+    
+    fmt: str
+    flagname: str
+    flagvalue: int
+
+    def build_reader(self, fname: str, ftype: type):
+        ftype, _ = get_args(ftype) # Get the type inside Optional
+        return _OptionalFieldReader(fname, self.fmt, self.flagname, self.flagvalue, ftype)
 
 @dataclasses.dataclass
 class StdBitset(MemberSerDe):

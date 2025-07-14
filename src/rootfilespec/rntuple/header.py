@@ -1,4 +1,5 @@
 from enum import IntEnum
+from typing import Annotated, Optional
 
 from rootfilespec.bootstrap.strings import RString
 from rootfilespec.buffer import ReadBuffer
@@ -129,11 +130,11 @@ class FieldDescription(RecordFrame):
     """The alias of the field type, if any."""
     fFieldDescription: RString
     """The description of the field, if any."""
-    fArraySize: Union[Annotated[int, Fmt("<Q")], None]
+    fArraySize: Annotated[Optional[int], OptionalField("<Q", "fFlags", 0x01)]
     """The size of the array for the field. Present only if flag 0x01 is set (repetitive field)."""
-    fSourceFieldID: Union[Annotated[int, Fmt("<I")], None]
+    fSourceFieldID: Annotated[Optional[int], OptionalField("<I", "fFlags", 0x02)]
     """The ID of the source field. Present only if flag 0x02 is set (projected field)."""
-    fTypeChecksum: Union[Annotated[int, Fmt("<I")], None]
+    fTypeChecksum: Annotated[Optional[int], OptionalField("<I", "fFlags", 0x04)]
     """The ROOT type checksum for the field. Present only if flag 0x04 is set (has ROOT type checksum)."""
 
     @classmethod
@@ -190,6 +191,7 @@ class ColumnDescription(RecordFrame):
     """
 
     fColumnType: Annotated[ColumnType, Fmt("<H")]
+    """The type of the column."""
     fBitsStorage: Annotated[int, Fmt("<H")]
     """The number of bits used to store the column value."""
     fFieldID: Annotated[int, Fmt("<I")]
@@ -203,12 +205,12 @@ class ColumnDescription(RecordFrame):
     fRepresentationIndex: Annotated[int, Fmt("<H")]
     # abbott TODO: verify docstring is correct
     """The index of the representation of the column in the list of representations for the field."""
-    # abbott TODO: verify these are signed. make PR updating ROOT documentation if so (indicate signed bit in table)
-    fFirstElementIndex: Union[Annotated[int, Fmt("<q")], None]
+    # abbott TODO: verify the below are signed. make PR updating ROOT documentation if so (indicate signed bit in table)
+    fFirstElementIndex: Annotated[Optional[int], OptionalField("<q", "fFlags", 0x01)]
     """The index of the first element in the column. Present only if flag 0x01 is set (deferred column)."""
-    fMinValue: Union[Annotated[int, Fmt("<q")], None]
+    fMinValue: Annotated[Optional[int], OptionalField("<q", "fFlags", 0x02)]
     """The minimum value of the column. Present only if flag 0x02 is set (column with range of values)."""
-    fMaxValue: Union[Annotated[int, Fmt("<q")], None]
+    fMaxValue: Annotated[Optional[int], OptionalField("<q", "fFlags", 0x02)]
     """The maximum value of the column. Present only if flag 0x02 is set (column with range of values)."""
 
     @classmethod
@@ -284,7 +286,7 @@ class HeaderEnvelope(REnvelope):
     """The name of the RNTuple."""
     fDescription: RString
     """The description of the RNTuple."""
-    fLibrary: RString  # abbott TODO: return here and update field name once i understand what this is
+    fLibrary: RString 
     """The library or program used to create the RNTuple."""
     fieldDescritions: ListFrame[FieldDescription]
     """The List Frame of Field Description Record Frames. Part of the RNTuple schema description.

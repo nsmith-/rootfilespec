@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Optional
 
 from rootfilespec.buffer import DataFetcher, ReadBuffer
 from rootfilespec.rntuple.RFrame import ListFrame
@@ -71,7 +71,7 @@ class PageLocations(ListFrame[RPageDescription]):
 
     elementoffset: int
     """The offset for the first element for this column."""
-    compressionsettings: int | None
+    compressionsettings: Optional[int]
     """The compression settings for the pages in this column."""
 
     @classmethod
