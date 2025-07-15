@@ -3,20 +3,18 @@ from pathlib import Path
 from skhep_testdata import data_path  # type: ignore[import-not-found]
 
 from rootfilespec.bootstrap import ROOT3a3aRNTuple, ROOTFile
+from rootfilespec.bootstrap.strings import RString
 from rootfilespec.buffer import ReadBuffer
 from rootfilespec.rntuple.envelope import REnvelopeLink, RFeatureFlags
 from rootfilespec.rntuple.footer import ClusterGroup, FooterEnvelope, SchemaExtension
+from rootfilespec.rntuple.header import HeaderEnvelope
 from rootfilespec.rntuple.pagelist import ClusterSummary, PageListEnvelope
-from rootfilespec.rntuple.pagelocations import (
-    ClusterLocations,
-    ColumnLocations,
-    PageLocations,
-    RPageDescription,
-)
+from rootfilespec.rntuple.pagelocations import (PageLocations, RPageDescription)
 from rootfilespec.rntuple.RFrame import ListFrame
 from rootfilespec.rntuple.RLocator import StandardLocator
+from rootfilespec.rntuple.schema import AliasColumnDescription, ColumnDescription, ColumnType, ExtraTypeInformation, FieldDescription
 
-# TODO: Add hardcoded representation of Header Envelope once implemented
+
 # TODO: Add hardcoded representation of RPages once implemented
 
 
@@ -49,8 +47,104 @@ def test_read_contributors():
             fMaxKeySize=1073741824,
         )
 
+        header = anchor.get_header(fetch_data)
+        assert header == HeaderEnvelope(
+            typeID=1,
+            length=332,
+            checksum=9346497350689737328,
+            featureFlags=RFeatureFlags(flags=0),
+            fName=RString(fString=b"Contributors"),
+            fDescription=RString(fString=b"The first ever RNTuple."),
+            fLibrary=RString(fString=b"ROOT v6.35.001"),
+            fieldDescriptions=ListFrame(
+                fSize=131,
+                items=[
+                    FieldDescription(
+                        fSize=60,
+                        fFieldVersion=0,
+                        fTypeVersion=0,
+                        fParentFieldID=0,
+                        fStructuralRole=0,
+                        fFlags=0,
+                        fFieldName=RString(fString=b"firstName"),
+                        fTypeName=RString(fString=b"std::string"),
+                        fTypeAlias=RString(fString=b""),
+                        fFieldDescription=RString(fString=b""),
+                        fArraySize=None,
+                        fSourceFieldID=None,
+                        fTypeChecksum=None,
+                    ),
+                    FieldDescription(
+                        fSize=59,
+                        fFieldVersion=0,
+                        fTypeVersion=0,
+                        fParentFieldID=1,
+                        fStructuralRole=0,
+                        fFlags=0,
+                        fFieldName=RString(fString=b"lastName"),
+                        fTypeName=RString(fString=b"std::string"),
+                        fTypeAlias=RString(fString=b""),
+                        fFieldDescription=RString(fString=b""),
+                        fArraySize=None,
+                        fSourceFieldID=None,
+                        fTypeChecksum=None,
+                    ),
+                ],
+            ),
+            columnDescriptions=ListFrame(
+                fSize=92,
+                items=[
+                    ColumnDescription(
+                        fSize=20,
+                        fColumnType=ColumnType.kIndex64,
+                        fBitsStorage=64,
+                        fFieldID=0,
+                        fFlags=0,
+                        fRepresentationIndex=0,
+                        fFirstElementIndex=None,
+                        fMinValue=None,
+                        fMaxValue=None,
+                    ),
+                    ColumnDescription(
+                        fSize=20,
+                        fColumnType=ColumnType.kChar,
+                        fBitsStorage=8,
+                        fFieldID=0,
+                        fFlags=0,
+                        fRepresentationIndex=0,
+                        fFirstElementIndex=None,
+                        fMinValue=None,
+                        fMaxValue=None,
+                    ),
+                    ColumnDescription(
+                        fSize=20,
+                        fColumnType=ColumnType.kIndex64,
+                        fBitsStorage=64,
+                        fFieldID=1,
+                        fFlags=0,
+                        fRepresentationIndex=0,
+                        fFirstElementIndex=None,
+                        fMinValue=None,
+                        fMaxValue=None,
+                    ),
+                    ColumnDescription(
+                        fSize=20,
+                        fColumnType=ColumnType.kChar,
+                        fBitsStorage=8,
+                        fFieldID=1,
+                        fFlags=0,
+                        fRepresentationIndex=0,
+                        fFirstElementIndex=None,
+                        fMinValue=None,
+                        fMaxValue=None,
+                    ),
+                ],
+            ),
+            aliasColumnDescriptions=ListFrame(fSize=12, items=[]),
+            extraTypeInformations=ListFrame(fSize=12, items=[])
+        )
+        
         footer = anchor.get_footer(fetch_data)
-
         assert footer == FooterEnvelope(
             typeID=2,
             length=148,
@@ -59,7 +153,10 @@ def test_read_contributors():
             headerChecksum=9346497350689737328,
             schemaExtension=SchemaExtension(
                 fSize=56,
-                # _unknown=b"\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00",
+                fieldDescriptions=ListFrame(fSize=12, items=[]),
+                columnDescriptions=ListFrame(fSize=12, items=[]),
+                aliasColumnDescriptions=ListFrame(fSize=12, items=[]),
+                extraTypeInformations=ListFrame(fSize=12, items=[]),
             ),
             clusterGroups=ListFrame(
                 fSize=60,
@@ -78,7 +175,6 @@ def test_read_contributors():
         )
 
         page_location_lists = footer.get_pagelists(fetch_data)
-
         assert page_location_lists == [
             PageListEnvelope(
                 typeID=3,
@@ -93,10 +189,10 @@ def test_read_contributors():
                         )
                     ],
                 ),
-                pageLocations=ClusterLocations(
+                pageLocations=ListFrame(
                     fSize=184,
                     items=[
-                        ColumnLocations(
+                        ListFrame(
                             fSize=172,
                             items=[
                                 PageLocations(
@@ -188,6 +284,55 @@ def test_read_multiple_rntuples():
             fMaxKeySize=1073741824,
         )
 
+        header_a = rntuple_a.get_header(fetch_data)
+        assert header_a == HeaderEnvelope(
+            typeID=1,
+            length=164,
+            checksum=1772847515747675522,
+            featureFlags=RFeatureFlags(flags=0),
+            fName=RString(fString=b"A"),
+            fDescription=RString(fString=b""),
+            fLibrary=RString(fString=b"ROOT v6.35.01"),
+            fieldDescriptions=ListFrame(
+                fSize=58,
+                items=[
+                    FieldDescription(
+                        fSize=46,
+                        fFieldVersion=0,
+                        fTypeVersion=0,
+                        fParentFieldID=0,
+                        fStructuralRole=0,
+                        fFlags=0,
+                        fFieldName=RString(fString=b"f"),
+                        fTypeName=RString(fString=b"float"),
+                        fTypeAlias=RString(fString=b""),
+                        fFieldDescription=RString(fString=b""),
+                        fArraySize=None,
+                        fSourceFieldID=None,
+                        fTypeChecksum=None,
+                    )
+                ],
+            ),
+            columnDescriptions=ListFrame(
+                fSize=32,
+                items=[
+                    ColumnDescription(
+                        fSize=20,
+                        fColumnType=ColumnType.kSplitReal32,
+                        fBitsStorage=32,
+                        fFieldID=0,
+                        fFlags=0,
+                        fRepresentationIndex=0,
+                        fFirstElementIndex=None,
+                        fMinValue=None,
+                        fMaxValue=None,
+                    )
+                ],
+            ),
+            aliasColumnDescriptions=ListFrame(fSize=12, items=[]),
+            extraTypeInformations=ListFrame(fSize=12, items=[])
+        )
+
         footer_a = rntuple_a.get_footer(fetch_data)
         assert footer_a == FooterEnvelope(
             typeID=2,
@@ -197,7 +342,10 @@ def test_read_multiple_rntuples():
             headerChecksum=1772847515747675522,
             schemaExtension=SchemaExtension(
                 fSize=56,
-                # _unknown=b"\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00",
+                fieldDescriptions=ListFrame(fSize=12, items=[]),
+                columnDescriptions=ListFrame(fSize=12, items=[]),
+                aliasColumnDescriptions=ListFrame(fSize=12, items=[]),
+                extraTypeInformations=ListFrame(fSize=12, items=[]),
             ),
             clusterGroups=ListFrame(
                 fSize=60,
@@ -230,10 +378,10 @@ def test_read_multiple_rntuples():
                         )
                     ],
                 ),
-                pageLocations=ClusterLocations(
+                pageLocations=ListFrame(
                     fSize=64,
                     items=[
-                        ColumnLocations(
+                        ListFrame(
                             fSize=52,
                             items=[
                                 PageLocations(
@@ -271,6 +419,55 @@ def test_read_multiple_rntuples():
             fMaxKeySize=1073741824,
         )
 
+        header_b = rntuple_b.get_header(fetch_data)
+        assert header_b == HeaderEnvelope(
+            typeID=1,
+            length=171,
+            checksum=14068653553654343426,
+            featureFlags=RFeatureFlags(flags=0),
+            fName=RString(fString=b"B"),
+            fDescription=RString(fString=b""),
+            fLibrary=RString(fString=b"ROOT v6.35.01"),
+            fieldDescriptions=ListFrame(
+                fSize=65,
+                items=[
+                    FieldDescription(
+                        fSize=53,
+                        fFieldVersion=0,
+                        fTypeVersion=0,
+                        fParentFieldID=0,
+                        fStructuralRole=0,
+                        fFlags=0,
+                        fFieldName=RString(fString=b"g"),
+                        fTypeName=RString(fString=b"std::int32_t"),
+                        fTypeAlias=RString(fString=b""),
+                        fFieldDescription=RString(fString=b""),
+                        fArraySize=None,
+                        fSourceFieldID=None,
+                        fTypeChecksum=None,
+                    )
+                ],
+            ),
+            columnDescriptions=ListFrame(
+                fSize=32,
+                items=[
+                    ColumnDescription(
+                        fSize=20,
+                        fColumnType=ColumnType.kSplitInt32,
+                        fBitsStorage=32,
+                        fFieldID=0,
+                        fFlags=0,
+                        fRepresentationIndex=0,
+                        fFirstElementIndex=None,
+                        fMinValue=None,
+                        fMaxValue=None,
+                    )
+                ],
+            ),
+            aliasColumnDescriptions=ListFrame(fSize=12, items=[]),
+            extraTypeInformations=ListFrame(fSize=12, items=[]),
+        )
+
         footer_b = rntuple_b.get_footer(fetch_data)
         assert footer_b == FooterEnvelope(
             typeID=2,
@@ -280,7 +477,10 @@ def test_read_multiple_rntuples():
             headerChecksum=14068653553654343426,
             schemaExtension=SchemaExtension(
                 fSize=56,
-                # _unknown=b"\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xf4\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\0",
+                fieldDescriptions=ListFrame(fSize=12, items=[]),
+                columnDescriptions=ListFrame(fSize=12, items=[]),
+                aliasColumnDescriptions=ListFrame(fSize=12, items=[]),
+                extraTypeInformations=ListFrame(fSize=12, items=[]),
             ),
             clusterGroups=ListFrame(
                 fSize=60,
@@ -313,10 +513,10 @@ def test_read_multiple_rntuples():
                         )
                     ],
                 ),
-                pageLocations=ClusterLocations(
+                pageLocations=ListFrame(
                     fSize=64,
                     items=[
-                        ColumnLocations(
+                        ListFrame(
                             fSize=52,
                             items=[
                                 PageLocations(
