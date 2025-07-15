@@ -9,11 +9,14 @@ from rootfilespec.rntuple.envelope import REnvelopeLink, RFeatureFlags
 from rootfilespec.rntuple.footer import ClusterGroup, FooterEnvelope, SchemaExtension
 from rootfilespec.rntuple.header import HeaderEnvelope
 from rootfilespec.rntuple.pagelist import ClusterSummary, PageListEnvelope
-from rootfilespec.rntuple.pagelocations import (PageLocations, RPageDescription)
+from rootfilespec.rntuple.pagelocations import PageLocations, RPageDescription
 from rootfilespec.rntuple.RFrame import ListFrame
 from rootfilespec.rntuple.RLocator import StandardLocator
-from rootfilespec.rntuple.schema import AliasColumnDescription, ColumnDescription, ColumnType, ExtraTypeInformation, FieldDescription
-
+from rootfilespec.rntuple.schema import (
+    ColumnDescription,
+    ColumnType,
+    FieldDescription,
+)
 
 # TODO: Add hardcoded representation of RPages once implemented
 
@@ -141,9 +144,9 @@ def test_read_contributors():
                 ],
             ),
             aliasColumnDescriptions=ListFrame(fSize=12, items=[]),
-            extraTypeInformations=ListFrame(fSize=12, items=[])
+            extraTypeInformations=ListFrame(fSize=12, items=[]),
         )
-        
+
         footer = anchor.get_footer(fetch_data)
         assert footer == FooterEnvelope(
             typeID=2,
@@ -330,7 +333,7 @@ def test_read_multiple_rntuples():
                 ],
             ),
             aliasColumnDescriptions=ListFrame(fSize=12, items=[]),
-            extraTypeInformations=ListFrame(fSize=12, items=[])
+            extraTypeInformations=ListFrame(fSize=12, items=[]),
         )
 
         footer_a = rntuple_a.get_footer(fetch_data)

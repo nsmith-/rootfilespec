@@ -9,7 +9,12 @@ from rootfilespec.rntuple.envelope import (
 )
 from rootfilespec.rntuple.pagelist import PageListEnvelope
 from rootfilespec.rntuple.RFrame import ListFrame, RecordFrame
-from rootfilespec.rntuple.schema import AliasColumnDescription, ColumnDescription, ExtraTypeInformation, FieldDescription
+from rootfilespec.rntuple.schema import (
+    AliasColumnDescription,
+    ColumnDescription,
+    ExtraTypeInformation,
+    FieldDescription,
+)
 from rootfilespec.serializable import serializable
 from rootfilespec.structutil import Fmt
 
@@ -54,7 +59,7 @@ class SchemaExtension(RecordFrame):
 
     Note that is it possible to extend existing fields by additional column representations.
         This means that columns of the extension header may point to fields of the regular header.
-    
+
     In practice, deferred columns only appear in the schema extension record frame.
     """
 
@@ -66,6 +71,7 @@ class SchemaExtension(RecordFrame):
     """The List Frame of Alias Column Description Record Frames. Part of the RNTuple schema description."""
     extraTypeInformations: ListFrame[ExtraTypeInformation]
     """The List Frame of Extra Type Information Record Frames. Part of the RNTuple schema description."""
+
 
 @serializable
 class FooterEnvelope(REnvelope):

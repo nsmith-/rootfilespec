@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated, Optional
 
 from rootfilespec.buffer import DataFetcher, ReadBuffer
-from rootfilespec.rntuple.RFrame import ListFrame, Item
+from rootfilespec.rntuple.RFrame import Item, ListFrame
 from rootfilespec.rntuple.RLocator import RLocator
 from rootfilespec.rntuple.RPage import RPage
 from rootfilespec.serializable import Members, ROOTSerializable, serializable
@@ -90,4 +90,3 @@ class PageLocations(ListFrame[Item]):
         members["elementoffset"] = elementoffset
         members["compressionsettings"] = compressionsettings
         return members, buffer
-

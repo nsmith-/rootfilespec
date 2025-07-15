@@ -6,25 +6,26 @@ from rootfilespec.rntuple.RFrame import RecordFrame
 from rootfilespec.serializable import serializable
 from rootfilespec.structutil import Fmt, OptionalField
 
+
 class ColumnType(IntEnum):
     """The type of the column.
 
-    The "split encoding" columns apply a byte transformation encoding to all pages of 
+    The "split encoding" columns apply a byte transformation encoding to all pages of
     that column and in addition, depending on the column type, delta or zigzag encoding:
 
     - Split (only) : Rearranges the bytes of elements: All the first bytes first, then all the second bytes, etc.
-    - Delta + split : The first element is stored unmodified, all other elements store the delta to the previous element. 
+    - Delta + split : The first element is stored unmodified, all other elements store the delta to the previous element.
         Followed by split encoding.
     - Zigzag + split : Used on signed integers only; it maps `x` to `2x` if `x` is positive and to `-(2x+1)` if `x` is negative.
         Followed by split encoding.
     Note: these encodings always happen within each page, thus decoding should be done page-wise, not cluster-wise.
 
-    The Real32Trunc type column is a variable-sized floating point column with lower precision than Real32 and SplitReal32. 
+    The Real32Trunc type column is a variable-sized floating point column with lower precision than Real32 and SplitReal32.
         It is an IEEE-754 single precision float with some of the mantissa's least significant bits truncated.
-    The Real32Quant type column is a variable-sized real column that is internally represented as an integer within 
+    The Real32Quant type column is a variable-sized real column that is internally represented as an integer within
         a specified range of values. For this column type, flag 0x02 (column with range) is always set.
-    Future versions of the file format may introduce additional column types without changing the minimum version 
-        of the header or introducing a feature flag. Old readers need to ignore these columns and fields constructed 
+    Future versions of the file format may introduce additional column types without changing the minimum version
+        of the header or introducing a feature flag. Old readers need to ignore these columns and fields constructed
         from such columns. Old readers can, however, figure out the number of elements stored in such unknown columns."""
 
     kBit = 0x00
@@ -91,6 +92,7 @@ class ColumnType(IntEnum):
     def __repr__(self) -> str:
         """Get a string representation of this element type."""
         return f"{self.__class__.__name__}.{self.name}"
+
 
 @serializable
 class FieldDescription(RecordFrame):
@@ -203,4 +205,3 @@ class ExtraTypeInformation(RecordFrame):
     """The version of the type for which this extra type information is provided."""
     fTypeName: RString
     """The name of the type for which this extra type information is provided."""
-

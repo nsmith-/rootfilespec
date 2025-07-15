@@ -7,9 +7,10 @@ from rootfilespec.rntuple.footer import FooterEnvelope
 from rootfilespec.rntuple.header import HeaderEnvelope
 from rootfilespec.rntuple.pagelist import PageListEnvelope
 
+
 @dataclasses.dataclass
-class RNTuple():
-    """A class representing an RNTuple. 
+class RNTuple:
+    """A class representing an RNTuple.
 
     # abbott: what do we need this to do?
     - Verify header checksums in footer/pagelist envelopes
@@ -19,6 +20,7 @@ class RNTuple():
     - Should this class take already created envelopes as input, or should it take an anchor and read in the envelopes?
 
     """
+
     headerEnvelope: HeaderEnvelope
     footerEnvelope: FooterEnvelope
     pagelistEnvelopes: list[PageListEnvelope]
@@ -31,14 +33,12 @@ class RNTuple():
 
         # Verify header checksum in footer
         if footerEnvelope.headerChecksum != headerEnvelope.checksum:
-            raise ValueError(
-                f"Header checksum mismatch: {footerEnvelope.headerChecksum} != {headerEnvelope.checksum}"
-            )
+            msg = f"Header checksum mismatch: {footerEnvelope.headerChecksum} != {headerEnvelope.checksum}"
+            raise ValueError(msg)
         pagelistEnvelopes = footerEnvelope.get_pagelists(fetch_data)
 
         return cls(headerEnvelope, footerEnvelope, pagelistEnvelopes)
 
-    
     @property
     def featureFlags(self) -> RFeatureFlags:
         """Returns the logical or of the feature flags from the header and footer envelopes."""

@@ -1,11 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import dataclasses
+from dataclasses import dataclass, field
 from typing import Any, Generic, TypeVar
 
 from rootfilespec.buffer import ReadBuffer
-from rootfilespec.serializable import ContainerSerDe, MemberType, Members, ROOTSerializable, ReadObjMethod
+from rootfilespec.serializable import (
+    ContainerSerDe,
+    Members,
+    MemberType,
+    ReadObjMethod,
+    ROOTSerializable,
+)
 
 Item = TypeVar("Item", bound=ROOTSerializable)
 
@@ -20,6 +26,7 @@ class RFrame(ROOTSerializable):
     _unknown: bytes = field(init=False, repr=False, compare=False)
     """Unknown bytes at the end of the frame."""
 
+
 @dataclasses.dataclass
 class _ListFrameReader:
     cls: type[ListFrame[Any]]
@@ -31,7 +38,7 @@ class _ListFrameReader:
         self, members: Members, buffer: ReadBuffer
     ) -> tuple[Members, ReadBuffer]:
         """Reads a ListFrame from the buffer."""
-        frame_members: Members = {} # Initialize an empty dictionary for frame members
+        frame_members: Members = {}  # Initialize an empty dictionary for frame members
 
         # Save initial buffer position (for checking unknown bytes)
         start_position = buffer.relpos
@@ -62,12 +69,13 @@ class _ListFrameReader:
         _unknown, buffer = buffer.consume(fSize - (buffer.relpos - start_position))
         # Unknown Bytes = Frame Size - Bytes Read
         # Bytes Read = buffer.relpos - start_position
-        
+
         frame = self.cls(**frame_members)
         frame._unknown = _unknown
 
         members[self.name] = frame
         return members, buffer
+
 
 @dataclasses.dataclass
 class ListFrame(RFrame, ContainerSerDe, Generic[Item]):
@@ -98,6 +106,7 @@ class ListFrame(RFrame, ContainerSerDe, Generic[Item]):
 
     def __getitem__(self, index: int) -> Item:
         return self.items[index]
+
 
 @dataclass
 class RecordFrame(RFrame):
