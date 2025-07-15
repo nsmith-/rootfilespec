@@ -129,11 +129,11 @@ class FieldDescription(RecordFrame):
     """The alias of the field type, if any."""
     fFieldDescription: RString
     """The description of the field, if any."""
-    fArraySize: Annotated[Optional[int], OptionalField("<Q", "fFlags", 0x01)]
+    fArraySize: Annotated[Optional[int], OptionalField("<Q", "fFlags", "&", 0x01)]
     """The size of the array for the field. Present only if flag 0x01 is set (repetitive field)."""
-    fSourceFieldID: Annotated[Optional[int], OptionalField("<I", "fFlags", 0x02)]
+    fSourceFieldID: Annotated[Optional[int], OptionalField("<I", "fFlags", "&", 0x02)]
     """The ID of the source field. Present only if flag 0x02 is set (projected field)."""
-    fTypeChecksum: Annotated[Optional[int], OptionalField("<I", "fFlags", 0x04)]
+    fTypeChecksum: Annotated[Optional[int], OptionalField("<I", "fFlags", "&", 0x04)]
     """The ROOT type checksum for the field. Present only if flag 0x04 is set (has ROOT type checksum)."""
 
 
@@ -165,11 +165,13 @@ class ColumnDescription(RecordFrame):
     fRepresentationIndex: Annotated[int, Fmt("<H")]
     """The index of the representation of the column in the list of representations for the field."""
     # abbott TODO: verify the below are signed. make PR updating ROOT documentation if so (indicate signed bit in table)
-    fFirstElementIndex: Annotated[Optional[int], OptionalField("<q", "fFlags", 0x01)]
+    fFirstElementIndex: Annotated[
+        Optional[int], OptionalField("<q", "fFlags", "&", 0x01)
+    ]
     """The index of the first element in the column. Present only if flag 0x01 is set (deferred column)."""
-    fMinValue: Annotated[Optional[int], OptionalField("<q", "fFlags", 0x02)]
+    fMinValue: Annotated[Optional[int], OptionalField("<q", "fFlags", "&", 0x02)]
     """The minimum value of the column. Present only if flag 0x02 is set (column with range of values)."""
-    fMaxValue: Annotated[Optional[int], OptionalField("<q", "fFlags", 0x02)]
+    fMaxValue: Annotated[Optional[int], OptionalField("<q", "fFlags", "&", 0x02)]
     """The maximum value of the column. Present only if flag 0x02 is set (column with range of values)."""
 
 

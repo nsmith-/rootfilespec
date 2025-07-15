@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import Annotated, Optional
 
-from rootfilespec.buffer import DataFetcher, ReadBuffer
+from rootfilespec.buffer import DataFetcher
 from rootfilespec.rntuple.RFrame import Item, ListFrame
 from rootfilespec.rntuple.RLocator import RLocator
 from rootfilespec.rntuple.RPage import RPage
-from rootfilespec.serializable import Members, ROOTSerializable, serializable
-from rootfilespec.structutil import Fmt
+from rootfilespec.serializable import ROOTSerializable, serializable
+from rootfilespec.structutil import Fmt, OptionalField
 
 
 @serializable
@@ -40,11 +40,11 @@ class RPageDescription(ROOTSerializable):
 
         #### Read the page from the buffer
         page, buffer = RPage.read(buffer)
-        
+
         if buffer:
             msg = "RPageDescription.get_page: buffer not empty after reading page."
             raise ValueError(msg)
-        
+
         return page
 
 
@@ -71,24 +71,24 @@ class PageLocations(ListFrame[Item]):
     Note that Page Description is not a record frame.
     """
 
-    elementoffset: int
+    elementoffset: Annotated[int, Fmt("<q")]
     """The offset for the first element for this column."""
-    compressionsettings: Optional[int]
-    """The compression settings for the pages in this column."""
+    compressionsettings: Annotated[
+        Optional[int], OptionalField("<I", "elementoffset", ">=", 0)
+    ]
+    """The compression settings for the pages in this column.
+    If `compressionsettings = 0`, the column is not compressed.
 
-    @classmethod
-    def update_members(
-        cls, members: Members, buffer: ReadBuffer
-    ) -> tuple[Members, ReadBuffer]:
-        """Reads the extra members of the Page List Frame from the buffer."""
-        # Read the element offset for this column
-        (elementoffset,), buffer = buffer.unpack("<q")
+    `compressionsettings = (<compression algorithm> * 100) + <compression level>`
+        value: compression algorithm
+        - -1: kInherit = -1, // Inherit the compression algorithm from the parent object
+        - 0: kUseGlobal = 0, // Use the global compression algorithm
+        - 1: kZLIB, // Use ZLIB compression
+        - 2: kLZMA, // Use LZMA compression
+        - 3: kOldCompressionAlgo, // Use the old compression algorithm
+        - 4: kLZ4, // Use LZ4 compression
+        - 5: kZSTD, // Use ZSTD compression
+        - 6: kUndefined // Undefined compression algorithm
 
-        compressionsettings = None
-        if elementoffset >= 0:  # If the column is not suppressed
-            # Read the compression settings
-            (compressionsettings,), buffer = buffer.unpack("<I")
-
-        members["elementoffset"] = elementoffset
-        members["compressionsettings"] = compressionsettings
-        return members, buffer
+    e.g. `compressionsettings = 505` means ZSTD compression with level 5.
+    source: https://root.cern/doc/master/Compression_8h_source.html#l00086 """

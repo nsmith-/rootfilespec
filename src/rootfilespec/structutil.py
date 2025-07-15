@@ -1,4 +1,5 @@
 import dataclasses
+import operator
 from typing import get_args
 
 from rootfilespec.buffer import ReadBuffer
@@ -39,13 +40,28 @@ class _OptionalFieldReader:
     fname: str
     fmt: str
     flagname: str
+    operation: str
     flagvalue: int
     ftype: type
 
     def __call__(
         self, members: Members, buffer: ReadBuffer
     ) -> tuple[Members, ReadBuffer]:
-        if members[self.flagname] & self.flagvalue:
+        flag = members[self.flagname]
+        ops = {
+            "&": lambda a, b: a & b,
+            "==": operator.eq,
+            "!=": operator.ne,
+            ">=": operator.ge,
+            "<=": operator.le,
+            ">": operator.gt,
+            "<": operator.lt,
+        }
+        op_func = ops.get(self.operation)
+        if op_func is None:
+            msg = f"Unsupported operation: {self.operation}. Supported operations: {', '.join(ops.keys())}"
+            raise ValueError(msg)
+        if op_func(flag, self.flagvalue):
             tup, buffer = buffer.unpack(self.fmt)
             members[self.fname] = self.ftype(*tup)
         else:
@@ -57,16 +73,18 @@ class _OptionalFieldReader:
 class OptionalField(MemberSerDe):
     """A class to hold an optional field format.
     Optional fields are fields that may or may not be present in the data.
-    They are only read if the value of the flag from flagname matches flagvalue."""
+    They are only read if the value of the flag from flagname matches flagvalue
+    according to the specified operation."""
 
     fmt: str
     flagname: str
+    operation: str
     flagvalue: int
 
     def build_reader(self, fname: str, ftype: type):
         ftype, _ = get_args(ftype)  # Get the type inside Optional
         return _OptionalFieldReader(
-            fname, self.fmt, self.flagname, self.flagvalue, ftype
+            fname, self.fmt, self.flagname, self.operation, self.flagvalue, ftype
         )
 
 
