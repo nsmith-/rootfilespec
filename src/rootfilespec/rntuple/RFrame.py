@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import dataclasses
-from dataclasses import dataclass, field
 from typing import Any, Generic, TypeVar
 
 from rootfilespec.buffer import ReadBuffer
@@ -16,14 +15,14 @@ from rootfilespec.serializable import (
 Item = TypeVar("Item", bound=ROOTSerializable)
 
 
-@dataclass
+@dataclasses.dataclass
 class RFrame(ROOTSerializable):
     """A class representing an RNTuple Frame.
     The ListFrame and RecordFrame classes inherit from this class."""
 
     fSize: int
     """The size of the frame in bytes. The size is negative for List Frames."""
-    _unknown: bytes = field(init=False, repr=False, compare=False)
+    _unknown: bytes = dataclasses.field(init=False, repr=False, compare=False)
     """Unknown bytes at the end of the frame."""
 
 
@@ -108,7 +107,7 @@ class ListFrame(RFrame, ContainerSerDe, Generic[Item]):
         return self.items[index]
 
 
-@dataclass
+@dataclasses.dataclass
 class RecordFrame(RFrame):
     """A class representing an RNTuple Record Frame.
     There are many Record Frames, each with a unique format."""
@@ -128,8 +127,6 @@ class RecordFrame(RFrame):
 
         #### Read the Record Frame Payload
         members, buffer = cls.update_members(members, buffer)
-
-        # abbott: any checks here?
 
         #### Consume any unknown trailing information in the frame
         _unknown, buffer = buffer.consume(fSize - (buffer.relpos - start_position))

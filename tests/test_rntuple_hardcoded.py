@@ -19,6 +19,8 @@ from rootfilespec.rntuple.schema import (
 )
 
 # TODO: Add hardcoded representation of RPages once implemented
+# TODO: Add hardcoded representation of RNTuple once implemented?
+# TODO: Add test for a more complex RNTuple with complex schema and multiple clusters?
 
 
 def test_read_contributors():

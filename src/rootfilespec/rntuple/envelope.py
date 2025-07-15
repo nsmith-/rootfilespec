@@ -138,7 +138,6 @@ class REnvelopeLink(ROOTSerializable):
         buffer = self.locator.get_buffer(fetch_data)
 
         #### If compressed, decompress the envelope
-        compressed = None
         # The length of the buffer is the number of bytes of compressed data
         if len(buffer) != self.length:
             # This is a compressed object

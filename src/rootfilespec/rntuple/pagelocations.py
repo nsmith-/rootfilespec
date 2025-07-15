@@ -40,9 +40,11 @@ class RPageDescription(ROOTSerializable):
 
         #### Read the page from the buffer
         page, buffer = RPage.read(buffer)
-
-        # TODO: compression
-        # check buffer is empty?
+        
+        if buffer:
+            msg = "RPageDescription.get_page: buffer not empty after reading page."
+            raise ValueError(msg)
+        
         return page
 
 

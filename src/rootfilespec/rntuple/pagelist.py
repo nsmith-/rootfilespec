@@ -61,21 +61,22 @@ class PageListEnvelope(REnvelope):
     """The Page Locations Triple Nested List Frame"""
 
     def get_pages(self, fetch_data: DataFetcher):
-        """Get the RNTuple Pages from the Page Locations Nested List Frame."""
+        """Get the RNTuple Pages from the Page Locations Nested List Frame.
+        Does not decompress the pages."""
         #### Get the Page Locations
-        page_locations: list[list[list[RPage]]] = []
+        pages: list[list[list[RPage]]] = []
 
-        for i_column, columnlist in enumerate(self.pageLocations):
-            page_locations.append([])
-            for i_page, pagelist in enumerate(columnlist):
-                page_locations[i_column].append([])
+        for i_cluster, columnlist in enumerate(self.pageLocations):
+            pages.append([])
+            for i_column, pagelist in enumerate(columnlist):
+                pages[i_cluster].append([])
                 for page_description in pagelist:
                     # Read the page from the buffer
                     page = page_description.get_page(fetch_data)
                     # Append the page to the list
-                    page_locations[i_column][i_page].append(page)
+                    pages[i_cluster][i_column].append(page)
 
-        return page_locations
+        return pages
 
 
 ENVELOPE_TYPE_MAP[0x03] = "PageListEnvelope"
