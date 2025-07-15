@@ -9,6 +9,7 @@ from rootfilespec.rntuple.envelope import (
 )
 from rootfilespec.rntuple.pagelist import PageListEnvelope
 from rootfilespec.rntuple.RFrame import ListFrame, RecordFrame
+from rootfilespec.rntuple.schema import AliasColumnDescription, ColumnDescription, ExtraTypeInformation, FieldDescription
 from rootfilespec.serializable import serializable
 from rootfilespec.structutil import Fmt
 
@@ -34,11 +35,8 @@ class ClusterGroup(RecordFrame):
 class SchemaExtension(RecordFrame):
     """A class representing an RNTuple Schema Extension Record Frame.
     This Record Frame is found in the Footer Envelope of an RNTuple.
-    It is an extension of the "Schema Description" located in the Header Envelope.
-    The schema description is not yet implemented.
-    """
 
-    """ The schema extension record frame contains an additional schema description that is incremental with respect to
+    The schema extension record frame contains an additional schema description that is incremental with respect to
             the schema contained in the header (see Section Header Envelope). Specifically, it is a record frame with
             the following four fields (identical to the last four fields in Header Envelope):
 
@@ -56,11 +54,18 @@ class SchemaExtension(RecordFrame):
 
     Note that is it possible to extend existing fields by additional column representations.
         This means that columns of the extension header may point to fields of the regular header.
+    
+    In practice, deferred columns only appear in the schema extension record frame.
     """
-    # In practice, deferred columns only appear in the schema extension record frame (see Section Footer Envelope).
 
-
-
+    fieldDescriptions: ListFrame[FieldDescription]
+    """The List Frame of Field Description Record Frames. Part of the RNTuple schema description."""
+    columnDescriptions: ListFrame[ColumnDescription]
+    """The List Frame of Column Description Record Frames. Part of the RNTuple schema description."""
+    aliasColumnDescriptions: ListFrame[AliasColumnDescription]
+    """The List Frame of Alias Column Description Record Frames. Part of the RNTuple schema description."""
+    extraTypeInformations: ListFrame[ExtraTypeInformation]
+    """The List Frame of Extra Type Information Record Frames. Part of the RNTuple schema description."""
 
 @serializable
 class FooterEnvelope(REnvelope):
