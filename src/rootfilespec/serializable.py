@@ -160,7 +160,10 @@ ReadMembersMethod = Callable[[Members, ReadBuffer], tuple[Members, ReadBuffer]]
 
 
 def _get_annotations(cls: type) -> dict[str, Any]:
-    """Get the annotations of a class, including private attributes."""
+    """Get the annotations of a class, including private attributes.
+    
+    Only retrieves annotations from the class itself, not from its base classes.
+    """
     if sys.version_info >= (3, 10):
         from inspect import get_annotations
 

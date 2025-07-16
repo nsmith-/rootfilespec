@@ -119,7 +119,7 @@ def _walk_branchlist(
             indent=indent + 1,
         )
         if not hasattr(branch, "fClassName"):
-            continue  # Simple data type, we trust we can deserialize it
+            continue  # Simple data type, we trust we can deserialize
         branch = cast(TBranchObject, branch)
 
         cpptype = branch.fClassName.fString
