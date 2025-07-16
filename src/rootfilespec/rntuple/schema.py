@@ -152,7 +152,7 @@ class ColumnDescription(RecordFrame):
 
     fColumnType: Annotated[ColumnType, Fmt("<H")]
     """The type of the column."""
-    fBitsStorage: Annotated[int, Fmt("<H")]
+    fBitsOnStorage: Annotated[int, Fmt("<H")]
     """The number of bits used to store the column value."""
     fFieldID: Annotated[int, Fmt("<I")]
     """The ID of the field that this column belongs to.

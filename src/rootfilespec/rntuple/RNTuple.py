@@ -1,4 +1,5 @@
 import dataclasses
+from math import ceil
 
 from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
 from rootfilespec.buffer import DataFetcher
@@ -6,9 +7,11 @@ from rootfilespec.rntuple.envelope import RFeatureFlags
 from rootfilespec.rntuple.footer import FooterEnvelope
 from rootfilespec.rntuple.header import HeaderEnvelope
 from rootfilespec.rntuple.pagelist import PageListEnvelope
+from rootfilespec.rntuple.pagelocations import RPageDescription
 from rootfilespec.rntuple.schema import (
     AliasColumnDescription,
     ColumnDescription,
+    ColumnType,
     ExtraTypeInformation,
     FieldDescription,
 )
@@ -68,12 +71,24 @@ class SchemaDescription:
 
 
 @dataclasses.dataclass
+class InterpretablePage:
+    """A class representing an interpretable page description.
+    It provides the page description, uncompressed size, and column type.
+    """
+
+    pageDescription: RPageDescription
+    """The RPageDescription object representing the page."""
+    uncompressedSize: int
+    """The uncompressed size of the page, in bytes."""
+    columnType: ColumnType
+    """The type of the column this page belongs to, e.g. kInt32, kFloat64, etc."""
+
+
+@dataclasses.dataclass
 class RNTuple:
     """A class representing an RNTuple.
 
     # abbott: what do we need this to do?
-    - Provide method to decompress pages, maybe method for getting specific page
-    - Provide method to deserialize pages (or something close)?
     """
 
     headerEnvelope: HeaderEnvelope
@@ -111,3 +126,39 @@ class RNTuple:
         return SchemaDescription.from_envelopes(
             self.headerEnvelope, self.footerEnvelope
         )
+
+    # can provide helpers to get page descriptions with different filters, columns/rows/etc.
+    def get_extended_page_descriptions(self):
+        """Fetches all pages from the RNTuple, decompressing them if necessary."""
+        envelopePages: list[list[list[list[InterpretablePage]]]] = []
+        for i_pagelistEnvelope, pagelistEnvelope in enumerate(self.pagelistEnvelopes):
+            envelopePages.append(
+                []
+            )  # Initialize the list of clusters for this envelope
+            for i_cluster, columnlist in enumerate(pagelistEnvelope.pageLocations):
+                envelopePages[i_pagelistEnvelope].append(
+                    []
+                )  # Initialize the list of columns for this cluster
+                for pagelist, column_description in zip(
+                    columnlist, self.schemaDescription.columnDescriptions
+                ):
+                    page_description_list = []
+                    for page_description in pagelist:
+                        uncompressed_size = ceil(
+                            (
+                                abs(page_description.fNElements)
+                                * column_description.fBitsOnStorage
+                            )
+                            / 8
+                        )  # Convert bits to bytes
+                        # Construct the ExtendedPageDescription
+                        extended_page_description = InterpretablePage(
+                            page_description,
+                            uncompressed_size,
+                            column_description.fColumnType,
+                        )
+                        page_description_list.append(extended_page_description)
+                    envelopePages[i_pagelistEnvelope][i_cluster].append(
+                        page_description_list
+                    )
+        return envelopePages

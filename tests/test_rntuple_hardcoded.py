@@ -102,7 +102,7 @@ def test_read_contributors():
                     ColumnDescription(
                         fSize=20,
                         fColumnType=ColumnType.kIndex64,
-                        fBitsStorage=64,
+                        fBitsOnStorage=64,
                         fFieldID=0,
                         fFlags=0,
                         fRepresentationIndex=0,
@@ -113,7 +113,7 @@ def test_read_contributors():
                     ColumnDescription(
                         fSize=20,
                         fColumnType=ColumnType.kChar,
-                        fBitsStorage=8,
+                        fBitsOnStorage=8,
                         fFieldID=0,
                         fFlags=0,
                         fRepresentationIndex=0,
@@ -124,7 +124,7 @@ def test_read_contributors():
                     ColumnDescription(
                         fSize=20,
                         fColumnType=ColumnType.kIndex64,
-                        fBitsStorage=64,
+                        fBitsOnStorage=64,
                         fFieldID=1,
                         fFlags=0,
                         fRepresentationIndex=0,
@@ -135,7 +135,7 @@ def test_read_contributors():
                     ColumnDescription(
                         fSize=20,
                         fColumnType=ColumnType.kChar,
-                        fBitsStorage=8,
+                        fBitsOnStorage=8,
                         fFieldID=1,
                         fFlags=0,
                         fRepresentationIndex=0,
@@ -324,7 +324,7 @@ def test_read_multiple_rntuples():
                     ColumnDescription(
                         fSize=20,
                         fColumnType=ColumnType.kSplitReal32,
-                        fBitsStorage=32,
+                        fBitsOnStorage=32,
                         fFieldID=0,
                         fFlags=0,
                         fRepresentationIndex=0,
@@ -459,7 +459,7 @@ def test_read_multiple_rntuples():
                     ColumnDescription(
                         fSize=20,
                         fColumnType=ColumnType.kSplitInt32,
-                        fBitsStorage=32,
+                        fBitsOnStorage=32,
                         fFieldID=0,
                         fFlags=0,
                         fRepresentationIndex=0,

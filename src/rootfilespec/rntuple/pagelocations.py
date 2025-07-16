@@ -80,13 +80,13 @@ class PageLocations(ListFrame[Item]):
     `compressionsettings = (<compression algorithm> * 100) + <compression level>`
         value: compression algorithm
         - -1: kInherit = -1, // Inherit the compression algorithm from the parent object
-        - 0: kUseGlobal = 0, // Use the global compression algorithm
-        - 1: kZLIB, // Use ZLIB compression
-        - 2: kLZMA, // Use LZMA compression
-        - 3: kOldCompressionAlgo, // Use the old compression algorithm
-        - 4: kLZ4, // Use LZ4 compression
-        - 5: kZSTD, // Use ZSTD compression
-        - 6: kUndefined // Undefined compression algorithm
+        - 0:  kUseGlobal = 0, // Use the global compression algorithm
+        - 1:  kZLIB, // Use ZLIB compression
+        - 2:  kLZMA, // Use LZMA compression
+        - 3:  kOldCompressionAlgo, // Use the old compression algorithm
+        - 4:  kLZ4, // Use LZ4 compression
+        - 5:  kZSTD, // Use ZSTD compression
+        - 6:  kUndefined // Undefined compression algorithm
 
     e.g. `compressionsettings = 505` means ZSTD compression with level 5.
     source: https://root.cern/doc/master/Compression_8h_source.html#l00086 """
