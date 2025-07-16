@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import dataclasses
 from typing import Any, Generic, TypeVar
 
@@ -28,7 +26,7 @@ class RFrame(ROOTSerializable):
 
 @dataclasses.dataclass
 class _ListFrameReader:
-    cls: type[ListFrame[Any]]
+    cls: type["ListFrame[Any]"]
     name: str
     inner_reader: ReadObjMethod
     """The type of items contained in the List Frame."""

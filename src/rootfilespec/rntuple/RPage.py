@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 from rootfilespec.buffer import ReadBuffer
@@ -15,7 +13,7 @@ class RPage(ROOTSerializable):
 
     # TODO: Flush out RPage class
     @classmethod
-    def read(cls, buffer: ReadBuffer) -> tuple[RPage, ReadBuffer]:
+    def read(cls, buffer: ReadBuffer) -> tuple["RPage", ReadBuffer]:
         """Reads an RPage from the buffer."""
 
         # For now, just return the entire buffer
