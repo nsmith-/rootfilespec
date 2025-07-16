@@ -130,35 +130,27 @@ class RNTuple:
     # can provide helpers to get page descriptions with different filters, columns/rows/etc.
     def get_extended_page_descriptions(self):
         """Fetches all pages from the RNTuple, decompressing them if necessary."""
-        envelopePages: list[list[list[list[InterpretablePage]]]] = []
-        for i_pagelistEnvelope, pagelistEnvelope in enumerate(self.pagelistEnvelopes):
-            envelopePages.append(
-                []
-            )  # Initialize the list of clusters for this envelope
-            for i_cluster, columnlist in enumerate(pagelistEnvelope.pageLocations):
-                envelopePages[i_pagelistEnvelope].append(
-                    []
-                )  # Initialize the list of columns for this cluster
-                for pagelist, column_description in zip(
-                    columnlist, self.schemaDescription.columnDescriptions
-                ):
-                    page_description_list = []
-                    for page_description in pagelist:
-                        uncompressed_size = ceil(
-                            (
+        envelopePages: list[list[list[list[InterpretablePage]]]] = [
+            [
+                [
+                    [
+                        InterpretablePage(
+                            pageDescription=page_description,
+                            uncompressedSize=ceil(
                                 abs(page_description.fNElements)
                                 * column_description.fBitsOnStorage
-                            )
-                            / 8
-                        )  # Convert bits to bytes
-                        # Construct the ExtendedPageDescription
-                        extended_page_description = InterpretablePage(
-                            page_description,
-                            uncompressed_size,
-                            column_description.fColumnType,
+                                / 8
+                            ),  # Convert bits to bytes
+                            columnType=column_description.fColumnType,
                         )
-                        page_description_list.append(extended_page_description)
-                    envelopePages[i_pagelistEnvelope][i_cluster].append(
-                        page_description_list
+                        for page_description in pagelist
+                    ]
+                    for pagelist, column_description in zip(
+                        columnlist, self.schemaDescription.columnDescriptions
                     )
+                ]
+                for columnlist in pagelistEnvelope.pageLocations
+            ]
+            for pagelistEnvelope in self.pagelistEnvelopes
+        ]
         return envelopePages
