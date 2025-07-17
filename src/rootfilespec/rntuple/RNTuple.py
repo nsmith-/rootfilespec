@@ -86,10 +86,7 @@ class InterpretablePage:
 
 @dataclasses.dataclass
 class RNTuple:
-    """A class representing an RNTuple.
-
-    # abbott: what do we need this to do?
-    """
+    """A class representing an RNTuple."""
 
     headerEnvelope: HeaderEnvelope
     footerEnvelope: FooterEnvelope
@@ -128,7 +125,9 @@ class RNTuple:
         )
 
     # can provide helpers to get page descriptions with different filters, columns/rows/etc.
-    def get_extended_page_descriptions(self):
+    def get_extended_page_descriptions(
+        self,
+    ) -> list[list[list[list[InterpretablePage]]]]:
         """Fetches all pages from the RNTuple, decompressing them if necessary."""
         envelopePages: list[list[list[list[InterpretablePage]]]] = [
             [
