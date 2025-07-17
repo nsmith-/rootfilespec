@@ -64,17 +64,13 @@ class PageListEnvelope(REnvelope):
         """Get the RNTuple Pages from the Page Locations Nested List Frame.
         Does not decompress the pages."""
         #### Get the Page Locations
-        pages: list[list[list[RPage]]] = []
-
-        for i_cluster, columnlist in enumerate(self.pageLocations):
-            pages.append([])
-            for i_column, pagelist in enumerate(columnlist):
-                pages[i_cluster].append([])
-                for page_description in pagelist:
-                    # Read the page from the buffer
-                    page = page_description.get_page(fetch_data)
-                    # Append the page to the list
-                    pages[i_cluster][i_column].append(page)
+        pages: list[list[list[RPage]]] = [
+            [
+                [page_description.get_page(fetch_data) for page_description in pagelist]
+                for pagelist in columnlist
+            ]
+            for columnlist in self.pageLocations
+        ]
 
         return pages
 
