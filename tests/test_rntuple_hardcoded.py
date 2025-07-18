@@ -3,6 +3,7 @@ from pathlib import Path
 from skhep_testdata import data_path  # type: ignore[import-not-found]
 
 from rootfilespec.bootstrap import ROOT3a3aRNTuple, ROOTFile
+from rootfilespec.bootstrap.compression import RCompressionSettings
 from rootfilespec.bootstrap.strings import RString
 from rootfilespec.buffer import ReadBuffer
 from rootfilespec.rntuple.envelope import REnvelopeLink, RFeatureFlags
@@ -210,7 +211,7 @@ def test_read_contributors():
                                             )
                                         ],
                                         elementoffset=0,
-                                        compressionsettings=0,
+                                        compressionsettings=RCompressionSettings(0),
                                     ),
                                     PageLocations(
                                         fSize=40,
@@ -223,7 +224,7 @@ def test_read_contributors():
                                             )
                                         ],
                                         elementoffset=0,
-                                        compressionsettings=0,
+                                        compressionsettings=RCompressionSettings(0),
                                     ),
                                     PageLocations(
                                         fSize=40,
@@ -236,7 +237,7 @@ def test_read_contributors():
                                             )
                                         ],
                                         elementoffset=0,
-                                        compressionsettings=0,
+                                        compressionsettings=RCompressionSettings(0),
                                     ),
                                     PageLocations(
                                         fSize=40,
@@ -249,7 +250,7 @@ def test_read_contributors():
                                             )
                                         ],
                                         elementoffset=0,
-                                        compressionsettings=0,
+                                        compressionsettings=RCompressionSettings(0),
                                     ),
                                 ],
                             )
@@ -535,7 +536,7 @@ def test_read_multiple_rntuples():
                                             )
                                         ],
                                         elementoffset=0,
-                                        compressionsettings=505,
+                                        compressionsettings=RCompressionSettings(505),
                                     )
                                 ],
                             )
@@ -728,7 +729,7 @@ def test_read_multiple_rntuples():
                                             )
                                         ],
                                         elementoffset=0,
-                                        compressionsettings=505,
+                                        compressionsettings=RCompressionSettings(505),
                                     )
                                 ],
                             )

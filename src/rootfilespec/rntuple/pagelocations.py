@@ -1,5 +1,6 @@
 from typing import Annotated, Optional
 
+from rootfilespec.bootstrap.compression import RCompressionSettings
 from rootfilespec.buffer import DataFetcher
 from rootfilespec.rntuple.RFrame import Item, ListFrame
 from rootfilespec.rntuple.RLocator import RLocator
@@ -72,21 +73,6 @@ class PageLocations(ListFrame[Item]):
     elementoffset: Annotated[int, Fmt("<q")]
     """The offset for the first element for this column."""
     compressionsettings: Annotated[
-        Optional[int], OptionalField("<I", "elementoffset", ">=", 0)
+        Optional[RCompressionSettings], OptionalField("class", "elementoffset", ">=", 0)
     ]
-    """The compression settings for the pages in this column.
-    If `compressionsettings = 0`, the column is not compressed.
-
-    `compressionsettings = (<compression algorithm> * 100) + <compression level>`
-        value: compression algorithm
-        - -1: kInherit = -1, // Inherit the compression algorithm from the parent object
-        - 0:  kUseGlobal = 0, // Use the global compression algorithm
-        - 1:  kZLIB, // Use ZLIB compression
-        - 2:  kLZMA, // Use LZMA compression
-        - 3:  kOldCompressionAlgo, // Use the old compression algorithm
-        - 4:  kLZ4, // Use LZ4 compression
-        - 5:  kZSTD, // Use ZSTD compression
-        - 6:  kUndefined // Undefined compression algorithm
-
-    e.g. `compressionsettings = 505` means ZSTD compression with level 5.
-    source: https://root.cern/doc/master/Compression_8h_source.html#l00086 """
+    """The compression settings for the pages in this column."""

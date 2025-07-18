@@ -3,7 +3,7 @@ import operator
 from typing import get_args
 
 from rootfilespec.buffer import ReadBuffer
-from rootfilespec.serializable import Members, MemberSerDe
+from rootfilespec.serializable import Members, MemberSerDe, ROOTSerializable
 
 
 @dataclasses.dataclass
@@ -62,8 +62,14 @@ class _OptionalFieldReader:
             msg = f"Unsupported operation: {self.operation}. Supported operations: {', '.join(ops.keys())}"
             raise ValueError(msg)
         if op_func(flag, self.flagvalue):
-            tup, buffer = buffer.unpack(self.fmt)
-            members[self.fname] = self.ftype(*tup)
+            if self.fmt == "class":
+                if not issubclass(self.ftype, ROOTSerializable):
+                    msg = f"Expected ftype to be a subclass of ROOTSerializable, got {self.ftype}"
+                    raise TypeError(msg)
+                members[self.fname], buffer = self.ftype.read(buffer)
+            else:
+                tup, buffer = buffer.unpack(self.fmt)
+                members[self.fname] = self.ftype(*tup)
         else:
             members[self.fname] = None
         return members, buffer
