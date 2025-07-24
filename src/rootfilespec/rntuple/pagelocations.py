@@ -1,18 +1,11 @@
-from __future__ import annotations
+from typing import Annotated, Optional
 
-from typing import Annotated
-
-from rootfilespec.rntuple.RFrame import ListFrame
+from rootfilespec.bootstrap.compression import RCompressionSettings
+from rootfilespec.rntuple.RFrame import Item, ListFrame
 from rootfilespec.rntuple.RLocator import RLocator
 from rootfilespec.rntuple.RPage import RPage
-from rootfilespec.serializable import (
-    DataFetcher,
-    Members,
-    ReadBuffer,
-    ROOTSerializable,
-    serializable,
-)
-from rootfilespec.structutil import Fmt
+from rootfilespec.serializable import DataFetcher, ROOTSerializable, serializable
+from rootfilespec.structutil import Fmt, OptionalField
 
 
 @serializable
@@ -46,13 +39,15 @@ class RPageDescription(ROOTSerializable):
         #### Read the page from the buffer
         page, buffer = RPage.read(buffer)
 
-        # TODO: compression
-        # check buffer is empty?
+        if buffer:
+            msg = "RPageDescription.get_page: buffer not empty after reading page."
+            raise ValueError(msg)
+
         return page
 
 
 @serializable
-class PageLocations(ListFrame[RPageDescription]):
+class PageLocations(ListFrame[Item]):
     """A class representing the RNTuple Page Locations Pages (Inner) List Frame.
     This class represents the locations of pages for a column for a cluster.
     This class is a specialized `ListFrame` that holds `RPageDescription` objects,
@@ -74,104 +69,9 @@ class PageLocations(ListFrame[RPageDescription]):
     Note that Page Description is not a record frame.
     """
 
-    elementoffset: int
+    elementoffset: Annotated[int, Fmt("<q")]
     """The offset for the first element for this column."""
-    compressionsettings: int | None
+    compressionsettings: Annotated[
+        Optional[RCompressionSettings], OptionalField("class", "elementoffset", ">=", 0)
+    ]
     """The compression settings for the pages in this column."""
-
-    @classmethod
-    def read(cls, buffer: ReadBuffer) -> tuple[PageLocations, ReadBuffer]:
-        """Reads the Page List Frame of Page Locations from the buffer."""
-        # Read the Page List as a ListFrame
-        pagelist, buffer = cls.read_as(RPageDescription, buffer)
-        return pagelist, buffer
-
-    @classmethod
-    def update_members(
-        cls, members: Members, buffer: ReadBuffer
-    ) -> tuple[Members, ReadBuffer]:
-        """Reads the extra members of the Page List Frame from the buffer."""
-        # Read the element offset for this column
-        (elementoffset,), buffer = buffer.unpack("<q")
-
-        compressionsettings = None
-        if elementoffset >= 0:  # If the column is not suppressed
-            # Read the compression settings
-            (compressionsettings,), buffer = buffer.unpack("<I")
-
-        members["elementoffset"] = elementoffset
-        members["compressionsettings"] = compressionsettings
-        return members, buffer
-
-
-@serializable
-class ColumnLocations(ListFrame[PageLocations]):
-    """A class representing the RNTuple Page Locations Column (Outer) List Frame.
-    This class represents the locations of pages within each column for a cluster.
-    This class is a specialized `ListFrame` that holds `PageLocations` objects,
-        where each object corresponds to a column, and each object represents
-        the locations of pages for that column.
-    The order of the columns matches the order of the columns in the schema description
-        and schema description extension (small to large).
-    This List Frame is found in the Page List Envelope of an RNTuple.
-
-    Notes:
-    This class is the Outer List Frame in the triple nested List Frame of RNTuple page locations.
-
-    [top-most[*outer*[inner[Page Description]]]]:
-
-        Top-Most List Frame -> Outer List Frame -> Inner List Frame ->  Inner Item
-            Clusters     ->      Columns     ->       Pages      ->  Page Description
-
-    Note that Page Description is not a record frame.
-    """
-
-    @classmethod
-    def read(cls, buffer: ReadBuffer) -> tuple[ColumnLocations, ReadBuffer]:
-        """Reads the Column List Frame of Page Locations from the buffer."""
-        # Read the Column List as a ListFrame
-        columnlist, buffer = cls.read_as(PageLocations, buffer)
-        return columnlist, buffer
-
-
-@serializable
-class ClusterLocations(ListFrame[ColumnLocations]):
-    """A class representing the RNTuple Page Locations Cluster (Top-Most) List Frame.
-    This class represents the locations of pages within columns for each cluster.
-    This class is a specialized `ListFrame` that holds `ColumnLocations` objects,
-        where each object corresponds to a cluster, and each object represents
-        the locations of pages for each column in that cluster.
-    The order of the clusters corresponds to the cluster IDs as defined
-        by the cluster groups and cluster summaries.
-    This List Frame is found in the Page List Envelope of an RNTuple.
-
-    Notes:
-    This class is the Top-Most List Frame in the triple nested List Frame of RNTuple page locations.
-
-    [*top-most*[outer[inner[Page Description]]]]:
-
-        Top-Most List Frame -> Outer List Frame -> Inner List Frame ->  Inner Item
-            Clusters     ->      Columns     ->       Pages      ->  Page Description
-
-    Note that Page Description is not a record frame.
-    """
-
-    @classmethod
-    def read(cls, buffer: ReadBuffer) -> tuple[ClusterLocations, ReadBuffer]:
-        """Reads the Cluster List Frame of Page Locations from the buffer."""
-        # Read the Cluster List as a ListFrame
-        clusterlist, buffer = cls.read_as(ColumnLocations, buffer)
-        return clusterlist, buffer
-
-    def find_page(self, column_index: int, entry: int) -> RPageDescription | None:
-        # TODO: test method
-        for cluster in self:
-            column = cluster[column_index]
-            if column.elementoffset <= entry:
-                cluster_local_offset = entry - column.elementoffset
-                offset = 0
-                for page in column:
-                    offset += page.fNElements
-                    if offset > cluster_local_offset:
-                        return page  # type: ignore[no-any-return]
-        return None

@@ -29,7 +29,7 @@ from rootfilespec.bootstrap.compression import RCompressed, RCompressionHeader
 from rootfilespec.bootstrap.double32 import Double32Serde
 from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
 from rootfilespec.bootstrap.streamedobject import Ref, StreamedObject
-from rootfilespec.bootstrap.strings import STLString, TString, string
+from rootfilespec.bootstrap.strings import RString, STLString, TString, string
 from rootfilespec.bootstrap.TBasket import TBasket
 from rootfilespec.bootstrap.TDatime import TDatime
 from rootfilespec.bootstrap.TDirectory import TDirectory, TDirectoryFile, TKeyList
@@ -84,6 +84,7 @@ __all__ = [
     "RCompressionHeader",
     "ROOT3a3aRNTuple",
     "ROOTFile",
+    "RString",
     "Ref",
     "RooLinkedList",
     "STLString",

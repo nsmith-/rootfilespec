@@ -46,6 +46,10 @@ class RFeatureFlags(ROOTSerializable):
         members["flags"] = flags
         return members, buffer
 
+    def __or__(self, other: "RFeatureFlags") -> "RFeatureFlags":
+        """Returns a new RFeatureFlags object with the combined flags."""
+        return RFeatureFlags(self.flags | other.flags)
+
 
 @dataclass
 class REnvelope(ROOTSerializable):
@@ -140,7 +144,6 @@ class REnvelopeLink(ROOTSerializable):
         buffer = self.locator.get_buffer(fetch_data)
 
         #### If compressed, decompress the envelope
-        compressed = None
         # The length of the buffer is the number of bytes of compressed data
         if len(buffer) != self.length:
             # This is a compressed object

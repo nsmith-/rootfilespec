@@ -4,10 +4,13 @@ from rootfilespec.rntuple.envelope import (
     ENVELOPE_TYPE_MAP,
     REnvelope,
 )
-from rootfilespec.rntuple.pagelocations import ClusterLocations
+from rootfilespec.rntuple.pagelocations import (
+    PageLocations,
+    RPageDescription,
+)
 from rootfilespec.rntuple.RFrame import ListFrame, RecordFrame
 from rootfilespec.rntuple.RPage import RPage
-from rootfilespec.serializable import DataFetcher, Members, ReadBuffer, serializable
+from rootfilespec.serializable import DataFetcher, serializable
 from rootfilespec.structutil import Fmt
 
 
@@ -53,42 +56,22 @@ class PageListEnvelope(REnvelope):
     """Checksum of the Header Envelope"""
     clusterSummaries: ListFrame[ClusterSummary]
     """The List Frame of Cluster Summary Record Frames"""
-    pageLocations: ClusterLocations
+    pageLocations: ListFrame[ListFrame[PageLocations[RPageDescription]]]
     """The Page Locations Triple Nested List Frame"""
 
-    @classmethod
-    def update_members(cls, members: Members, buffer: ReadBuffer):
-        """Reads the RNTuple Page List Envelope payload from the given buffer."""
-        # Read the header checksum
-        (headerChecksum,), buffer = buffer.unpack("<Q")
-
-        # Read the cluster summary list frame
-        clusterSummaries, buffer = ListFrame.read_as(ClusterSummary, buffer)
-
-        # Read the page locations
-        pageLocations, buffer = ClusterLocations.read(buffer)
-
-        members["headerChecksum"] = headerChecksum
-        members["clusterSummaries"] = clusterSummaries
-        members["pageLocations"] = pageLocations
-        return members, buffer
-
     def get_pages(self, fetch_data: DataFetcher):
-        """Get the RNTuple Pages from the Page Locations Nested List Frame."""
+        """Get the RNTuple Pages from the Page Locations Nested List Frame.
+        Does not decompress the pages."""
         #### Get the Page Locations
-        page_locations: list[list[list[RPage]]] = []
+        pages: list[list[list[RPage]]] = [
+            [
+                [page_description.get_page(fetch_data) for page_description in pagelist]
+                for pagelist in columnlist
+            ]
+            for columnlist in self.pageLocations
+        ]
 
-        for i_column, columnlist in enumerate(self.pageLocations):
-            page_locations.append([])
-            for i_page, pagelist in enumerate(columnlist):
-                page_locations[i_column].append([])
-                for page_description in pagelist:
-                    # Read the page from the buffer
-                    page = page_description.get_page(fetch_data)
-                    # Append the page to the list
-                    page_locations[i_column][i_page].append(page)
-
-        return page_locations
+        return pages
 
 
 ENVELOPE_TYPE_MAP[0x03] = "PageListEnvelope"

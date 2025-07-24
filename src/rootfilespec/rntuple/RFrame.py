@@ -1,38 +1,42 @@
-from __future__ import annotations
+import dataclasses
+from typing import Any, Generic, TypeVar
 
-from dataclasses import dataclass, field
-from typing import Generic, TypeVar
-
-from rootfilespec.serializable import Members, ReadBuffer, ROOTSerializable
+from rootfilespec.serializable import (
+    ContainerSerDe,
+    Members,
+    MemberType,
+    ReadBuffer,
+    ReadObjMethod,
+    ROOTSerializable,
+)
 
 Item = TypeVar("Item", bound=ROOTSerializable)
 
 
-@dataclass
+@dataclasses.dataclass
 class RFrame(ROOTSerializable):
     """A class representing an RNTuple Frame.
     The ListFrame and RecordFrame classes inherit from this class."""
 
     fSize: int
     """The size of the frame in bytes. The size is negative for List Frames."""
-    _unknown: bytes = field(init=False, repr=False, compare=False)
+    _unknown: bytes = dataclasses.field(init=False, repr=False, compare=False)
     """Unknown bytes at the end of the frame."""
 
 
-@dataclass
-class ListFrame(RFrame, Generic[Item]):
-    """A class representing an RNTuple List Frame.
-    The List Frame is a container for a list of items of type Item."""
+@dataclasses.dataclass
+class _ListFrameReader:
+    cls: type["ListFrame[Any]"]
+    name: str
+    inner_reader: ReadObjMethod
+    """The type of items contained in the List Frame."""
 
-    items: list[Item]
-    """The list of items in the List Frame."""
+    def __call__(
+        self, members: Members, buffer: ReadBuffer
+    ) -> tuple[Members, ReadBuffer]:
+        """Reads a ListFrame from the buffer."""
+        frame_members: Members = {}  # Initialize an empty dictionary for frame members
 
-    @classmethod
-    def read_as(
-        cls,
-        itemtype: type[Item],
-        buffer: ReadBuffer,
-    ):
         # Save initial buffer position (for checking unknown bytes)
         start_position = buffer.relpos
 
@@ -43,27 +47,45 @@ class ListFrame(RFrame, Generic[Item]):
             raise ValueError(msg)
         # abs(fSize) is the uncompressed byte size of frame (including payload)
         fSize = abs(fSize)
+        frame_members["fSize"] = fSize
 
         #### Read the List Frame Items
         (nItems,), buffer = buffer.unpack("<I")
-        items: list[Item] = []
+        items: list[MemberType] = []
         while len(items) < nItems:
             # Read a regular item
-            item, buffer = itemtype.read(buffer)
+            item, buffer = self.inner_reader(buffer)
             items.append(item)
+        frame_members["items"] = items
 
-        members: Members = {"fSize": fSize, "items": items}
+        # members: Members = {"fSize": fSize, "items": items}
         # Read the rest of the members
-        members, buffer = cls.update_members(members, buffer)
+        frame_members, buffer = self.cls.update_members(frame_members, buffer)
 
         #### Consume any unknown trailing information in the frame
         _unknown, buffer = buffer.consume(fSize - (buffer.relpos - start_position))
         # Unknown Bytes = Frame Size - Bytes Read
         # Bytes Read = buffer.relpos - start_position
 
-        frame = cls(**members)
+        frame = self.cls(**frame_members)
         frame._unknown = _unknown
-        return frame, buffer
+
+        members[self.name] = frame
+        return members, buffer
+
+
+@dataclasses.dataclass
+class ListFrame(RFrame, ContainerSerDe, Generic[Item]):
+    """A class representing an RNTuple List Frame.
+    The List Frame is a container for a list of items of type Item."""
+
+    items: list[Item]
+    """The list of items in the List Frame."""
+
+    @classmethod
+    def build_reader(cls, fname: str, inner_reader: ReadObjMethod):
+        """Build a reader for the ListFrame[Item]."""
+        return _ListFrameReader(cls, fname, inner_reader)
 
     @classmethod
     def update_members(
@@ -83,7 +105,7 @@ class ListFrame(RFrame, Generic[Item]):
         return self.items[index]
 
 
-@dataclass
+@dataclasses.dataclass
 class RecordFrame(RFrame):
     """A class representing an RNTuple Record Frame.
     There are many Record Frames, each with a unique format."""
@@ -103,8 +125,6 @@ class RecordFrame(RFrame):
 
         #### Read the Record Frame Payload
         members, buffer = cls.update_members(members, buffer)
-
-        # abbott: any checks here?
 
         #### Consume any unknown trailing information in the frame
         _unknown, buffer = buffer.consume(fSize - (buffer.relpos - start_position))

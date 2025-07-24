@@ -1,3 +1,4 @@
+from enum import IntEnum
 from functools import partial
 from typing import Annotated, Optional, Protocol
 
@@ -164,3 +165,65 @@ class RCompressed(ROOTSerializable):
             start += length
         assert start == len(out)
         return out
+
+
+class CompressionAlgorithm(IntEnum):
+    """The compression algorithm used for a column.
+    source: https://root.cern/doc/master/Compression_8h_source.html#l00086"""
+
+    # kInherit = -1 # Not used in RNTuple
+    # """Inherit the compression algorithm from the parent object."""
+    # kUseGlobal = 0 # Not used in RNTuple
+    # """Use the global compression algorithm."""
+    kUncompressed = 0
+    """Is not compressed."""
+    kZLIB = 1
+    """Use ZLIB compression."""
+    kLZMA = 2
+    """Use LZMA compression."""
+    kOldCompressionAlgo = 3
+    """Use Old Jean-loup Gailly's deflation algorithm"""
+    kLZ4 = 4
+    """Use LZ4 compression."""
+    kZSTD = 5
+    """Use ZSTD compression."""
+    kUndefined = 6
+    """Undefined compression algorithm."""
+
+    def __repr__(self) -> str:
+        """Get a string representation of this element type."""
+        return f"{self.__class__.__name__}.{self.name}"
+
+
+@serializable
+class RCompressionSettings(ROOTSerializable):
+    """A class representing the Compression Settings for RNTuple pages/columns.
+
+    If `compressionsettings = 0`, the column is not compressed.
+
+    `compressionsettings = (<compression algorithm> * 100) + <compression level>`
+        value: compression algorithm
+        - -1: kInherit = -1, // Inherit the compression algorithm from the parent object
+        - 0:  kUseGlobal = 0, // Use the global compression algorithm
+        - 1:  kZLIB, // Use ZLIB compression
+        - 2:  kLZMA, // Use LZMA compression
+        - 3:  kOldCompressionAlgo, // Use Old Jean-loup Gailly's deflation algorithm
+        - 4:  kLZ4, // Use LZ4 compression
+        - 5:  kZSTD, // Use ZSTD compression
+        - 6:  kUndefined // Undefined compression algorithm
+
+    e.g. `compressionsettings = 505` means ZSTD compression with level 5.
+    source: https://root.cern/doc/master/Compression_8h_source.html#l00086"""
+
+    compressionsettings: Annotated[int, Fmt("<I")]
+    """The compression settings for the pages in this column."""
+
+    @property
+    def algorithm(self) -> CompressionAlgorithm:
+        """Get the compression algorithm used for this column."""
+        return CompressionAlgorithm(self.compressionsettings // 100)
+
+    @property
+    def level(self) -> int:
+        """Get the compression level used for this column."""
+        return self.compressionsettings % 100
