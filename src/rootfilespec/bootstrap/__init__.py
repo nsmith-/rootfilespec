@@ -26,6 +26,7 @@ from rootfilespec.bootstrap.assumed import (
     Uninterpreted,
 )
 from rootfilespec.bootstrap.compression import RCompressed, RCompressionHeader
+from rootfilespec.bootstrap.double32 import Double32Serde
 from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
 from rootfilespec.bootstrap.streamedobject import Ref, StreamedObject
 from rootfilespec.bootstrap.strings import STLString, TString, string
@@ -78,6 +79,7 @@ BOOTSTRAP_CONTEXT = _BootstrapContext(
 
 __all__ = [
     "BOOTSTRAP_CONTEXT",
+    "Double32Serde",
     "RCompressed",
     "RCompressionHeader",
     "ROOT3a3aRNTuple",

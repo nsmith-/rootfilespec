@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Annotated, Union
 
+from rootfilespec.bootstrap.double32 import parse_double32_title
 from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TList import TObjArray
 from rootfilespec.bootstrap.TObject import TNamed
@@ -345,6 +346,17 @@ class TStreamerBasicType(TStreamerElement):
             fmt = ElementType(self.fType - ElementType.kOffsetL).as_fmt()
             atype = f"FixedSizeArray({fmt!r}, {self.fArrayLength})"
             return f"{self.member_name()}: Annotated[np.ndarray, {atype}]", []
+
+        # In TStreamerBasicType.member_definition
+        if self.fType == ElementType.kDouble32:
+            title = self.fTitle.fString.decode("utf-8", errors="replace").strip()
+            xmin, xmax, nbits, factor = parse_double32_title(title)
+
+            return (
+                f"{self.member_name()}: Annotated[float, Double32Serde(factor={factor}, xmin={xmin}, xmax={xmax}, nbits={nbits})]",
+                [],
+            )
+
         fmt = self.fType.as_fmt()
         pytype = _structtype_to_pytype(fmt).__name__
         return f"{self.member_name()}: Annotated[{pytype}, Fmt({fmt!r})]", []

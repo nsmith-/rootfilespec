@@ -12,7 +12,7 @@ class _FmtReader:
     def __call__(
         self, members: Members, buffer: ReadBuffer
     ) -> tuple[Members, ReadBuffer]:
-        if self.fmt in ("float16", "double32", "charstar"):
+        if self.fmt in ("float16", "charstar"):
             msg = f"Unimplemented format {self.fmt}"
             raise NotImplementedError(msg)
         tup, buffer = buffer.unpack(self.fmt)

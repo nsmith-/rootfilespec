@@ -122,7 +122,7 @@ class FixedSizeArray(MemberSerDe):
     size: int
 
     def build_reader(self, fname: str, ftype: type):  # noqa: ARG002
-        if self.fmt in ("float16", "double32", "charstar"):
+        if self.fmt in ("float16", "charstar", "double32"):
             msg = f"Unimplemented format {self.fmt}"
             raise NotImplementedError(msg)
         return _FixedSizeArrayReader(fname, np.dtype(self.fmt), self.size)
