@@ -1,11 +1,10 @@
 from typing import Annotated, Optional
 
 from rootfilespec.bootstrap.compression import RCompressionSettings
-from rootfilespec.buffer import DataFetcher
 from rootfilespec.rntuple.RFrame import Item, ListFrame
 from rootfilespec.rntuple.RLocator import RLocator
 from rootfilespec.rntuple.RPage import RPage
-from rootfilespec.serializable import ROOTSerializable, serializable
+from rootfilespec.serializable import DataFetcher, ROOTSerializable, serializable
 from rootfilespec.structutil import Fmt, OptionalField
 
 

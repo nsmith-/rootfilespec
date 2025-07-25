@@ -1,5 +1,3 @@
-import sys
-import types
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -9,15 +7,25 @@ import numpy as np
 import pytest
 from skhep_testdata import data_path, known_files  # type: ignore[import-not-found]
 
-from rootfilespec.bootstrap import ROOT3a3aRNTuple, ROOTFile, TBasket, TDirectory
+from rootfilespec.bootstrap import (
+    BOOTSTRAP_CONTEXT,
+    ROOT3a3aRNTuple,
+    ROOTFile,
+    TBasket,
+    TDirectory,
+)
 from rootfilespec.bootstrap.streamedobject import Ref, StreamHeader
 from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TList import TObjArray
-from rootfilespec.buffer import DataFetcher, ReadBuffer
 from rootfilespec.container import _CArrayReader
-from rootfilespec.dispatch import DICTIONARY, normalize
-from rootfilespec.dynamic import streamerinfo_to_classes
-from rootfilespec.serializable import ROOTSerializable
+from rootfilespec.dispatch import normalize
+from rootfilespec.dynamic import build_file_context
+from rootfilespec.serializable import (
+    BufferContext,
+    DataFetcher,
+    ReadBuffer,
+    ROOTSerializable,
+)
 
 TESTABLE_FILES = [f for f in known_files if f.endswith(".root")]
 
@@ -36,22 +44,23 @@ def _dummy_fetch(buffer: ReadBuffer, _seek: int, _size: int) -> ReadBuffer:
 
 @dataclass
 class _ReadBasket:
-    dyntype: type[ROOTSerializable]
+    typename: str
     n: int
 
     @property
     def __name__(self):
-        return self.dyntype.__name__
+        return self.typename
 
     def read(self, buffer: ReadBuffer):
         items = []
+        dyntype = buffer.file_context.type_by_name(self.typename)
         for _ in range(self.n):
             itemheader, _ = StreamHeader.read(buffer)
             item_end = itemheader.fByteCount + 4
             buffer, remaining = buffer[:item_end], buffer[item_end:]
-            item, buffer = self.dyntype.read(buffer)
+            item, buffer = dyntype.read(buffer)
             if buffer:
-                msg = f"Expected buffer to be empty after reading {self.dyntype}, but got\n{buffer}"
+                msg = f"Expected buffer to be empty after reading {self.typename}, but got\n{buffer}"
                 raise ValueError(msg)
             items.append(item)
             buffer = remaining
@@ -110,7 +119,7 @@ def _walk_branchlist(
             indent=indent + 1,
         )
         if not hasattr(branch, "fClassName"):
-            continue  # Simple data type, we trust we can deserialize it
+            continue  # Simple data type, we trust we can deserialize
         branch = cast(TBranchObject, branch)
 
         cpptype = branch.fClassName.fString
@@ -122,8 +131,7 @@ def _walk_branchlist(
                 # e.g. uproot-issue-798.root (xAOD3a3aFileMetaDataAuxInfo_v1)
                 cpptype = branch.fTitle.fString.rsplit(b".", 1)[-1]
         typename = normalize(cpptype)
-        dyntype = DICTIONARY.get(typename)
-        print(f"{'  ' * indent}  Type: {typename} ({dyntype})")
+        print(f"{'  ' * indent}  Type: {typename}")
 
         if len(branch.fLeaves.objects):
             # This is a split branch
@@ -134,14 +142,6 @@ def _walk_branchlist(
             print(f"{'  ' * indent}  Leaves: {b','.join(leaves)!r}")
             continue
 
-        if dyntype is None:
-            # maybe if there are no baskets it is ok?
-            if np.all(branch.fBasketBytes == 0):
-                print("{'  ' * indent}  No baskets, skipping")
-                continue
-            msg = f"Unknown type {typename} in branch {branch.fName.fString!r}"
-            raise TypeError(msg)
-
         for size, seek in zip(branch.fBasketBytes, branch.fBasketSeek):
             if size == 0:
                 continue
@@ -150,7 +150,7 @@ def _walk_branchlist(
             # TODO: this is a bit of a hack to avoid writing the same decompression code as in TKey.read_object
             basket.read_object(
                 partial(_dummy_fetch, buffer),
-                _ReadBasket(dyntype, basket.bheader.fNevBuf),
+                _ReadBasket(typename, basket.bheader.fNevBuf),
             )
 
 
@@ -198,7 +198,12 @@ def test_read_file(filename: str):
 
         def fetch_data(seek: int, size: int):
             filehandle.seek(seek)
-            return ReadBuffer(memoryview(filehandle.read(size)), seek, 0)
+            return ReadBuffer(
+                memoryview(filehandle.read(size)),
+                0,
+                BOOTSTRAP_CONTEXT,
+                BufferContext(abspos=seek),
+            )
 
         buffer = fetch_data(0, initial_read_size)
         file, _ = ROOTFile.read(buffer)
@@ -230,23 +235,27 @@ def test_read_file(filename: str):
 
         # Render the class definitions into python code
         try:
-            classes = streamerinfo_to_classes(streamerinfo)
+            file_context = build_file_context(streamerinfo)
         except NotImplementedError as ex:
             return pytest.xfail(reason=str(ex))
 
-        # Evaluate the python code to create the classes and add them to the DICTIONARY
-        oldkeys = set(DICTIONARY)
-        try:
-            module = types.ModuleType(f"rootfilespec.generated_{id(streamerinfo)}")
-            sys.modules[module.__name__] = module
-            exec(classes, module.__dict__)
+        # Define a new fetcher now that we can interpret the file data
+        def fetch_after_streamers(seek: int, size: int):
+            print(f"fetch_data {seek=} {size=}")
+            filehandle.seek(seek)
+            return ReadBuffer(
+                memoryview(filehandle.read(size)),
+                0,
+                file_context,
+                BufferContext(abspos=seek),
+            )
 
-            # Read all objects from the file
-            _walk(rootdir, fetch_data, fail_cb)
+        # Read all objects from the file
+        try:
+            _walk(rootdir, fetch_after_streamers, fail_cb)
             if failures:
                 return pytest.xfail(reason=",".join(set(failures)))
         except NotImplementedError as ex:
             return pytest.xfail(reason=str(ex))
         finally:
-            for key in set(DICTIONARY) - oldkeys:
-                DICTIONARY.pop(key)
+            file_context.purge_module()

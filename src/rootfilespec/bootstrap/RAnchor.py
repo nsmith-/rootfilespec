@@ -1,13 +1,11 @@
 from typing import Annotated
 
 from rootfilespec.bootstrap.streamedobject import StreamedObject
-from rootfilespec.buffer import DataFetcher
-from rootfilespec.dispatch import DICTIONARY
 from rootfilespec.rntuple.envelope import REnvelopeLink
 from rootfilespec.rntuple.footer import FooterEnvelope
 from rootfilespec.rntuple.header import HeaderEnvelope
 from rootfilespec.rntuple.RLocator import LargeLocator
-from rootfilespec.serializable import serializable
+from rootfilespec.serializable import DataFetcher, serializable
 from rootfilespec.structutil import Fmt
 
 
@@ -40,6 +38,3 @@ class ROOT3a3aRNTuple(StreamedObject):
         )
 
         return footerLink.read_envelope(fetch_data, FooterEnvelope)
-
-
-DICTIONARY["ROOT3a3aRNTuple"] = ROOT3a3aRNTuple

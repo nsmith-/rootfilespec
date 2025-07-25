@@ -2,7 +2,6 @@ import dataclasses
 from math import ceil
 
 from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
-from rootfilespec.buffer import DataFetcher
 from rootfilespec.rntuple.envelope import RFeatureFlags
 from rootfilespec.rntuple.footer import FooterEnvelope
 from rootfilespec.rntuple.header import HeaderEnvelope
@@ -15,6 +14,7 @@ from rootfilespec.rntuple.schema import (
     ExtraTypeInformation,
     FieldDescription,
 )
+from rootfilespec.serializable import DataFetcher
 
 
 @dataclasses.dataclass

@@ -1,6 +1,5 @@
 from typing import Annotated
 
-from rootfilespec.buffer import DataFetcher
 from rootfilespec.rntuple.envelope import (
     ENVELOPE_TYPE_MAP,
     REnvelope,
@@ -15,7 +14,7 @@ from rootfilespec.rntuple.schema import (
     ExtraTypeInformation,
     FieldDescription,
 )
-from rootfilespec.serializable import serializable
+from rootfilespec.serializable import DataFetcher, serializable
 from rootfilespec.structutil import Fmt
 
 

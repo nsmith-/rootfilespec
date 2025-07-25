@@ -2,10 +2,9 @@ from pathlib import Path
 
 from skhep_testdata import data_path  # type: ignore[import-not-found]
 
-from rootfilespec.bootstrap import ROOT3a3aRNTuple, ROOTFile
+from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT, ROOT3a3aRNTuple, ROOTFile
 from rootfilespec.bootstrap.compression import RCompressionSettings
 from rootfilespec.bootstrap.strings import RString
-from rootfilespec.buffer import ReadBuffer
 from rootfilespec.rntuple.envelope import REnvelopeLink, RFeatureFlags
 from rootfilespec.rntuple.footer import ClusterGroup, FooterEnvelope, SchemaExtension
 from rootfilespec.rntuple.header import HeaderEnvelope
@@ -19,6 +18,7 @@ from rootfilespec.rntuple.schema import (
     ColumnType,
     FieldDescription,
 )
+from rootfilespec.serializable import BufferContext, ReadBuffer
 
 # TODO: Add test for a more complex RNTuple with complex schema and multiple clusters
 
@@ -30,7 +30,12 @@ def test_read_contributors():
 
         def fetch_data(seek: int, size: int):
             filehandle.seek(seek)
-            return ReadBuffer(memoryview(filehandle.read(size)), seek, 0)
+            return ReadBuffer(
+                memoryview(filehandle.read(size)),
+                0,
+                BOOTSTRAP_CONTEXT,
+                BufferContext(abspos=seek),
+            )
 
         buffer = fetch_data(0, 512)
         file, _ = ROOTFile.read(buffer)
@@ -403,7 +408,12 @@ def test_read_multiple_rntuples():
 
         def fetch_data(seek: int, size: int):
             filehandle.seek(seek)
-            return ReadBuffer(memoryview(filehandle.read(size)), seek, 0)
+            return ReadBuffer(
+                memoryview(filehandle.read(size)),
+                0,
+                BOOTSTRAP_CONTEXT,
+                BufferContext(abspos=seek),
+            )
 
         buffer = fetch_data(0, 512)
         file, _ = ROOTFile.read(buffer)

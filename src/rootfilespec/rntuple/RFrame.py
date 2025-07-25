@@ -1,11 +1,11 @@
 import dataclasses
 from typing import Any, Generic, TypeVar
 
-from rootfilespec.buffer import ReadBuffer
 from rootfilespec.serializable import (
     ContainerSerDe,
     Members,
     MemberType,
+    ReadBuffer,
     ReadObjMethod,
     ROOTSerializable,
 )

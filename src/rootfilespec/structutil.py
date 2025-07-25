@@ -2,8 +2,7 @@ import dataclasses
 import operator
 from typing import get_args
 
-from rootfilespec.buffer import ReadBuffer
-from rootfilespec.serializable import Members, MemberSerDe, ROOTSerializable
+from rootfilespec.serializable import Members, MemberSerDe, ReadBuffer, ROOTSerializable
 
 
 @dataclasses.dataclass
