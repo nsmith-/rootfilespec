@@ -1,18 +1,18 @@
-from uproot.model import Model
+from uproot.model import Model  # type: ignore[import-not-found]
 
 from rootfilespec.serializable import ROOTSerializable, _get_annotations
 
 
-class UprootModelAdapter(Model):
+class UprootModelAdapter(Model):  # type: ignore[misc]
     """
     Adapter for Uproot models to be used with the rootfilespec library.
     This class allows Uproot to read ROOTSerializable objects
     """
+
     _model: ROOTSerializable
 
     @property
     def encoded_classname(self):
-
         name = type(self._model).__name__.replace("3a3a", "_3a3a_")
         return "Model_" + name
 
@@ -26,8 +26,17 @@ class UprootModelAdapter(Model):
             # check the member is in this type and not base classes
             fields = _get_annotations(type(self._model))
             out = None if name not in fields else getattr(self._model, name, None)
-        
+
         if none_if_missing and out is None:
             msg = f"Member {name} not found in {self._model.__class__.__name__}"
             raise AttributeError(msg)
         return out
+
+
+def create_adapter_class(uproot_cls):
+    # TODO Find the base class of uproot_cls that has the behavior you want
+    behavior_cls = uproot_cls
+
+    return type(
+        f"Adapter_{behavior_cls.__name__}", (UprootModelAdapter, behavior_cls), {}
+    )
