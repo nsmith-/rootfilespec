@@ -12,9 +12,24 @@ class UprootModelAdapter(Model):  # type: ignore[misc]
     """
 
     _model: ROOTSerializable
+    _file: Any
 
     def __init__(self, model: Any) -> None:
         self._model = model
+
+    def __getattr__(self, name: str):
+        # Try the wrapped model first
+        if hasattr(self._model, name):
+            return getattr(self._model, name)
+
+        # Then try the class we're adapting to (Uproot behavior/model internals)
+        behavior_cls = getattr(type(self), "__behavior_cls__", None)
+        if behavior_cls and hasattr(behavior_cls, name):
+            return getattr(behavior_cls, name)
+
+        # Fall back to error
+        raise AttributeError(f"{self.__class__.__name__} has no attribute {name!r}")
+
 
     @property
     def _fields(self):
@@ -35,34 +50,76 @@ class UprootModelAdapter(Model):  # type: ignore[misc]
             err = f"Member index {index} out of range"
             raise IndexError(err) from None
 
-    def member(self, name, all=True, none_if_missing=False):
+    def member(self, name, all: bool = True, none_if_missing: bool = False):
         if all:
-            out = getattr(self._model, name, None)
+            value = getattr(self._model, name, None)
         else:
-            # check the member is in this type and not base classes
+            # Check only declared fields on this type (not bases)
             fields = _get_annotations(type(self._model))
-            out = None if name not in fields else getattr(self._model, name, None)
+            value = getattr(self._model, name, None) if name in fields else None
 
-        if none_if_missing and out is None:
+        if none_if_missing and value is None:
             msg = f"Member {name} not found in {self._model.__class__.__name__}"
             raise AttributeError(msg)
-        return out
+
+        return self._adapt_value(value)
+
+    def _adapt_value(self, value):
+        """Normalize ROOTSerializable values into Uproot-friendly objects."""
+        if isinstance(value, ROOTSerializable):
+            if value.__class__.__name__ == "TString":
+                return value.fString.decode("utf-8")
+
+            adapter_cls = create_adapter_class(type(value))
+            return adapter_cls(value)
+
+        elif isinstance(value, (list, tuple)):
+            return type(value)(self._adapt_value(v) for v in value)
+
+        elif isinstance(value, dict):
+            return {k: self._adapt_value(v) for k, v in value.items()}
+
+        return value 
 
 
-def create_adapter_class(uproot_cls: Any) -> type:
-    behavior_cls = getattr(uproot_cls, "__behavior__", object) or object
+from typing import Any
 
-    def call_optional_init(init_func: Any, instance: Any) -> None:
-        if callable(init_func) and init_func is not object.__init__:
-            init_func(instance)
+def create_adapter_class(model_cls):
+    """
+    Wrap a Model class (like Model_TTree_v20) into an Adapter that exposes
+    lookup, bases, cache_key, and underscored aliases safely.
+    """
+    class Adapter:        
+        def __init__(self, model_instance):
+            self.model = model_instance
+            self._internal_lookup = getattr(model_instance, "_lookup", {})
+            self._internal_bases = getattr(model_instance, "_bases", [])
+            self._internal_cache_key = getattr(model_instance, "cache_key", None)
 
-    class Adapter(UprootModelAdapter, behavior_cls):  # type: ignore[misc, valid-type]
-        def __init__(self, model: Any) -> None:
-            # Call known init directly — safe and type-checkable
-            UprootModelAdapter.__init__(self, model)
+        @property
+        def lookup(self):
+            return getattr(self.model, "lookup", self._internal_lookup)
 
-            init = getattr(behavior_cls, "__init__", None)
-            call_optional_init(init, self)
+        @property
+        def bases(self):
+            return getattr(self.model, "bases", self._internal_bases)
 
-    Adapter.__name__ = f"Adapter_{behavior_cls.__name__}"
+        @property
+        def cache_key(self):
+            return getattr(self.model, "cache_key", self._internal_cache_key)
+
+        @property
+        def _lookup(self):
+            return self.lookup
+
+        @property
+        def _bases(self):
+            return self.bases
+
+        @property
+        def _cache_key(self):
+            return self.cache_key
+
+    Adapter.__name__ = f"Adapter_{model_cls.__name__}"
+
     return Adapter
