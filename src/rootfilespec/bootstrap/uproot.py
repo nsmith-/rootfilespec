@@ -89,24 +89,63 @@ def create_adapter_class(model_cls):
     Wrap a Model class (like Model_TTree_v20) into an Adapter that exposes
     lookup, bases, cache_key, and underscored aliases safely.
     """
-    class Adapter:        
+    class Adapter(UprootModelAdapter):        
         def __init__(self, model_instance):
-            self.model = model_instance
+            super().__init__(model_instance)
             self._internal_lookup = getattr(model_instance, "_lookup", {})
             self._internal_bases = getattr(model_instance, "_bases", [])
             self._internal_cache_key = getattr(model_instance, "cache_key", None)
 
         @property
+        def name(self):
+            return getattr(self._model, "name", None)
+
+        @property
+        def class_version(self):
+            return getattr(self._model, "class_version", None)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            try:
+                close = getattr(self, "close", None)
+                if callable(close):
+                    close()
+                else:
+                    mclose = getattr(self._model, "close", None)
+                    if callable(mclose):
+                        mclose()
+            except Exception:
+                return False
+            return False
+
+        def __getitem__(self, key):
+            try:
+                return self.lookup[key]
+            except Exception:
+                return self._internal_lookup[key]
+
+        @property
         def lookup(self):
-            return getattr(self.model, "lookup", self._internal_lookup)
+            val = getattr(self.model, "lookup", None)
+            if val is None or isinstance(val, property):
+                return self._internal_lookup
+            return val
 
         @property
         def bases(self):
-            return getattr(self.model, "bases", self._internal_bases)
+            val = getattr(self.model, "bases", None)
+            if val is None or isinstance(val, property):
+                return self._internal_bases
+            return val
 
         @property
         def cache_key(self):
-            return getattr(self.model, "cache_key", self._internal_cache_key)
+            val = getattr(self.model, "cache_key", None)
+            if val is None or isinstance(val, property):
+                return self._internal_cache_key
+            return val
 
         @property
         def _lookup(self):
