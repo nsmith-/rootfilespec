@@ -89,7 +89,18 @@ def create_adapter_class(model_cls):
     Wrap a Model class (like Model_TTree_v20) into an Adapter that exposes
     lookup, bases, cache_key, and underscored aliases safely.
     """
-    class Adapter(UprootModelAdapter):        
+    try:
+            behavior_subclasses = model_cls.behavior
+    except AttributeError:
+            behavior_subclasses = (
+                base
+                for base in model_cls.__bases__
+                if "uproot.behavior" in base.__module__
+            )
+            print(model_cls.__bases__)
+
+    # TODO: Check if we can use model_cls instead of *behavior_subclasses
+    class Adapter(UprootModelAdapter, *behavior_subclasses):   
         def __init__(self, model_instance):
             super().__init__(model_instance)
             self._internal_lookup = getattr(model_instance, "_lookup", {})
@@ -120,18 +131,18 @@ def create_adapter_class(model_cls):
                 return False
             return False
 
-        def __getitem__(self, key):
-            try:
-                return self.lookup[key]
-            except Exception:
-                return self._internal_lookup[key]
+        # def __getitem__(self, key):
+        #     try:
+        #         return self.lookup[key]
+        #     except Exception:
+        #         return self._internal_lookup[key]
 
-        @property
-        def lookup(self):
-            val = getattr(self.model, "lookup", None)
-            if val is None or isinstance(val, property):
-                return self._internal_lookup
-            return val
+        # @property
+        # def lookup(self):
+        #     val = getattr(self.model, "lookup", None)
+        #     if val is None or isinstance(val, property):
+        #         return self._internal_lookup
+        #     return val
 
         @property
         def bases(self):
@@ -147,9 +158,9 @@ def create_adapter_class(model_cls):
                 return self._internal_cache_key
             return val
 
-        @property
-        def _lookup(self):
-            return self.lookup
+        # @property
+        # def _lookup(self):
+        #     return self.lookup
 
         @property
         def _bases(self):

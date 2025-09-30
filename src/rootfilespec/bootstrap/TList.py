@@ -71,6 +71,10 @@ class TObjArray(TSeqCollection):
     objects: tuple[ROOTSerializable, ...]
     """List of objects."""
 
+
+    def __iter__(self):
+        return iter(self.objects)
+
     @classmethod
     def update_members(cls, members: Members, buffer: ReadBuffer):
         (members["fLowerBound"],), buffer = buffer.unpack(">i")
