@@ -16,7 +16,7 @@ class RFrame(ROOTSerializable):
 
     fSize: int
     """The size of the frame in bytes. The size is negative for List Frames."""
-    _unknown: bytes = field(init=False, repr=False)
+    _unknown: bytes = field(init=False, repr=False, compare=False)
     """Unknown bytes at the end of the frame."""
 
 

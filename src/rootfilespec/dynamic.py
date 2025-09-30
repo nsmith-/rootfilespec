@@ -26,12 +26,12 @@ from rootfilespec.container import (
     StdPair,
 )
 from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.serializable import serializable
+from rootfilespec.serializable import serializable, ROOTSerializable
 from rootfilespec.structutil import Fmt, StdBitset
 
 """
 
-BOOTSTRAP_TYPES: set[str] = set(bootstrap.__all__)
+BOOTSTRAP_TYPES: set[str] = set(bootstrap.__all__) | {"ROOTSerializable"}
 
 
 def streamerinfo_to_classes(streamerinfo: bootstrap.TList) -> str:

@@ -40,6 +40,7 @@ test = [
 dev = [
   "pytest >=6",
   "pytest-cov >=3",
+  "scikit-hep-testdata",
 ]
 docs = [
   "sphinx>=7.0",
@@ -147,7 +148,6 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["T20"]
 "noxfile.py" = ["T20"]
-"rntuple_reader.py" = ["T20"]
 
 
 [tool.pylint]
