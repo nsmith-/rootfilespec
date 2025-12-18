@@ -92,7 +92,14 @@ class ColumnType(IntEnum):
     def __repr__(self) -> str:
         """Get a string representation of this element type."""
         return f"{self.__class__.__name__}.{self.name}"
-
+    
+FIELD_STRUCTURAL_ROLES = {
+    0x00: "Plain field",
+    0x01: "Collection parent",
+    0x02: "Record parent",
+    0x03: "Variant parent",
+    0x04: "ROOT Streamer serialized object",
+}
 
 @serializable
 class FieldDescription(RecordFrame):
@@ -110,7 +117,7 @@ class FieldDescription(RecordFrame):
     fStructuralRole: Annotated[int, Fmt("<H")]
     """The structural role of the field; can have one of the following values:
         - Value: Meaning
-        - 0x00:  Leaf field in the schema tree
+        - 0x00:  Plain field in the schema tree that does not carry a particular structural role
         - 0x01:  The field is the parent of a collection (e.g., a vector)
         - 0x02:  The field is the parent of a record (e.g., a struct)
         - 0x03:  The field is the parent of a variant
@@ -118,7 +125,7 @@ class FieldDescription(RecordFrame):
     fFlags: Annotated[int, Fmt("<H")]
     """The flags for the field; can have any of the following bits set:
         - Bit:   Meaning
-        - 0x01:  Repetitive field, i.e. for every entry n copies of the field are stored
+        - 0x01:  Repetitive field, i.e. for every entry `n` copies of the field are stored
         - 0x02:  Projected field
         - 0x04:  Has ROOT type checksum as reported by TClass"""
     fFieldName: RString
@@ -136,6 +143,10 @@ class FieldDescription(RecordFrame):
     fTypeChecksum: Annotated[Optional[int], OptionalField("<I", "fFlags", "&", 0x04)]
     """The ROOT type checksum for the field. Present only if flag 0x04 is set (has ROOT type checksum)."""
 
+    @property
+    def structural_role(self) -> Optional[str]:
+        """Get the structural role of the field."""
+        return FIELD_STRUCTURAL_ROLES.get(self.fStructuralRole, "Unknown")
 
 @serializable
 class ColumnDescription(RecordFrame):
