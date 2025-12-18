@@ -92,7 +92,8 @@ class ColumnType(IntEnum):
     def __repr__(self) -> str:
         """Get a string representation of this element type."""
         return f"{self.__class__.__name__}.{self.name}"
-    
+
+
 FIELD_STRUCTURAL_ROLES = {
     0x00: "Plain field",
     0x01: "Collection parent",
@@ -100,6 +101,7 @@ FIELD_STRUCTURAL_ROLES = {
     0x03: "Variant parent",
     0x04: "ROOT Streamer serialized object",
 }
+
 
 @serializable
 class FieldDescription(RecordFrame):
@@ -147,6 +149,7 @@ class FieldDescription(RecordFrame):
     def structural_role(self) -> Optional[str]:
         """Get the structural role of the field."""
         return FIELD_STRUCTURAL_ROLES.get(self.fStructuralRole, "Unknown")
+
 
 @serializable
 class ColumnDescription(RecordFrame):
