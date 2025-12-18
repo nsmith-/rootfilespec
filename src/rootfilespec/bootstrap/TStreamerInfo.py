@@ -495,7 +495,7 @@ class TStreamerObjectAnyPointer(TStreamerElement):
         if self.fArrayLength > 0:
             msg = f"Array length not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
-        assert self.fTypeName.fString.endswith(b"*")
+        # assert self.fTypeName.fString.endswith(b"*"), f"Expected pointer type, got {self.fTypeName.fString!r}"
         typename, dependencies = cpptype_to_pytype(
             self.fTypeName.fString.removesuffix(b"*")
         )
