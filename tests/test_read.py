@@ -1,7 +1,8 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import Callable, Union, cast
+from typing import cast
 
 import numpy as np
 import pytest
@@ -78,7 +79,7 @@ class TLeaf:
 
 
 class LeafArray:
-    objects: tuple[Union[TLeaf, Ref[TLeaf]], ...]
+    objects: tuple[TLeaf | Ref[TLeaf], ...]
 
 
 class TBranch(ROOTSerializable):
@@ -142,10 +143,12 @@ def _walk_branchlist(
             print(f"{'  ' * indent}  Leaves: {b','.join(leaves)!r}")
             continue
 
-        for size, seek in zip(branch.fBasketBytes, branch.fBasketSeek):
+        for size, seek in zip(branch.fBasketBytes, branch.fBasketSeek, strict=False):
             if size == 0:
                 continue
-            buffer = fetch_data(seek, size)
+            # TODO: hacky fix for: tests/test_read.py:149: error: Argument 1 has incompatible type "signedinteger[_64Bit]"; expected "int"  [arg-type] (also happened for "signedinteger[_32Bit]")
+            # buffer = fetch_data(seek, size)
+            buffer = fetch_data(int(seek), int(size))
             basket, _ = TBasket.read(buffer)
             # TODO: this is a bit of a hack to avoid writing the same decompression code as in TKey.read_object
             basket.read_object(

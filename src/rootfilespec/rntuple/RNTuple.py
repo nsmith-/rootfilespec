@@ -127,8 +127,13 @@ class RNTuple:
     # can provide helpers to get page descriptions with different filters, columns/rows/etc.
     def get_extended_page_descriptions(
         self,
+        includeSuppressed: bool = False,
     ) -> list[list[list[list[InterpretablePage]]]]:
-        """Fetches all pages from the RNTuple, decompressing them if necessary."""
+        """Fetches all pages from the RNTuple, organized by cluster group, column, and page.
+
+        Args:
+            includeSuppressed (bool): If False, skip suppressed columns.
+        """
         envelopePages: list[list[list[list[InterpretablePage]]]] = [
             [
                 [
@@ -145,8 +150,11 @@ class RNTuple:
                         for page_description in pagelist
                     ]
                     for pagelist, column_description in zip(
-                        columnlist, self.schemaDescription.columnDescriptions
+                        columnlist,
+                        self.schemaDescription.columnDescriptions,
+                        strict=False,
                     )
+                    if includeSuppressed or pagelist.elementoffset >= 0
                 ]
                 for columnlist in pagelistEnvelope.pageLocations
             ]

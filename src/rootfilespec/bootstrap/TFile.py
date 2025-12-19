@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Annotated, Union
+from typing import Annotated
 
 from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TDirectory import TDirectory
@@ -144,9 +144,9 @@ class ROOTFile(ROOTSerializable):
     """The magic number identifying the file as a ROOT file."""
     fVersion: VersionInfo
     """The version information of the ROOT file."""
-    header: Union[
-        ROOTFile_header_v302, ROOTFile_header_v622_small, ROOTFile_header_v622_large
-    ]
+    header: (
+        ROOTFile_header_v302 | ROOTFile_header_v622_small | ROOTFile_header_v622_large
+    )
     """The header of the ROOT file."""
     padding: bytes
     """Padding bytes in the ROOT file."""

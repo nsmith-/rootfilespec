@@ -1,5 +1,5 @@
 from enum import IntEnum
-from typing import Annotated, Optional
+from typing import Annotated
 
 from rootfilespec.bootstrap.strings import RString
 from rootfilespec.rntuple.RFrame import RecordFrame
@@ -94,6 +94,15 @@ class ColumnType(IntEnum):
         return f"{self.__class__.__name__}.{self.name}"
 
 
+FIELD_STRUCTURAL_ROLES = {
+    0x00: "Plain field",
+    0x01: "Collection parent",
+    0x02: "Record parent",
+    0x03: "Variant parent",
+    0x04: "ROOT Streamer serialized object",
+}
+
+
 @serializable
 class FieldDescription(RecordFrame):
     """A class representing an RNTuple Field Description Record Frame.
@@ -110,7 +119,7 @@ class FieldDescription(RecordFrame):
     fStructuralRole: Annotated[int, Fmt("<H")]
     """The structural role of the field; can have one of the following values:
         - Value: Meaning
-        - 0x00:  Leaf field in the schema tree
+        - 0x00:  Plain field in the schema tree that does not carry a particular structural role
         - 0x01:  The field is the parent of a collection (e.g., a vector)
         - 0x02:  The field is the parent of a record (e.g., a struct)
         - 0x03:  The field is the parent of a variant
@@ -118,7 +127,7 @@ class FieldDescription(RecordFrame):
     fFlags: Annotated[int, Fmt("<H")]
     """The flags for the field; can have any of the following bits set:
         - Bit:   Meaning
-        - 0x01:  Repetitive field, i.e. for every entry n copies of the field are stored
+        - 0x01:  Repetitive field, i.e. for every entry `n` copies of the field are stored
         - 0x02:  Projected field
         - 0x04:  Has ROOT type checksum as reported by TClass"""
     fFieldName: RString
@@ -129,12 +138,17 @@ class FieldDescription(RecordFrame):
     """The alias of the field type, if any."""
     fFieldDescription: RString
     """The description of the field, if any."""
-    fArraySize: Annotated[Optional[int], OptionalField("<Q", "fFlags", "&", 0x01)]
+    fArraySize: Annotated[int | None, OptionalField("<Q", "fFlags", "&", 0x01)]
     """The size of the array for the field. Present only if flag 0x01 is set (repetitive field)."""
-    fSourceFieldID: Annotated[Optional[int], OptionalField("<I", "fFlags", "&", 0x02)]
+    fSourceFieldID: Annotated[int | None, OptionalField("<I", "fFlags", "&", 0x02)]
     """The ID of the source field. Present only if flag 0x02 is set (projected field)."""
-    fTypeChecksum: Annotated[Optional[int], OptionalField("<I", "fFlags", "&", 0x04)]
+    fTypeChecksum: Annotated[int | None, OptionalField("<I", "fFlags", "&", 0x04)]
     """The ROOT type checksum for the field. Present only if flag 0x04 is set (has ROOT type checksum)."""
+
+    @property
+    def structural_role(self) -> str | None:
+        """Get the structural role of the field."""
+        return FIELD_STRUCTURAL_ROLES.get(self.fStructuralRole, "Unknown")
 
 
 @serializable
@@ -165,13 +179,11 @@ class ColumnDescription(RecordFrame):
     fRepresentationIndex: Annotated[int, Fmt("<H")]
     """The index of the representation of the column in the list of representations for the field."""
     # abbott TODO: verify the below are signed. make PR updating ROOT documentation if so (indicate signed bit in table)
-    fFirstElementIndex: Annotated[
-        Optional[int], OptionalField("<q", "fFlags", "&", 0x01)
-    ]
+    fFirstElementIndex: Annotated[int | None, OptionalField("<q", "fFlags", "&", 0x01)]
     """The index of the first element in the column. Present only if flag 0x01 is set (deferred column)."""
-    fMinValue: Annotated[Optional[int], OptionalField("<q", "fFlags", "&", 0x02)]
+    fMinValue: Annotated[int | None, OptionalField("<q", "fFlags", "&", 0x02)]
     """The minimum value of the column. Present only if flag 0x02 is set (column with range of values)."""
-    fMaxValue: Annotated[Optional[int], OptionalField("<q", "fFlags", "&", 0x02)]
+    fMaxValue: Annotated[int | None, OptionalField("<q", "fFlags", "&", 0x02)]
     """The maximum value of the column. Present only if flag 0x02 is set (column with range of values)."""
 
 

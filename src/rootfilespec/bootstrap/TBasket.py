@@ -1,6 +1,6 @@
 """TBasket seems to be assumed in ROOT files and is not in the TStreamerInfo"""
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 import numpy as np
 from numpy.typing import NDArray
@@ -43,7 +43,7 @@ class TBasket(TKey):
     bheader: TBasket_header
     fEntryOffset: NDArray[np.int32]  #  BasicArray(np.dtype(">i"), "fNevBuf")
     "Offset of entries in fBuffer(TKey)"
-    fBuffer: Optional[memoryview]
+    fBuffer: memoryview | None
     "Buffer if the basket owns it"
 
     @classmethod

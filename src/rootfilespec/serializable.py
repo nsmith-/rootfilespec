@@ -1,11 +1,10 @@
 import dataclasses
 import struct
-import sys
+from collections.abc import Callable
+from inspect import get_annotations
 from typing import (
     Annotated,
     Any,
-    Callable,
-    Optional,
     TypeVar,
     get_args,
     get_origin,
@@ -30,7 +29,7 @@ class FileContext:
     """
 
     def type_by_name(
-        self, name: str, expect_version: Optional[int] = None
+        self, name: str, expect_version: int | None = None
     ) -> type["ROOTSerializable"]:
         """Lookup a ROOTSerializable-derived type by its name
 
@@ -50,7 +49,7 @@ class FileContext:
 class BufferContext:
     """Holds local context for a buffer"""
 
-    abspos: Optional[int]
+    abspos: int | None
     """The absolute position of the buffer in the file.
         If the buffer was created from a compressed buffer, this will be None.
     """
@@ -164,11 +163,7 @@ def _get_annotations(cls: type) -> dict[str, Any]:
 
     Only retrieves annotations from the class itself, not from its base classes.
     """
-    if sys.version_info >= (3, 10):
-        from inspect import get_annotations
-
-        return get_annotations(cls)
-    return dict(cls.__dict__.get("__annotations__", {}).items())
+    return get_annotations(cls)
 
 
 @dataclasses.dataclass

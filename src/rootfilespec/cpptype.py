@@ -25,7 +25,7 @@ which can be rendered with lark using `python -m lark.tools.standalone cpptype.l
 import re
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Optional, Protocol
+from typing import Protocol
 
 from rootfilespec.dispatch import normalize
 
@@ -102,10 +102,10 @@ class _TokenStream:
         self._tokens = iter(_Token(match) for match in split[1::2])
         self._current = next(self._tokens, None)
 
-    def peek(self) -> Optional[_Token]:
+    def peek(self) -> _Token | None:
         return self._current
 
-    def next(self) -> Optional[_Token]:
+    def next(self) -> _Token | None:
         token, self._current = self._current, next(self._tokens, None)
         return token
 
