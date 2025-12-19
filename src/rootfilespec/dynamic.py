@@ -2,7 +2,6 @@ import dataclasses
 import sys
 import types
 import warnings
-from typing import Optional
 
 from rootfilespec import bootstrap, generated
 from rootfilespec.bootstrap.TStreamerInfo import (
@@ -76,7 +75,7 @@ class DynamicFileContext(FileContext):
         return f"<DynamicFileContext(module={self.module.__name__})>"
 
     def type_by_name(
-        self, name: str, expect_version: Optional[int] = None
+        self, name: str, expect_version: int | None = None
     ) -> type[ROOTSerializable]:
         cls = self.module.__dict__.get(name)
         if cls is None:

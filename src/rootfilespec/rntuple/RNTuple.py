@@ -150,7 +150,9 @@ class RNTuple:
                         for page_description in pagelist
                     ]
                     for pagelist, column_description in zip(
-                        columnlist, self.schemaDescription.columnDescriptions
+                        columnlist,
+                        self.schemaDescription.columnDescriptions,
+                        strict=False,
                     )
                     if includeSuppressed or pagelist.elementoffset >= 0
                 ]

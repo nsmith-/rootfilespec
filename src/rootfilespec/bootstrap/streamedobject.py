@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Generic, Optional, TypeVar, overload
+from typing import Generic, TypeVar, overload
 
 from rootfilespec.dispatch import normalize
 from rootfilespec.serializable import (
@@ -39,11 +39,11 @@ class StreamHeader(ROOTSerializable):
 
     fByteCount: int
     """Number of remaining bytes in object (uncompressed)"""
-    fVersion: Optional[int]
+    fVersion: int | None
     """Version of Class"""
-    fClassName: Optional[bytes]
+    fClassName: bytes | None
     """Class name of object, if first instance of class in buffer"""
-    fClassRef: Optional[int]
+    fClassRef: int | None
     """Position in buffer of class name if not specified here"""
     memberwise: bool
     """If the object is memberwise streamed"""
@@ -123,10 +123,10 @@ class Ref(ContainerSerDe, Generic[T]):
     being cyclic and cause a stack overflow.
     """
 
-    obj: Optional[T]
+    obj: T | None
     """The object that is referenced."""
 
-    def __init__(self, obj: Optional[T]):
+    def __init__(self, obj: T | None):
         self.obj = obj
 
     def __repr__(self):
@@ -151,7 +151,7 @@ def read_streamed_item(
 
 
 def read_streamed_item(
-    buffer: ReadBuffer, method: Optional[ReadObjMethod] = None
+    buffer: ReadBuffer, method: ReadObjMethod | None = None
 ) -> tuple[ROOTSerializable, ReadBuffer]:
     # Read ahead the stream header to determine the type of the object
     itemheader, _ = StreamHeader.read(buffer)

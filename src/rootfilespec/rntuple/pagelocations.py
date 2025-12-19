@@ -1,4 +1,4 @@
-from typing import Annotated, Optional
+from typing import Annotated
 
 from rootfilespec.bootstrap.compression import RCompressionSettings
 from rootfilespec.rntuple.RFrame import Item, ListFrame
@@ -72,6 +72,6 @@ class PageLocations(ListFrame[Item]):
     elementoffset: Annotated[int, Fmt("<q")]
     """The offset for the first element for this column."""
     compressionsettings: Annotated[
-        Optional[RCompressionSettings], OptionalField("class", "elementoffset", ">=", 0)
+        RCompressionSettings | None, OptionalField("class", "elementoffset", ">=", 0)
     ]
     """The compression settings for the pages in this column."""

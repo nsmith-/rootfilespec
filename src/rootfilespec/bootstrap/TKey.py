@@ -1,4 +1,4 @@
-from typing import Annotated, Optional, TypeVar, Union, overload
+from typing import Annotated, TypeVar, overload
 
 from rootfilespec.bootstrap.compression import RCompressed
 from rootfilespec.bootstrap.strings import TString
@@ -105,8 +105,8 @@ class TKey(ROOTSerializable):
     def read_object(
         self,
         fetch_data: DataFetcher,
-        objtype: Optional[type[ObjType]] = None,
-    ) -> Union[ObjType, ROOTSerializable]:
+        objtype: type[ObjType] | None = None,
+    ) -> ObjType | ROOTSerializable:
         buffer = fetch_data(self.fSeekKey, self.header.fNbytes)
         # TODO: should we compare the key in the buffer with ourself?
         buffer = buffer[self.header.fKeylen :]

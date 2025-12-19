@@ -1,6 +1,6 @@
 import dataclasses
 from collections.abc import Hashable
-from typing import Any, Generic, TypeVar, Union, get_args, get_origin
+from typing import Any, Generic, TypeVar, get_args, get_origin
 
 import numpy as np
 
@@ -133,7 +133,7 @@ class _ObjectArrayReader:
     """Array that has its length at the beginning of the array and has no pad byte"""
 
     name: str
-    size: Union[int, str]
+    size: int | str
     inner_reader: ReadObjMethod
 
     def __call__(
@@ -159,7 +159,7 @@ class _ObjectArrayReader:
 class ObjectArray(MemberSerDe):
     """A class to hold an array of objects of a given type."""
 
-    size: Union[int, str]
+    size: int | str
     """Either a fixed size or the name of a member that holds the size of the array."""
 
     def build_reader(self, fname: str, ftype: type):
@@ -230,7 +230,7 @@ class StdVector(ContainerSerDe, Generic[T]):
                     for _ in range(n):
                         second, buffer = inner_reader.membermethod.value_reader(buffer)
                         seconds.append(second)
-                    return cls(list(zip(firsts, seconds))), buffer  # type: ignore[arg-type]
+                    return cls(list(zip(firsts, seconds, strict=False))), buffer  # type: ignore[arg-type]
                 msg = "Memberwise reading of StdVector not implemented"
                 raise NotImplementedError(msg)
         (n,), buffer = buffer.unpack(">i")

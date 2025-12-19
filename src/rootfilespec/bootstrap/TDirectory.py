@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Annotated, Optional
+from typing import Annotated
 
 from rootfilespec.bootstrap.TDatime import TDatime, TDatime_to_datetime
 from rootfilespec.bootstrap.TKey import TKey
@@ -79,7 +79,7 @@ class TDirectory(ROOTSerializable):
     """Byte offset of parent directory record in file"""
     fSeekKeys: int
     """Byte offset of associated KeysList record in file"""
-    fUUID: Optional[TUUID]
+    fUUID: TUUID | None
     """Universally Unique Identifier"""
 
     @classmethod

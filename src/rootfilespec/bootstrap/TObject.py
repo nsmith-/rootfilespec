@@ -1,5 +1,5 @@
 from enum import IntFlag
-from typing import Annotated, Optional
+from typing import Annotated
 
 from rootfilespec.bootstrap.streamedobject import StreamedObject
 from rootfilespec.bootstrap.strings import TString
@@ -75,7 +75,7 @@ class TObject(StreamedObject):
     """Unique ID of the object."""
     fBits: Annotated[TObjFlag, Fmt(">i")]
     """Bit mask for the object."""
-    pidf: Optional[int]
+    pidf: int | None
     """An identifier of the TProcessID record for the process that wrote the object.
     This identifier is an unsigned short. The relevant record has a name that is
     the string "ProcessID" concatenated with the ASCII decimal representation of

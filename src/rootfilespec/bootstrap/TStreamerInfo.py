@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Annotated, Union
+from typing import Annotated
 
 from rootfilespec.bootstrap.double32 import parse_double32_title
 from rootfilespec.bootstrap.strings import TString
@@ -76,7 +76,7 @@ class TStreamerInfo(TNamed):
         members: list[tuple[str, str]] = []
         dependencies: list[str] = []
         for element in self.fObjects.objects:
-            if not isinstance(element, (TStreamerElement, TStreamerSTLstring)):
+            if not isinstance(element, TStreamerElement | TStreamerSTLstring):
                 msg = f"Unexpected element: {element}"
                 raise TypeError(msg)
             if isinstance(element, TStreamerBase):
@@ -112,7 +112,7 @@ class TStreamerInfo(TNamed):
         return ClassDef(clsname, bases + dependencies, "\n".join(lines))
 
 
-def _structtype_to_pytype(fmt: str) -> type[Union[int, float, bool, bytes]]:
+def _structtype_to_pytype(fmt: str) -> type[int | float | bool | bytes]:
     if fmt.lstrip("<>").lower() in "bhilq":
         return int
     if fmt.lstrip("<>").lower() in "fd":

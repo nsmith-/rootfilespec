@@ -8,7 +8,6 @@ These types generally hold big-endian encoded primitive types.
 """
 
 import dataclasses
-from typing import Optional
 
 from rootfilespec.bootstrap.array import (
     TArray,
@@ -60,7 +59,7 @@ class _BootstrapContext(FileContext):
     types: dict[str, type[ROOTSerializable]]
 
     def type_by_name(
-        self, name: str, expect_version: Optional[int] = None
+        self, name: str, expect_version: int | None = None
     ) -> type[ROOTSerializable]:
         cls = self.types.get(name)
         if cls is None:

@@ -1,6 +1,6 @@
 from enum import IntEnum
 from functools import partial
-from typing import Annotated, Optional, Protocol
+from typing import Annotated, Protocol
 
 import cramjam  # type: ignore[import-not-found]
 
@@ -101,7 +101,7 @@ class RCompressedChunk(ROOTSerializable):
     """
 
     header: RCompressionHeader
-    checksum: Optional[bytes]
+    checksum: bytes | None
     payload: memoryview
 
     @classmethod
