@@ -1,11 +1,14 @@
-from typing import Annotated, Union
+from typing import Annotated
 
 from rootfilespec.bootstrap.streamedobject import Ref, read_streamed_item
 from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TObject import TObject
-from rootfilespec.buffer import ReadBuffer
-from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.serializable import (
+    Members,
+    ReadBuffer,
+    ROOTSerializable,
+    serializable,
+)
 from rootfilespec.structutil import Fmt
 
 
@@ -16,15 +19,9 @@ class TCollection(TObject):
     fSize: Annotated[int, Fmt(">i")]
 
 
-DICTIONARY["TCollection"] = TCollection
-
-
 @serializable
 class TSeqCollection(TCollection):
     _SkipHeader = True
-
-
-DICTIONARY["TSeqCollection"] = TSeqCollection
 
 
 @serializable
@@ -33,16 +30,16 @@ class TList(TSeqCollection):
     Reference: https://root.cern/doc/master/streamerinfo.html (TList section)
     """
 
-    items: list[Union[TObject, Ref[TObject]]]
+    items: list[TObject | Ref[TObject]]
     """List of objects."""
 
     @classmethod
     def update_members(cls, members: Members, buffer: ReadBuffer):
-        items: list[Union[TObject, Ref[TObject]]] = []
+        items: list[TObject | Ref[TObject]] = []
         fSize: int = members["fSize"]
         for _ in range(fSize):
             item, buffer = read_streamed_item(buffer)
-            if not (isinstance(item, (TObject, Ref))):
+            if not (isinstance(item, TObject | Ref)):
                 msg = f"Expected TObject but got {item!r}"
                 raise ValueError(msg)
             # No idea why there is a null pad byte here
@@ -57,9 +54,6 @@ class TList(TSeqCollection):
             items.append(item)
         members["items"] = items
         return members, buffer
-
-
-DICTIONARY["TList"] = TList
 
 
 @serializable
@@ -85,6 +79,3 @@ class TObjArray(TSeqCollection):
             objects.append(item)
         members["objects"] = tuple(objects)
         return members, buffer
-
-
-DICTIONARY["TObjArray"] = TObjArray

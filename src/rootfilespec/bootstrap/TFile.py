@@ -1,13 +1,18 @@
 from dataclasses import dataclass
-from typing import Annotated, Union
+from typing import Annotated
 
 from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TDirectory import TDirectory
 from rootfilespec.bootstrap.TKey import TKey
 from rootfilespec.bootstrap.TList import TList
 from rootfilespec.bootstrap.TUUID import TUUID
-from rootfilespec.buffer import DataFetcher, ReadBuffer
-from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.serializable import (
+    DataFetcher,
+    Members,
+    ReadBuffer,
+    ROOTSerializable,
+    serializable,
+)
 from rootfilespec.structutil import Fmt
 
 
@@ -139,9 +144,9 @@ class ROOTFile(ROOTSerializable):
     """The magic number identifying the file as a ROOT file."""
     fVersion: VersionInfo
     """The version information of the ROOT file."""
-    header: Union[
-        ROOTFile_header_v302, ROOTFile_header_v622_small, ROOTFile_header_v622_large
-    ]
+    header: (
+        ROOTFile_header_v302 | ROOTFile_header_v622_small | ROOTFile_header_v622_large
+    )
     """The header of the ROOT file."""
     padding: bytes
     """Padding bytes in the ROOT file."""

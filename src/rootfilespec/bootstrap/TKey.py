@@ -1,11 +1,17 @@
-from typing import Annotated, Optional, TypeVar, Union, overload
+from typing import Annotated, TypeVar, overload
 
 from rootfilespec.bootstrap.compression import RCompressed
 from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TDatime import TDatime, TDatime_to_datetime
-from rootfilespec.buffer import DataFetcher, ReadBuffer
-from rootfilespec.dispatch import DICTIONARY, normalize
-from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.dispatch import normalize
+from rootfilespec.serializable import (
+    BufferContext,
+    DataFetcher,
+    Members,
+    ReadBuffer,
+    ROOTSerializable,
+    serializable,
+)
 from rootfilespec.structutil import Fmt
 
 
@@ -99,8 +105,8 @@ class TKey(ROOTSerializable):
     def read_object(
         self,
         fetch_data: DataFetcher,
-        objtype: Optional[type[ObjType]] = None,
-    ) -> Union[ObjType, ROOTSerializable]:
+        objtype: type[ObjType] | None = None,
+    ) -> ObjType | ROOTSerializable:
         buffer = fetch_data(self.fSeekKey, self.header.fNbytes)
         # TODO: should we compare the key in the buffer with ourself?
         buffer = buffer[self.header.fKeylen :]
@@ -119,18 +125,16 @@ class TKey(ROOTSerializable):
                 raise ValueError(msg)
             buffer = ReadBuffer(
                 compressed.decompress(),
-                abspos=None,
                 relpos=self.header.fKeylen,
+                file_context=buffer.file_context,
+                context=BufferContext(abspos=None),
             )
         if objtype is not None:
             typename = objtype.__name__
             obj, buffer = objtype.read(buffer)
         else:
             typename = normalize(self.fClassName.fString)
-            dyntype = DICTIONARY.get(typename)
-            if dyntype is None:
-                msg = f"TKey.read_object: unknown type {typename}"
-                raise NotImplementedError(msg)
+            dyntype = buffer.file_context.type_by_name(typename)
             obj, buffer = dyntype.read(buffer)
         # Some types we have to handle trailing bytes
         if typename == "TKeyList":

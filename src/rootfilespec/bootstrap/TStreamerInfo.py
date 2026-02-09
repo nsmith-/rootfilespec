@@ -1,12 +1,13 @@
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Annotated, Union
+from typing import Annotated
 
+from rootfilespec.bootstrap.double32 import parse_double32_title
 from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TList import TObjArray
 from rootfilespec.bootstrap.TObject import TNamed
 from rootfilespec.cpptype import cpptype_to_pytype
-from rootfilespec.dispatch import DICTIONARY, ENCODING, normalize
+from rootfilespec.dispatch import ENCODING, normalize
 from rootfilespec.serializable import serializable
 from rootfilespec.structutil import Fmt
 
@@ -75,7 +76,7 @@ class TStreamerInfo(TNamed):
         members: list[tuple[str, str]] = []
         dependencies: list[str] = []
         for element in self.fObjects.objects:
-            if not isinstance(element, (TStreamerElement, TStreamerSTLstring)):
+            if not isinstance(element, TStreamerElement | TStreamerSTLstring):
                 msg = f"Unexpected element: {element}"
                 raise TypeError(msg)
             if isinstance(element, TStreamerBase):
@@ -95,9 +96,7 @@ class TStreamerInfo(TNamed):
             lines.append(
                 "# No checksum: almost certainly a custom streamer, will be left uninterpreted"
             )
-            lines.append(
-                f"class {clsname}(Uninterpreted):\n    pass\nDICTIONARY['{clsname}'] = {clsname}\n"
-            )
+            lines.append(f"class {clsname}(Uninterpreted):\n    pass\n")
             return ClassDef(self.class_name(), [], "\n".join(lines))
         lines.append("@serializable")
         lines.append(f"class {clsname}({basestr}):")
@@ -108,15 +107,12 @@ class TStreamerInfo(TNamed):
         if not members:
             lines.append("    pass")
         lines.append("\n")
-        lines.append(f"DICTIONARY['{clsname}'] = {clsname}")
+        # lines.append(f"DICTIONARY['{clsname}'] = {clsname}")
         lines.append("")
         return ClassDef(clsname, bases + dependencies, "\n".join(lines))
 
 
-DICTIONARY["TStreamerInfo"] = TStreamerInfo
-
-
-def _structtype_to_pytype(fmt: str) -> type[Union[int, float, bool, bytes]]:
+def _structtype_to_pytype(fmt: str) -> type[int | float | bool | bytes]:
     if fmt.lstrip("<>").lower() in "bhilq":
         return int
     if fmt.lstrip("<>").lower() in "fd":
@@ -332,9 +328,6 @@ class TStreamerElement(TNamed):
         raise NotImplementedError(msg)
 
 
-DICTIONARY["TStreamerElement"] = TStreamerElement
-
-
 @serializable
 class TStreamerBase(TStreamerElement):
     """Streamer element for a base class.
@@ -346,9 +339,6 @@ class TStreamerBase(TStreamerElement):
     fBaseVersion: Annotated[int, Fmt(">i")]
 
 
-DICTIONARY["TStreamerBase"] = TStreamerBase
-
-
 @serializable
 class TStreamerBasicType(TStreamerElement):
     def member_definition(self, parent: TStreamerInfo):  # noqa: ARG002
@@ -356,17 +346,20 @@ class TStreamerBasicType(TStreamerElement):
             fmt = ElementType(self.fType - ElementType.kOffsetL).as_fmt()
             atype = f"FixedSizeArray({fmt!r}, {self.fArrayLength})"
             return f"{self.member_name()}: Annotated[np.ndarray, {atype}]", []
-        
-        # if double32, use double32serde
-        # add a breakpoint, use debug mode on pytest
-        # run "uproot-Event.root", "uproot-double32-float16.root", "uproot-issue-308.root"
-        
+
+        # In TStreamerBasicType.member_definition
+        if self.fType == ElementType.kDouble32:
+            title = self.fTitle.fString.decode("utf-8", errors="replace").strip()
+            xmin, xmax, nbits, factor = parse_double32_title(title)
+
+            return (
+                f"{self.member_name()}: Annotated[float, Double32Serde(factor={factor}, xmin={xmin}, xmax={xmax}, nbits={nbits})]",
+                [],
+            )
+
         fmt = self.fType.as_fmt()
         pytype = _structtype_to_pytype(fmt).__name__
         return f"{self.member_name()}: Annotated[{pytype}, Fmt({fmt!r})]", []
-
-
-DICTIONARY["TStreamerBasicType"] = TStreamerBasicType
 
 
 @serializable
@@ -376,9 +369,6 @@ class TStreamerString(TStreamerElement):
             msg = f"Array length not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
         return f"{self.member_name()}: TString", []
-
-
-DICTIONARY["TStreamerString"] = TStreamerString
 
 
 @serializable
@@ -419,9 +409,6 @@ class TStreamerBasicPointer(TStreamerElement):
         )
 
 
-DICTIONARY["TStreamerBasicPointer"] = TStreamerBasicPointer
-
-
 @serializable
 class TStreamerObject(TStreamerElement):
     def member_definition(self, parent: TStreamerInfo):
@@ -435,9 +422,6 @@ class TStreamerObject(TStreamerElement):
             typename = f"Annotated[list[{typename}], ObjectArray({self.fArrayLength})]"
         mdef = f"{self.member_name()}: {typename}"
         return mdef, dependencies
-
-
-DICTIONARY["TStreamerObject"] = TStreamerObject
 
 
 @serializable
@@ -458,9 +442,6 @@ class TStreamerObjectPointer(TStreamerElement):
             typename = typename.replace(this, f'"{this}"')
         mdef = f"{self.member_name()}: {typename}"
         return mdef, list(dependencies)
-
-
-DICTIONARY["TStreamerObjectPointer"] = TStreamerObjectPointer
 
 
 @serializable
@@ -494,9 +475,6 @@ class TStreamerLoop(TStreamerElement):
         )
 
 
-DICTIONARY["TStreamerLoop"] = TStreamerLoop
-
-
 @serializable
 class TStreamerObjectAny(TStreamerElement):
     def member_definition(self, parent: TStreamerInfo):
@@ -511,16 +489,13 @@ class TStreamerObjectAny(TStreamerElement):
         return f"{self.member_name()}: {typename}", list(dependencies)
 
 
-DICTIONARY["TStreamerObjectAny"] = TStreamerObjectAny
-
-
 @serializable
 class TStreamerObjectAnyPointer(TStreamerElement):
     def member_definition(self, parent: TStreamerInfo):
         if self.fArrayLength > 0:
             msg = f"Array length not implemented for {self.__class__.__name__}"
             raise NotImplementedError(msg)
-        assert self.fTypeName.fString.endswith(b"*")
+        # assert self.fTypeName.fString.endswith(b"*"), f"Expected pointer type, got {self.fTypeName.fString!r}"
         typename, dependencies = cpptype_to_pytype(
             self.fTypeName.fString.removesuffix(b"*")
         )
@@ -529,9 +504,6 @@ class TStreamerObjectAnyPointer(TStreamerElement):
             typename = f'"{typename}"'
         mdef = f"{self.member_name()}: Ref[{typename}]"
         return mdef, list(dependencies)
-
-
-DICTIONARY["TStreamerObjectAnyPointer"] = TStreamerObjectAnyPointer
 
 
 class STLType(IntEnum):
@@ -615,16 +587,9 @@ class TStreamerSTL(TStreamerElement):
         return f"{self.member_name()}: {typename}", list(dependencies)
 
 
-DICTIONARY["TStreamerSTL"] = TStreamerSTL
-
-
 @serializable
 class TStreamerSTLstring(TStreamerSTL):
     """STL string streamer element."""
 
     def member_definition(self, parent: TStreamerInfo):  # noqa: ARG002
         return f"{self.member_name()}: STLString", []
-
-
-# the lower case "string" is intentional
-DICTIONARY["TStreamerSTLstring"] = TStreamerSTLstring

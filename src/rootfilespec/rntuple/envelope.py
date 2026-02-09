@@ -4,9 +4,15 @@ from typing import Annotated, TypeVar
 from typing_extensions import Self
 
 from rootfilespec.bootstrap.compression import RCompressed
-from rootfilespec.buffer import DataFetcher, ReadBuffer
 from rootfilespec.rntuple.RLocator import RLocator
-from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.serializable import (
+    BufferContext,
+    DataFetcher,
+    Members,
+    ReadBuffer,
+    ROOTSerializable,
+    serializable,
+)
 from rootfilespec.structutil import Fmt
 
 # Map of envelope type to string for printing
@@ -39,6 +45,10 @@ class RFeatureFlags(ROOTSerializable):
             raise NotImplementedError(msg)
         members["flags"] = flags
         return members, buffer
+
+    def __or__(self, other: "RFeatureFlags") -> "RFeatureFlags":
+        """Returns a new RFeatureFlags object with the combined flags."""
+        return RFeatureFlags(self.flags | other.flags)
 
 
 @dataclass
@@ -134,7 +144,6 @@ class REnvelopeLink(ROOTSerializable):
         buffer = self.locator.get_buffer(fetch_data)
 
         #### If compressed, decompress the envelope
-        compressed = None
         # The length of the buffer is the number of bytes of compressed data
         if len(buffer) != self.length:
             # This is a compressed object
@@ -148,8 +157,9 @@ class REnvelopeLink(ROOTSerializable):
                 raise ValueError(msg)
             buffer = ReadBuffer(
                 compressed.decompress(),
-                abspos=None,
                 relpos=self.length,
+                file_context=buffer.file_context,
+                context=BufferContext(abspos=None),
             )
         # Now the envelope is uncompressed
 

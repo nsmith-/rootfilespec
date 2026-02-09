@@ -1,15 +1,18 @@
 """TBasket seems to be assumed in ROOT files and is not in the TStreamerInfo"""
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 import numpy as np
 from numpy.typing import NDArray
 
 from rootfilespec.bootstrap.streamedobject import StreamHeader
 from rootfilespec.bootstrap.TKey import TKey
-from rootfilespec.buffer import ReadBuffer
-from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.serializable import (
+    Members,
+    ReadBuffer,
+    ROOTSerializable,
+    serializable,
+)
 from rootfilespec.structutil import Fmt
 
 
@@ -40,7 +43,7 @@ class TBasket(TKey):
     bheader: TBasket_header
     fEntryOffset: NDArray[np.int32]  #  BasicArray(np.dtype(">i"), "fNevBuf")
     "Offset of entries in fBuffer(TKey)"
-    fBuffer: Optional[memoryview]
+    fBuffer: memoryview | None
     "Buffer if the basket owns it"
 
     @classmethod
@@ -85,6 +88,3 @@ class TBasket(TKey):
         members["fEntryOffset"] = fEntryOffset
         members["fBuffer"] = fBuffer
         return members, buffer
-
-
-DICTIONARY["TBasket"] = TBasket

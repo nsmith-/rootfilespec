@@ -1,7 +1,10 @@
 from rootfilespec.bootstrap.streamedobject import StreamedObject
-from rootfilespec.buffer import ReadBuffer
-from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.serializable import (
+    Members,
+    ReadBuffer,
+    ROOTSerializable,
+    serializable,
+)
 
 
 @serializable
@@ -34,11 +37,7 @@ class TString(ROOTSerializable):
         return members, buffer
 
 
-# No examples so far of TString being streamed but it is in most StreamerInfo
-DICTIONARY["TString"] = TString
-
 string = TString
-DICTIONARY["string"] = TString
 
 
 @serializable
@@ -57,4 +56,24 @@ class STLString(StreamedObject):
         return members, buffer
 
 
-DICTIONARY["STLString"] = STLString
+@serializable
+class RString(ROOTSerializable):
+    """A class representing an RString."""
+
+    fString: bytes
+    """The string data."""
+
+    def __hash__(self) -> int:
+        return hash(self.fString)
+
+    @classmethod
+    def update_members(cls, members: Members, buffer: ReadBuffer):
+        """Reads an RString from the given buffer.
+        RStrings are always prefixed with a 32bit unsigned integer indicating the length of the string.
+        String data are UTF-8 encoded.
+        """
+
+        (length,), buffer = buffer.unpack("<I")
+        data, buffer = buffer.consume(length)
+        members["fString"] = data
+        return members, buffer

@@ -1,11 +1,9 @@
 from enum import IntFlag
-from typing import Annotated, Optional
+from typing import Annotated
 
 from rootfilespec.bootstrap.streamedobject import StreamedObject
 from rootfilespec.bootstrap.strings import TString
-from rootfilespec.buffer import ReadBuffer
-from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.serializable import Members, serializable
+from rootfilespec.serializable import Members, ReadBuffer, serializable
 from rootfilespec.structutil import Fmt
 
 
@@ -77,7 +75,7 @@ class TObject(StreamedObject):
     """Unique ID of the object."""
     fBits: Annotated[TObjFlag, Fmt(">i")]
     """Bit mask for the object."""
-    pidf: Optional[int]
+    pidf: int | None
     """An identifier of the TProcessID record for the process that wrote the object.
     This identifier is an unsigned short. The relevant record has a name that is
     the string "ProcessID" concatenated with the ASCII decimal representation of
@@ -100,18 +98,12 @@ class TObject(StreamedObject):
         return members, buffer
 
 
-DICTIONARY["TObject"] = TObject
-
-
 @serializable
 class TObjString(TObject):
     """Format for TObjString class."""
 
     fString: TString
     """String data of the object."""
-
-
-DICTIONARY["TObjString"] = TObjString
 
 
 @serializable
@@ -122,6 +114,3 @@ class TNamed(TObject):
     """Name of the object."""
     fTitle: TString
     """Title of the object."""
-
-
-DICTIONARY["TNamed"] = TNamed

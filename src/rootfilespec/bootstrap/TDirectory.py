@@ -1,12 +1,16 @@
 from collections.abc import Mapping
-from typing import Annotated, Optional
+from typing import Annotated
 
 from rootfilespec.bootstrap.TDatime import TDatime, TDatime_to_datetime
 from rootfilespec.bootstrap.TKey import TKey
 from rootfilespec.bootstrap.TUUID import TUUID
-from rootfilespec.buffer import DataFetcher, ReadBuffer
-from rootfilespec.dispatch import DICTIONARY
-from rootfilespec.serializable import Members, ROOTSerializable, serializable
+from rootfilespec.serializable import (
+    DataFetcher,
+    Members,
+    ReadBuffer,
+    ROOTSerializable,
+    serializable,
+)
 from rootfilespec.structutil import Fmt
 
 """
@@ -75,7 +79,7 @@ class TDirectory(ROOTSerializable):
     """Byte offset of parent directory record in file"""
     fSeekKeys: int
     """Byte offset of associated KeysList record in file"""
-    fUUID: Optional[TUUID]
+    fUUID: TUUID | None
     """Universally Unique Identifier"""
 
     @classmethod
@@ -125,9 +129,8 @@ class TDirectory(ROOTSerializable):
         return key.read_object(fetch_cached, objtype=TKeyList)
 
 
-# TODO: are these different?
-DICTIONARY["TDirectory"] = TDirectory
-DICTIONARY["TDirectoryFile"] = TDirectory
+# TODO: are these different? Both are encountered
+TDirectoryFile = TDirectory
 
 
 @serializable
