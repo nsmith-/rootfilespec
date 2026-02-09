@@ -2,6 +2,7 @@ from typing import Any
 
 from uproot.model import Model  # type: ignore[import-not-found]
 
+from rootfilespec.bootstrap.strings import TString
 from rootfilespec.serializable import ROOTSerializable, _get_annotations
 
 
@@ -14,7 +15,7 @@ class UprootModelAdapter(Model):  # type: ignore[misc]
     _model: ROOTSerializable
     _file: Any
 
-    def __init__(self, model: Any) -> None:
+    def __init__(self, model: ROOTSerializable) -> None:
         self._model = model
 
     def __getattr__(self, name: str):
@@ -28,8 +29,8 @@ class UprootModelAdapter(Model):  # type: ignore[misc]
             return getattr(behavior_cls, name)
 
         # Fall back to error
-        raise AttributeError(f"{self.__class__.__name__} has no attribute {name!r}")
-
+        msg = f"{self.__class__.__name__} has no attribute {name!r}"
+        raise AttributeError(msg)
 
     @property
     def _fields(self):
@@ -64,43 +65,38 @@ class UprootModelAdapter(Model):  # type: ignore[misc]
 
         return self._adapt_value(value)
 
-    def _adapt_value(self, value):
+    def _adapt_value(self, value: Any) -> Any:
         """Normalize ROOTSerializable values into Uproot-friendly objects."""
         if isinstance(value, ROOTSerializable):
-            if value.__class__.__name__ == "TString":
+            if isinstance(value, TString):
                 return value.fString.decode("utf-8")
 
             adapter_cls = create_adapter_class(type(value))
             return adapter_cls(value)
 
-        elif isinstance(value, (list, tuple)):
+        if isinstance(value, list | tuple):
             return type(value)(self._adapt_value(v) for v in value)
 
-        elif isinstance(value, dict):
+        if isinstance(value, dict):
             return {k: self._adapt_value(v) for k, v in value.items()}
 
-        return value 
+        return value
 
 
-from typing import Any
-
-def create_adapter_class(model_cls):
+def create_adapter_class(model_cls: type) -> type:
     """
     Wrap a Model class (like Model_TTree_v20) into an Adapter that exposes
     lookup, bases, cache_key, and underscored aliases safely.
     """
     try:
-            behavior_subclasses = model_cls.behavior
+        behavior_subclasses = model_cls.behavior  # type: ignore[attr-defined]
     except AttributeError:
-            behavior_subclasses = (
-                base
-                for base in model_cls.__bases__
-                if "uproot.behavior" in base.__module__
-            )
-            print(model_cls.__bases__)
+        behavior_subclasses = (
+            base for base in model_cls.__bases__ if "uproot.behavior" in base.__module__
+        )
 
     # TODO: Check if we can use model_cls instead of *behavior_subclasses
-    class Adapter(UprootModelAdapter, *behavior_subclasses):   
+    class Adapter(UprootModelAdapter, *behavior_subclasses):  # type: ignore[misc]
         def __init__(self, model_instance):
             super().__init__(model_instance)
             self._internal_lookup = getattr(model_instance, "_lookup", {})

@@ -65,7 +65,6 @@ class TObjArray(TSeqCollection):
     objects: tuple[ROOTSerializable, ...]
     """List of objects."""
 
-
     def __iter__(self):
         return iter(self.objects)
 
