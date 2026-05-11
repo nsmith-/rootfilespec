@@ -30,16 +30,15 @@ classifiers = [
 dynamic = ["version"]
 dependencies = ["cramjam", "xxhash", "numpy", "typing_extensions"]
 
-[project.optional-dependencies]
+[dependency-groups]
 test = [
   "pytest >=6",
   "pytest-cov >=3",
   "scikit-hep-testdata",
 ]
 dev = [
-  "pytest >=6",
-  "pytest-cov >=3",
-  "scikit-hep-testdata",
+  { include-group = "test" },
+  "mypy",
 ]
 docs = [
   "sphinx>=7.0",
@@ -63,12 +62,6 @@ build.hooks.vcs.version-file = "src/rootfilespec/_version.py"
 [tool.hatch.envs.default]
 features = ["test"]
 scripts.test = "pytest {args}"
-
-
-[tool.uv]
-dev-dependencies = [
-  "rootfilespec[test]",
-]
 
 
 [tool.pytest.ini_options]
