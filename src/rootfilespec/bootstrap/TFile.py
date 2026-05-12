@@ -169,7 +169,7 @@ class ROOTFile(ROOTSerializable):
         elif not fVersion.large:
             header, buffer = ROOTFile_header_v622_small.read(buffer)  # type: ignore[assignment]
         else:
-            header, buffer = ROOTFile_header_v622_small.read(buffer)  # type: ignore[assignment]
+            header, buffer = ROOTFile_header_v622_large.read(buffer)  # type: ignore[assignment]
         padding, buffer = buffer.consume(header.fBEGIN - buffer.relpos)
         members["magic"] = magic
         members["fVersion"] = fVersion
