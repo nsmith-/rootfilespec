@@ -175,6 +175,10 @@ def _walk_branchlist(
                     buffer.file_context,
                     BufferContext(abspos=None),
                 )
+            else:
+                # TODO: does the basket always own the buffer?
+                msg = "TODO: basket doesn't own its buffer! Existing code might be OK"
+                raise ValueError(msg)
             if basket.header.fKeylen != buffer.relpos:
                 msg = f"Expected to be at the end of the key after reading the basket, but got {buffer.relpos} != {basket.header.fKeylen}"
                 raise ValueError(msg)
