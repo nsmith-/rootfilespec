@@ -15,27 +15,42 @@ from rootfilespec.bootstrap import (
     TBasket,
     TDirectory,
 )
+from rootfilespec.bootstrap.compression import decompress
 from rootfilespec.bootstrap.streamedobject import Ref, StreamHeader
 from rootfilespec.bootstrap.strings import TString
+from rootfilespec.bootstrap.TFile import InitialReadLocator
 from rootfilespec.bootstrap.TList import TObjArray
 from rootfilespec.container import _CArrayReader
 from rootfilespec.dispatch import normalize
 from rootfilespec.dynamic import build_file_context
 from rootfilespec.serializable import (
     BufferContext,
-    DataFetcher,
+    Locator,
     ReadBuffer,
     ROOTSerializable,
+    T_co,
 )
 
 TESTABLE_FILES = [f for f in known_files if f.endswith(".root")]
 
 
-def _walk_RNTuple(anchor: ROOT3a3aRNTuple, fetch_data: DataFetcher):
-    footer = anchor.get_footer(fetch_data)
-    pagelists = footer.get_pagelists(fetch_data)
+@dataclass(frozen=True)
+class DummyLoc:
+    offset: int
+    size: int
+
+    def read_from(self, buffer: ReadBuffer) -> ROOTSerializable:
+        raise NotImplementedError()
+
+
+def _walk_RNTuple(anchor: ROOT3a3aRNTuple, fetch_data: Callable[[Locator], ReadBuffer]):
+    def old_fetch(offset: int, size: int) -> ReadBuffer:
+        return fetch_data(DummyLoc(offset, size))
+
+    footer = anchor.get_footer(old_fetch)
+    pagelists = footer.get_pagelists(old_fetch)
     for page_locations in pagelists:
-        page_locations.get_pages(fetch_data)
+        page_locations.get_pages(old_fetch)
 
 
 def _dummy_fetch(buffer: ReadBuffer, _seek: int, _size: int) -> ReadBuffer:
@@ -101,7 +116,7 @@ class TBranchElement(TBranchObject):
 
 def _walk_branchlist(
     branchlist: TObjArray,
-    fetch_data: DataFetcher,
+    fetch_data: Callable[[Locator], ReadBuffer],
     notimplemented_callback: Callable[[bytes, NotImplementedError], None],
     path: bytes = b"",
     indent: int = 0,
@@ -148,18 +163,29 @@ def _walk_branchlist(
                 continue
             # TODO: hacky fix for: tests/test_read.py:149: error: Argument 1 has incompatible type "signedinteger[_64Bit]"; expected "int"  [arg-type] (also happened for "signedinteger[_32Bit]")
             # buffer = fetch_data(seek, size)
-            buffer = fetch_data(int(seek), int(size))
-            basket, _ = TBasket.read(buffer)
-            # TODO: this is a bit of a hack to avoid writing the same decompression code as in TKey.read_object
-            basket.read_object(
-                partial(_dummy_fetch, buffer),
-                _ReadBasket(typename, basket.bheader.fNevBuf),
-            )
+            buffer = fetch_data(DummyLoc(seek, size))
+            basket, buffer = TBasket.read(buffer)
+            if len(buffer) == 0:
+                if basket.fBuffer is None:
+                    msg = "Expected to read a basket with data, but got an empty buffer"
+                    raise ValueError(msg)
+                buffer = ReadBuffer(
+                    basket.fBuffer,
+                    basket.header.fKeylen,  # TODO: unsure if this is correct
+                    buffer.file_context,
+                    BufferContext(abspos=None),
+                )
+            if basket.header.fKeylen != buffer.relpos:
+                msg = f"Expected to be at the end of the key after reading the basket, but got {buffer.relpos} != {basket.header.fKeylen}"
+                raise ValueError(msg)
+            if len(buffer) != basket.header.fObjlen:
+                buffer = decompress(buffer, basket.header.fObjlen)
+            _ReadBasket(typename, basket.bheader.fNevBuf).read(buffer)
 
 
 def _walk(
     dir: TDirectory,
-    fetch_data: DataFetcher,
+    fetch_data: Callable[[Locator], ReadBuffer],
     notimplemented_callback: Callable[[bytes, NotImplementedError], None],
     *,
     depth=0,
@@ -169,11 +195,20 @@ def _walk(
     if dir.fSeekKeys == 0:
         # empty directory
         return
-    keylist = dir.get_KeyList(fetch_data)
+
+    buffer = fetch_data(dir.keylist_locator)
+    try:
+        keylist_key = dir.keylist_locator.read_from(buffer)
+        keylist = keylist_key.read_from(buffer)
+    except NotImplementedError as ex:
+        notimplemented_callback(path, ex)
+        return
+
     for item in keylist.values():
         itempath = path + item.fName.fString
+        buffer = fetch_data(item)
         try:
-            obj = item.read_object(fetch_data)
+            obj = item.read_from(buffer)
         except NotImplementedError as ex:
             notimplemented_callback(itempath, ex)
             continue
@@ -189,17 +224,28 @@ def _walk(
             _walk_RNTuple(obj, fetch_data)
         elif type(obj).__name__ == "TTree":
             _walk_branchlist(
-                obj.fBranches, fetch_data, notimplemented_callback, itempath + b"/"
+                obj.fBranches,  # type: ignore[attr-defined]
+                fetch_data,
+                notimplemented_callback,
+                itempath + b"/",
             )
+
+
+def fetch_cached(buffer: ReadBuffer, loc: Locator[T_co]) -> T_co:
+    seek, size = loc.offset, loc.size
+    if seek + size <= len(buffer):
+        return loc.read_from(buffer[seek : seek + size])
+    msg = "Didn't find data in cached buffer"
+    raise ValueError(msg)
 
 
 @pytest.mark.parametrize("filename", TESTABLE_FILES)
 def test_read_file(filename: str):
-    initial_read_size = 512
     path = Path(data_path(filename))
     with path.open("rb") as filehandle:
 
-        def fetch_data(seek: int, size: int):
+        def fetch_buffer(loc: Locator):
+            seek, size = loc.offset, loc.size
             filehandle.seek(seek)
             return ReadBuffer(
                 memoryview(filehandle.read(size)),
@@ -208,17 +254,13 @@ def test_read_file(filename: str):
                 BufferContext(abspos=seek),
             )
 
-        buffer = fetch_data(0, initial_read_size)
+        buffer = fetch_buffer(InitialReadLocator())
         file, _ = ROOTFile.read(buffer)
 
-        # Read root directory object, which should be contained in the initial buffer
-        def fetch_cached(seek: int, size: int):
-            if seek + size <= len(buffer):
-                return buffer[seek : seek + size]
-            msg = "Didn't find data in initial read buffer"
-            raise ValueError(msg)
-
-        rootdir = file.get_TFile(fetch_cached).rootdir
+        fetch_begin = partial(fetch_cached, buffer)
+        tfilekey = fetch_begin(file.tfile_locator)
+        tfile = fetch_begin(tfilekey)
+        rootdir = tfile.rootdir
 
         # List to collect NotImplementedError messages
         failures: list[str] = []
@@ -227,14 +269,24 @@ def test_read_file(filename: str):
             print(f"NotImplementedError: {ex}")
             failures.append(str(ex))
 
+        buffer = None
         # Read all StreamerInfo (class definitions) from the file
-        streamerinfo = file.get_StreamerInfo(fetch_data)
-        if not streamerinfo:
+        # two test files have non-null locators but they point beyond the end of
+        # the file, so we have to check for that
+        if file.streamerinfo_locator:
+            buffer = fetch_buffer(file.streamerinfo_locator)
+
+        if not buffer:
             # Try to read all objects anyway
-            _walk(rootdir, fetch_data, fail_cb)
+            _walk(rootdir, fetch_buffer, fail_cb)
             if failures:
                 return pytest.xfail(reason=",".join(set(failures)))
             return None
+
+        assert file.streamerinfo_locator is not None
+        # this buffer should contain the key and the TList of StreamerInfo
+        streamerinfokey = file.streamerinfo_locator.read_from(buffer)
+        streamerinfo = streamerinfokey.read_from(buffer)
 
         # Render the class definitions into python code
         try:
@@ -243,7 +295,8 @@ def test_read_file(filename: str):
             return pytest.xfail(reason=str(ex))
 
         # Define a new fetcher now that we can interpret the file data
-        def fetch_after_streamers(seek: int, size: int):
+        def fetch_after_streamers(loc: Locator) -> ReadBuffer:
+            seek, size = loc.offset, loc.size
             print(f"fetch_data {seek=} {size=}")
             filehandle.seek(seek)
             return ReadBuffer(

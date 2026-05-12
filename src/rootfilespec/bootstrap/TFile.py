@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Annotated
 
 from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TDirectory import TDirectory
-from rootfilespec.bootstrap.TKey import TKey
+from rootfilespec.bootstrap.TKey import TKey, TypedTKey
 from rootfilespec.bootstrap.TList import TList
 from rootfilespec.bootstrap.TUUID import TUUID
 from rootfilespec.serializable import (
@@ -165,9 +167,9 @@ class ROOTFile(ROOTSerializable):
         if fVersion <= VersionInfo(6, 2, 2):
             header, buffer = ROOTFile_header_v302.read(buffer)
         elif not fVersion.large:
-            header, buffer = ROOTFile_header_v622_small.read(buffer)
+            header, buffer = ROOTFile_header_v622_small.read(buffer)  # type: ignore[assignment]
         else:
-            header, buffer = ROOTFile_header_v622_large.read(buffer)
+            header, buffer = ROOTFile_header_v622_small.read(buffer)  # type: ignore[assignment]
         padding, buffer = buffer.consume(header.fBEGIN - buffer.relpos)
         members["magic"] = magic
         members["fVersion"] = fVersion
@@ -175,17 +177,29 @@ class ROOTFile(ROOTSerializable):
         members["padding"] = padding
         return members, buffer
 
+    @property
+    def tfile_locator(self) -> TFileLocator:
+        """Get a locator for the TFile object (root directory) in the file."""
+        return TFileLocator(self.header.fBEGIN, self.header.fNbytesName)
+
     def get_TFile(self, fetch_data: DataFetcher):
         """Get the TFile object (root directory) from the file."""
         buffer = fetch_data(self.header.fBEGIN, self.header.fNbytesName)
         key, buffer = TKey.read(buffer)
         if key.fSeekKey != self.header.fBEGIN:
-            msg = f"ROOTFile.read_rootkey: key.fSeekKey != self.header.fBEGIN: {key.fSeekKey} != {self.header.fBEGIN}"
+            msg = f"key.fSeekKey != self.header.fBEGIN: {key.fSeekKey} != {self.header.fBEGIN}"
             raise ValueError(msg)
         if key.fSeekPdir != 0:
-            msg = f"ROOTFile.read_rootkey: key.fSeekPdir != 0: {key.fSeekPdir} != 0"
+            msg = f"key.fSeekPdir != 0: {key.fSeekPdir} != 0"
             raise ValueError(msg)
         return key.read_object(fetch_data, objtype=TFile)
+
+    @property
+    def streamerinfo_locator(self) -> StreamerInfoLocator | None:
+        """Get a locator for the StreamerInfo record in the file, if it exists."""
+        if self.header.fNbytesInfo == 0:
+            return None
+        return StreamerInfoLocator(self.header.fSeekInfo, self.header.fNbytesInfo)
 
     def get_StreamerInfo(self, fetch_data: DataFetcher):
         if self.header.fNbytesInfo == 0:
@@ -206,6 +220,31 @@ class ROOTFile(ROOTSerializable):
         return key.read_object(fetch_cached, objtype=TList)
 
 
+@dataclass(frozen=True)
+class InitialReadLocator:
+    """Locator for the initial read of the ROOT file"""
+
+    initial_read_size: int = 512
+    """Suggested size to read for the initial information of the ROOT file.
+
+    This is a size hint for some initial information, including the ROOTFile
+    header and TFile key+object, but not necessarily the StreamerInfo.
+    """
+
+    @property
+    def offset(self) -> int:
+        return 0
+
+    @property
+    def size(self) -> int:
+        return self.initial_read_size
+
+    def read_from(self, buffer: ReadBuffer) -> ROOTFile:
+        """Read the ROOTFile object from the given buffer."""
+        file, _ = ROOTFile.read(buffer)
+        return file
+
+
 @serializable
 class TFile(ROOTSerializable):
     """The TFile object is a TDirectory with an extra name and title field (the first or "root" TDirectory):
@@ -223,3 +262,48 @@ class TFile(ROOTSerializable):
 
     def get_KeyList(self, fetch_data):
         return self.rootdir.get_KeyList(fetch_data)
+
+
+@dataclass(frozen=True)
+class TFileLocator:
+    """Locator for the TFile object in the ROOT file."""
+
+    offset: int
+    size: int
+
+    def read_from(self, buffer: ReadBuffer):
+        """Read the TFile object from the given buffer."""
+        key, buffer = TKey.read(buffer)
+        if key.fSeekKey != self.offset:
+            msg = f"Key's reported position does not match location: {key.fSeekKey} != {self.offset}"
+            raise ValueError(msg)
+        if key.fSeekPdir != 0:
+            msg = f"Key's parent directory is not the root directory: {key.fSeekPdir}"
+            raise ValueError(msg)
+
+        return TypedTKey(key, TFile)
+
+
+@dataclass(frozen=True)
+class StreamerInfoLocator:
+    """Locator for the StreamerInfo record in the ROOT file."""
+
+    offset: int
+    size: int
+
+    def read_from(self, buffer: ReadBuffer):
+        """Read the StreamerInfo TList object from the given buffer.
+
+        The StreamerInfo record is a TList prepended as usual by a TKey, but
+        abnormally, the TKey that would be used to read this is itself
+        the prepended TKey.  So we read both from the one buffer.
+        """
+        key, buffer = TKey.read(buffer)
+        if key.fSeekKey != self.offset:
+            msg = f"Key's reported position does not match location: {key.fSeekKey} != {self.offset}"
+            raise ValueError(msg)
+        if key.header.fNbytes != self.size:
+            msg = f"Key's reported size does not match location: {key.header.fNbytes} != {self.size}"
+            raise ValueError(msg)
+
+        return TypedTKey(key, TList)

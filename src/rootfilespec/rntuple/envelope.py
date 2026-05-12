@@ -3,10 +3,9 @@ from typing import Annotated, TypeVar
 
 from typing_extensions import Self
 
-from rootfilespec.bootstrap.compression import RCompressed
+from rootfilespec.bootstrap.compression import decompress
 from rootfilespec.rntuple.RLocator import RLocator
 from rootfilespec.serializable import (
-    BufferContext,
     DataFetcher,
     Members,
     ReadBuffer,
@@ -147,20 +146,7 @@ class REnvelopeLink(ROOTSerializable):
         # The length of the buffer is the number of bytes of compressed data
         if len(buffer) != self.length:
             # This is a compressed object
-            compressed, buffer = RCompressed.read(buffer)
-            if compressed.uncompressed_size() != self.length:
-                msg = "REnvelopeLink.read_envelope: uncompressed size mismatch. "
-                msg += f"{compressed.uncompressed_size()} != {self.length}"
-                raise ValueError(msg)
-            if buffer:
-                msg = f"REnvelopeLink.read_envelope: buffer not empty after reading compressed object. {buffer=}"
-                raise ValueError(msg)
-            buffer = ReadBuffer(
-                compressed.decompress(),
-                relpos=self.length,
-                file_context=buffer.file_context,
-                context=BufferContext(abspos=None),
-            )
+            buffer = decompress(buffer, self.length)
         # Now the envelope is uncompressed
 
         #### Read the envelope

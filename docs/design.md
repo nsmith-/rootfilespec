@@ -111,3 +111,65 @@ class TNamed(TObject):
 where the `@serializable` decorator takes care of the conversion between `str`
 and `TString`. In this library, we will prefer to use the second approach when
 feasible.
+
+## Data Fetching and Locators
+
+Many ROOT objects serve as references to data stored elsewhere in the file. For
+example, a `TKey` points to a serialized object, an `REnvelopeLink` points to an
+RNTuple envelope, and `TDirectory` points to a key list. To enable flexible I/O
+patterns (synchronous, asynchronous, or batch fetching), this library separates
+**data location** from **data fetching**.
+
+### The Locator Pattern
+
+The design follows this principle: **objects describe where data is; callers
+decide when and how to fetch it**.
+
+Each object that points to data provides a `*_locator` property that returns a
+specialized locator object. The locator has:
+
+- `offset: int` - byte offset in the file
+- `size: int` - size of the data to be read
+- `read_from(buffer) -> T` - deserializes the specific data type from the buffer
+
+### Specialized Locator Classes
+
+Even though `read_from` might appear to be implementable as `T.read(buffer)`,
+sometimes a locator points to some wrapper of the data. For example, a `TKey`
+points to the data prefixed by essentially another copy of itself, as a
+validation check. This method allows the locator to handle the unwrapping logic,
+and to return the correct type.
+
+### Usage Pattern
+
+```python
+# 1. Get the locator (no I/O)
+loc = root_file.tfile_locator
+print(f"TFile at offset {loc.offset}, size {loc.size}")
+
+# 2. Fetch the data (caller controls I/O)
+buffer = fetch_data(loc.offset, loc.size)
+
+# 3. Deserialize (locator knows the type)
+tfile = loc.read(buffer)
+```
+
+### Batch Fetching Example
+
+```python
+# Collect all locators first (no I/O)
+tfile_loc = root_file.tfile_locator
+si_loc = root_file.streamerinfo_locator
+locators = [tfile_loc, si_loc] if si_loc else [tfile_loc]
+
+# Batch fetch (optimization opportunity)
+# - Sort by offset for sequential reads
+# - Combine nearby reads
+# - Parallelize independent fetches
+# - Check cache before fetching
+buffers = [fetch_data(loc.offset, loc.size) for loc in locators]
+
+# Deserialize all at once
+tfile = tfile_loc.read(buffers[0])
+streamerinfo = si_loc.read(buffers[1]) if si_loc else None
+```

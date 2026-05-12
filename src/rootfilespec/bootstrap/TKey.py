@@ -1,11 +1,11 @@
-from typing import Annotated, TypeVar, overload
+from dataclasses import dataclass
+from typing import Annotated, Generic, TypeVar, overload
 
-from rootfilespec.bootstrap.compression import RCompressed
+from rootfilespec.bootstrap.compression import decompress
 from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TDatime import TDatime, TDatime_to_datetime
 from rootfilespec.dispatch import normalize
 from rootfilespec.serializable import (
-    BufferContext,
     DataFetcher,
     Members,
     ReadBuffer,
@@ -115,27 +115,14 @@ class TKey(ROOTSerializable):
         # The length of the buffer is the number of bytes of compressed data
         if len(buffer) != self.header.fObjlen:
             # This is a compressed object
-            compressed, buffer = RCompressed.read(buffer)
-            if compressed.uncompressed_size() != self.header.fObjlen:
-                msg = "TKey.read_object: uncompressed size mismatch. "
-                msg += f"{compressed.uncompressed_size()} != {self.header.fObjlen}"
-                raise ValueError(msg)
-            if buffer:
-                msg = f"TKey.read_object: buffer not empty after reading compressed object. {buffer=}"
-                raise ValueError(msg)
-            buffer = ReadBuffer(
-                compressed.decompress(),
-                relpos=self.header.fKeylen,
-                file_context=buffer.file_context,
-                context=BufferContext(abspos=None),
-            )
+            buffer = decompress(buffer, self.header.fObjlen)
         if objtype is not None:
             typename = objtype.__name__
             obj, buffer = objtype.read(buffer)
         else:
             typename = normalize(self.fClassName.fString)
             dyntype = buffer.file_context.type_by_name(typename)
-            obj, buffer = dyntype.read(buffer)
+            obj, buffer = dyntype.read(buffer)  # type: ignore[assignment]
         # Some types we have to handle trailing bytes
         if typename == "TKeyList":
             # TODO: understand this padding
@@ -153,5 +140,41 @@ class TKey(ROOTSerializable):
             msg += f"\n{obj=}"
             msg += f"\nBuffer: {buffer}"
             raise ValueError(msg)
-        # mypy doesn't understand that we have obj: ObjType | ROOTSerializable here
-        return obj  # type: ignore[no-any-return]
+        return obj
+
+    @property
+    def offset(self) -> int:
+        return self.fSeekKey
+
+    @property
+    def size(self) -> int:
+        return self.header.fNbytes
+
+    def read_from(self, buffer: ReadBuffer) -> ROOTSerializable:
+        return self.read_object(lambda _seek, _size: buffer)
+
+
+@dataclass(frozen=True)
+class TypedTKey(Generic[ObjType], ROOTSerializable):
+    """A TKey with a specified object type."""
+
+    key: TKey
+    objtype: type[ObjType]
+
+    @property
+    def offset(self) -> int:
+        return self.key.offset
+
+    @property
+    def size(self) -> int:
+        return self.key.size
+
+    @classmethod
+    def read(cls, buffer: ReadBuffer):
+        key, buffer = TKey.read(buffer)
+        typename = normalize(key.fClassName.fString)
+        objtype = buffer.file_context.type_by_name(typename)
+        return cls(key=key, objtype=objtype), buffer  # type: ignore[arg-type]
+
+    def read_from(self, buffer: ReadBuffer) -> ObjType:
+        return self.key.read_object(lambda _seek, _size: buffer, objtype=self.objtype)

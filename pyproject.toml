@@ -100,6 +100,9 @@ module = "rootfilespec.*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_any_generics = false
 
 
 [tool.ruff.lint]

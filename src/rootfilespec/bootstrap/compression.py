@@ -5,6 +5,7 @@ from typing import Annotated, Protocol
 import cramjam  # type: ignore[import-not-found]
 
 from rootfilespec.serializable import (
+    BufferContext,
     Members,
     MemberSerDe,
     ReadBuffer,
@@ -156,7 +157,7 @@ class RCompressed(ROOTSerializable):
     def uncompressed_size(self) -> int:
         return sum(chunk.header.uncompressed_size() for chunk in self.chunks)
 
-    def decompress(self):
+    def decompress(self) -> memoryview[int]:
         out = memoryview(bytearray(self.uncompressed_size()))
         start = 0
         for chunk in self.chunks:
@@ -227,3 +228,22 @@ class RCompressionSettings(ROOTSerializable):
     def level(self) -> int:
         """Get the compression level used for this column."""
         return self.compressionsettings % 100
+
+
+def decompress(buffer: ReadBuffer, expected_size: int) -> ReadBuffer:
+    """Decompress a data payload from the given buffer."""
+    relpos = buffer.relpos
+    compressed, buffer = RCompressed.read(buffer)
+    if compressed.uncompressed_size() != expected_size:
+        msg = "Decompressed size mismatch. "
+        msg += f"{compressed.uncompressed_size()} != {expected_size}"
+        raise ValueError(msg)
+    if buffer:
+        msg = f"Expected buffer to be empty after reading compressed data, but got\n{buffer}"
+        raise ValueError(msg)
+    return ReadBuffer(
+        compressed.decompress(),
+        relpos=relpos,
+        file_context=buffer.file_context,
+        context=BufferContext(abspos=None),
+    )
