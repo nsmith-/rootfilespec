@@ -157,7 +157,7 @@ class RCompressed(ROOTSerializable):
     def uncompressed_size(self) -> int:
         return sum(chunk.header.uncompressed_size() for chunk in self.chunks)
 
-    def decompress(self) -> memoryview[int]:
+    def decompress(self) -> memoryview:
         out = memoryview(bytearray(self.uncompressed_size()))
         start = 0
         for chunk in self.chunks:
