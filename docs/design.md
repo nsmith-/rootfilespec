@@ -151,7 +151,7 @@ print(f"TFile at offset {loc.offset}, size {loc.size}")
 buffer = fetch_data(loc.offset, loc.size)
 
 # 3. Deserialize (locator knows the type)
-tfile = loc.read(buffer)
+tfile = loc.read_from(buffer)
 ```
 
 ### Batch Fetching Example
@@ -170,6 +170,6 @@ locators = [tfile_loc, si_loc] if si_loc else [tfile_loc]
 buffers = [fetch_data(loc.offset, loc.size) for loc in locators]
 
 # Deserialize all at once
-tfile = tfile_loc.read(buffers[0])
-streamerinfo = si_loc.read(buffers[1]) if si_loc else None
+tfile = tfile_loc.read_from(buffers[0])
+streamerinfo = si_loc.read_from(buffers[1]) if si_loc else None
 ```
