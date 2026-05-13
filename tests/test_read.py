@@ -44,18 +44,35 @@ class DummyLoc:
 
 
 def _walk_RNTuple(anchor: ROOT3a3aRNTuple, fetch_data: Callable[[Locator], ReadBuffer]):
-    def old_fetch(offset: int, size: int) -> ReadBuffer:
-        return fetch_data(DummyLoc(offset, size))
+    # Collect locators (no I/O yet)
+    header_loc = anchor.header_locator
+    footer_loc = anchor.footer_locator
 
-    footer = anchor.get_footer(old_fetch)
-    pagelists = footer.get_pagelists(old_fetch)
-    for page_locations in pagelists:
-        page_locations.get_pages(old_fetch)
+    # Fetch header and footer
+    header_buffer = fetch_data(header_loc)
+    footer_buffer = fetch_data(footer_loc)
 
+    # Deserialize
+    _header = header_loc.read_from(header_buffer)
+    footer = footer_loc.read_from(footer_buffer)
 
-def _dummy_fetch(buffer: ReadBuffer, _seek: int, _size: int) -> ReadBuffer:
-    """A dummy fetch function that does nothing."""
-    return buffer
+    # Get pagelist locators (no I/O)
+    pagelist_locs = footer.pagelist_locators
+
+    # Fetch and deserialize pagelists
+    for pl_loc in pagelist_locs:
+        pl_buffer = fetch_data(pl_loc)
+        pagelist = pl_loc.read_from(pl_buffer)
+
+        # Get page locators (no I/O)
+        page_locs = pagelist.page_locators
+
+        # Fetch and deserialize pages
+        for cluster in page_locs:
+            for column in cluster:
+                for page_loc in column:
+                    page_buffer = fetch_data(page_loc)
+                    _page = page_loc.read_from(page_buffer)
 
 
 @dataclass

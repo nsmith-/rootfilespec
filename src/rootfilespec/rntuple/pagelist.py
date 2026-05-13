@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Annotated
 
 from rootfilespec.rntuple.envelope import (
@@ -10,7 +11,12 @@ from rootfilespec.rntuple.pagelocations import (
 )
 from rootfilespec.rntuple.RFrame import ListFrame, RecordFrame
 from rootfilespec.rntuple.RPage import RPage
-from rootfilespec.serializable import DataFetcher, serializable
+from rootfilespec.serializable import (
+    Locator,
+    ReadBuffer,
+    ROOTSerializable,
+    serializable,
+)
 from rootfilespec.structutil import Fmt
 
 
@@ -59,7 +65,21 @@ class PageListEnvelope(REnvelope):
     pageLocations: ListFrame[ListFrame[PageLocations[RPageDescription]]]
     """The Page Locations Triple Nested List Frame"""
 
-    def get_pages(self, fetch_data: DataFetcher):
+    @property
+    def page_locators(self) -> list[list[list[RPageDescription]]]:
+        """Get locators for all pages in this page list.
+
+        Returns a triple-nested list structure:
+        - Top level: clusters
+        - Middle level: columns
+        - Inner level: pages
+        """
+        return [
+            [list(pagelist) for pagelist in columnlist]
+            for columnlist in self.pageLocations
+        ]
+
+    def get_pages(self, fetch_data: Callable[[Locator[ROOTSerializable]], ReadBuffer]):
         """Get the RNTuple Pages from the Page Locations Nested List Frame.
         Does not decompress the pages."""
         #### Get the Page Locations
