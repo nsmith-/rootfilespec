@@ -1,13 +1,13 @@
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Annotated, TypeVar
+from typing import Annotated, Generic, TypeVar, cast
 
 from typing_extensions import Self
 
-from rootfilespec.bootstrap.compression import RCompressed
+from rootfilespec.bootstrap.compression import decompress
 from rootfilespec.rntuple.RLocator import RLocator
 from rootfilespec.serializable import (
-    BufferContext,
-    DataFetcher,
+    Locator,
     Members,
     ReadBuffer,
     ROOTSerializable,
@@ -117,16 +117,62 @@ class REnvelope(ROOTSerializable):
 EnvType = TypeVar("EnvType", bound=REnvelope)
 
 
+@dataclass(frozen=True)
+class REnvelopeLocator(Generic[EnvType]):
+    """A locator for an RNTuple Envelope.
+
+    This follows the locator pattern: it describes where an envelope is located
+    and how to deserialize it, but the caller controls when/how to fetch the data.
+    """
+
+    length: int
+    """The uncompressed length of the envelope."""
+    locator: RLocator
+    """The locator for the envelope (offset and size)."""
+    envtype: type[EnvType]
+    """The envelope type to deserialize."""
+
+    @property
+    def offset(self) -> int:
+        """The byte offset of the envelope in the file."""
+        # Note: self.locator is always StandardLocator or LargeLocator at runtime,
+        # which have offset fields. Cast needed because base RLocator doesn't have offset.
+        return cast(Locator[ROOTSerializable], self.locator).offset
+
+    @property
+    def size(self) -> int:
+        """The (compressed) size of the envelope data."""
+        return self.locator.size
+
+    def read_from(self, buffer: ReadBuffer) -> EnvType:
+        """Read the envelope from the given buffer.
+
+        Envelopes are compressed, so this decompresses and deserializes.
+        """
+        #### Decompress the buffer if necessary
+        if len(buffer) != self.length:
+            buffer = decompress(buffer, self.length)
+
+        #### Now read the envelope
+        envelope, buffer = self.envtype.read(buffer)
+
+        if buffer:
+            msg = "REnvelopeLocator.read_from: buffer not empty after reading envelope."
+            raise ValueError(msg)
+
+        return envelope
+
+
 @serializable
 class REnvelopeLink(ROOTSerializable):
     """A class representing the RNTuple Envelope Link (somewhat analogous to a TKey).
+
     An Envelope Link references an Envelope in an RNTuple.
-    An Envelope Link is consists of a 64 bit unsigned integer that specifies the
-        uncompressed size (i.e. length) of the envelope, followed by a Locator.
+    An Envelope Link consists of a 64 bit unsigned integer that specifies the
+    uncompressed size (i.e. length) of the envelope, followed by a Locator.
 
     Envelope Links of this form (currently seem to be) only used to locate Page List Envelopes.
     The Header Envelope and Footer Envelope are located using the information in the RNTuple Anchor.
-    The Header and Footer Envelope Links are created in the RNTuple Anchor class by casting directly to this class.
     """
 
     length: Annotated[int, Fmt("<Q")]
@@ -134,46 +180,16 @@ class REnvelopeLink(ROOTSerializable):
     locator: RLocator
     """The locator for the envelope."""
 
+    def envelope_locator(self, envtype: type[EnvType]) -> REnvelopeLocator[EnvType]:
+        """Get a locator for the envelope."""
+        return REnvelopeLocator(self.length, self.locator, envtype)
+
     def read_envelope(
         self,
-        fetch_data: DataFetcher,
+        fetch_data: Callable[[Locator[ROOTSerializable]], ReadBuffer],
         envtype: type[EnvType],
     ) -> EnvType:
-        """Reads an REnvelope from the given buffer."""
-        #### Load the (possibly compressed) envelope into the buffer
-        buffer = self.locator.get_buffer(fetch_data)
-
-        #### If compressed, decompress the envelope
-        # The length of the buffer is the number of bytes of compressed data
-        if len(buffer) != self.length:
-            # This is a compressed object
-            compressed, buffer = RCompressed.read(buffer)
-            if compressed.uncompressed_size() != self.length:
-                msg = "REnvelopeLink.read_envelope: uncompressed size mismatch. "
-                msg += f"{compressed.uncompressed_size()} != {self.length}"
-                raise ValueError(msg)
-            if buffer:
-                msg = f"REnvelopeLink.read_envelope: buffer not empty after reading compressed object. {buffer=}"
-                raise ValueError(msg)
-            buffer = ReadBuffer(
-                compressed.decompress(),
-                relpos=self.length,
-                file_context=buffer.file_context,
-                context=BufferContext(abspos=None),
-            )
-        # Now the envelope is uncompressed
-
-        #### Read the envelope
-        envelope, buffer = envtype.read(buffer)
-
-        #### Check that buffer is empty
-        if buffer:
-            msg = (
-                "REnvelopeLink.read_envelope: buffer not empty after reading envelope."
-            )
-            msg += f"\n{self=}"
-            msg += f"\n{envelope=}"
-            msg += f"\nBuffer: {buffer}"
-            raise ValueError(msg)
-
-        return envelope
+        """Reads the Envelope from the given data source using the locator."""
+        loc = self.envelope_locator(envtype)
+        buffer = fetch_data(loc)
+        return loc.read_from(buffer)

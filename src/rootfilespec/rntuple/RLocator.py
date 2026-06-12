@@ -1,15 +1,16 @@
 from dataclasses import dataclass
 
-from rootfilespec.serializable import DataFetcher, ReadBuffer, ROOTSerializable
+from rootfilespec.serializable import ReadBuffer, ROOTSerializable
 
 
 @dataclass
 class RLocator(ROOTSerializable):
-    """A base class representing a Locator for RNTuples.
-    A locator is a generalized way to specify a certain byte range on the storage medium.
-        For disk-based storage, the locator is just byte offset and byte size.
-        For other storage systems, the locator contains enough information to retrieve the referenced block,
-            e.g. in object stores, the locator can specify a certain object ID.
+    """A base class representing an RNTuple locator data structure.
+
+    An RLocator is a generalized way to specify a certain byte range on the storage medium.
+    For disk-based storage, the locator contains byte offset and byte size.
+    For other storage systems, the locator contains enough information to retrieve the referenced block,
+    e.g. in object stores, the locator can specify a certain object ID.
 
     All locators begin with a signed 32 bit integer.
     If the integer is positive, the locator is a standard locator.
@@ -18,11 +19,13 @@ class RLocator(ROOTSerializable):
     Size and type mean different things for standard and non-standard locators.
 
     This base class checks the type of the locator and reads the appropriate subclass.
-    It contains a `get_buffer()` method that should be implemented by subclasses to return the buffer for the envelope.
-    This provides forward compatibility for different locator types, as the envelope can be read using the same method.
 
-    All Envelope Links will have a Locator, but a Locator doesn't require an Envelope Link.
-    (See the Page Location in the Page List Envelopes for an example of a Locator without an Envelope Link.)
+    All Envelope Links will have an RLocator, but an RLocator doesn't require an Envelope Link.
+    (See the Page Location in the Page List Envelopes for an example of an RLocator without an Envelope Link.)
+
+    Note: RLocator itself is just a data structure holding offset/size information.
+    It is used as a building block by full locators like REnvelopeLocator and RPageDescription,
+    which implement the Locator protocol with offset, size, and read_from() methods.
     """
 
     size: int
@@ -70,11 +73,6 @@ class RLocator(ROOTSerializable):
         msg = f"Unknown non-standard locator type: {locatorType=}"
         raise ValueError(msg)
 
-    def get_buffer(self, fetch_data: DataFetcher):
-        """This should be overridden by subclasses"""
-        msg = "get_buffer() not implemented for this locator type"
-        raise NotImplementedError(msg)
-
 
 @dataclass
 class StandardLocator(RLocator):
@@ -99,10 +97,6 @@ class StandardLocator(RLocator):
 
         return cls(size, offset), buffer
 
-    def get_buffer(self, fetch_data: DataFetcher):
-        """Returns the buffer for the byte range specified by the standard locator."""
-        return fetch_data(self.offset, self.size)
-
 
 @dataclass
 class LargeLocator(RLocator):
@@ -125,7 +119,3 @@ class LargeLocator(RLocator):
         (offset,), buffer = buffer.unpack("<Q")
 
         return cls(size, offset), buffer
-
-    def get_buffer(self, fetch_data: DataFetcher):
-        """Returns the buffer for the byte range specified by the "Large Locator" payload."""
-        return fetch_data(self.offset, self.size)

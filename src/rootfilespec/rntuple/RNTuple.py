@@ -1,4 +1,5 @@
 import dataclasses
+from collections.abc import Callable
 from math import ceil
 
 from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
@@ -14,7 +15,7 @@ from rootfilespec.rntuple.schema import (
     ExtraTypeInformation,
     FieldDescription,
 )
-from rootfilespec.serializable import DataFetcher
+from rootfilespec.serializable import Locator, ReadBuffer, ROOTSerializable
 
 
 @dataclasses.dataclass
@@ -93,7 +94,11 @@ class RNTuple:
     pagelistEnvelopes: list[PageListEnvelope]
 
     @classmethod
-    def from_anchor(cls, anchor: ROOT3a3aRNTuple, fetch_data: DataFetcher) -> "RNTuple":
+    def from_anchor(
+        cls,
+        anchor: ROOT3a3aRNTuple,
+        fetch_data: Callable[[Locator[ROOTSerializable]], ReadBuffer],
+    ) -> "RNTuple":
         """Reads the RNTuple from the given anchor."""
         headerEnvelope = anchor.get_header(fetch_data)
         footerEnvelope = anchor.get_footer(fetch_data)

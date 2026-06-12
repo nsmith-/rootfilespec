@@ -1,10 +1,16 @@
-from typing import Annotated
+from collections.abc import Callable
+from typing import Annotated, cast
 
 from rootfilespec.bootstrap.compression import RCompressionSettings
 from rootfilespec.rntuple.RFrame import Item, ListFrame
 from rootfilespec.rntuple.RLocator import RLocator
 from rootfilespec.rntuple.RPage import RPage
-from rootfilespec.serializable import DataFetcher, ROOTSerializable, serializable
+from rootfilespec.serializable import (
+    Locator,
+    ReadBuffer,
+    ROOTSerializable,
+    serializable,
+)
 from rootfilespec.structutil import Fmt, OptionalField
 
 
@@ -28,22 +34,40 @@ class RPageDescription(ROOTSerializable):
     locator: RLocator
     """The locator for the page."""
 
-    def get_page(self, fetch_data: DataFetcher) -> RPage:
-        """Reads the page data from the data source using the locator.
+    @property
+    def offset(self) -> int:
+        """The byte offset of the page in the file."""
+        # Note: self.locator is always StandardLocator or LargeLocator at runtime,
+        # which have offset fields. Cast needed because base RLocator doesn't have offset.
+        return cast(Locator[ROOTSerializable], self.locator).offset
+
+    @property
+    def size(self) -> int:
+        """The (compressed) size of the page data."""
+        return self.locator.size
+
+    def read_from(self, buffer: ReadBuffer) -> RPage:
+        """Read the page from the given buffer.
+
         Pages are wrapped in compression blocks (like envelopes).
         """
-
-        #### Load the (possibly compressed) Page into the buffer
-        buffer = self.locator.get_buffer(fetch_data)
-
         #### Read the page from the buffer
         page, buffer = RPage.read(buffer)
 
         if buffer:
-            msg = "RPageDescription.get_page: buffer not empty after reading page."
+            msg = "RPageDescription.read_from: buffer not empty after reading page."
             raise ValueError(msg)
 
         return page
+
+    def get_page(
+        self, fetch_data: Callable[[Locator[ROOTSerializable]], ReadBuffer]
+    ) -> RPage:
+        """Reads the page data from the data source using the locator.
+        Pages are wrapped in compression blocks (like envelopes).
+        """
+        buffer = fetch_data(self)
+        return self.read_from(buffer)
 
 
 @serializable

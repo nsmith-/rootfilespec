@@ -37,6 +37,9 @@ def test_read_contributors():
                 BufferContext(abspos=seek),
             )
 
+        def fetch_from_locator(loc):
+            return fetch_data(loc.offset, loc.size)
+
         buffer = fetch_data(0, 512)
         file, _ = ROOTFile.read(buffer)
         tfile = file.get_TFile(fetch_data)
@@ -57,7 +60,7 @@ def test_read_contributors():
             fMaxKeySize=1073741824,
         )
 
-        rntuple = RNTuple.from_anchor(anchor, fetch_data)
+        rntuple = RNTuple.from_anchor(anchor, fetch_from_locator)
         assert rntuple == RNTuple(
             headerEnvelope=HeaderEnvelope(
                 typeID=1,
@@ -415,6 +418,9 @@ def test_read_multiple_rntuples():
                 BufferContext(abspos=seek),
             )
 
+        def fetch_from_locator(loc):
+            return fetch_data(loc.offset, loc.size)
+
         buffer = fetch_data(0, 512)
         file, _ = ROOTFile.read(buffer)
         tfile = file.get_TFile(fetch_data)
@@ -435,7 +441,7 @@ def test_read_multiple_rntuples():
             fMaxKeySize=1073741824,
         )
 
-        rntuple_a = RNTuple.from_anchor(anchor_a, fetch_data)
+        rntuple_a = RNTuple.from_anchor(anchor_a, fetch_from_locator)
         assert rntuple_a == RNTuple(
             headerEnvelope=HeaderEnvelope(
                 typeID=1,
@@ -628,7 +634,7 @@ def test_read_multiple_rntuples():
             fMaxKeySize=1073741824,
         )
 
-        rntuple_b = RNTuple.from_anchor(anchor_b, fetch_data)
+        rntuple_b = RNTuple.from_anchor(anchor_b, fetch_from_locator)
         assert rntuple_b == RNTuple(
             headerEnvelope=HeaderEnvelope(
                 typeID=1,

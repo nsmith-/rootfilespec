@@ -1,11 +1,17 @@
+from collections.abc import Callable
 from typing import Annotated
 
 from rootfilespec.bootstrap.streamedobject import StreamedObject
-from rootfilespec.rntuple.envelope import REnvelopeLink
+from rootfilespec.rntuple.envelope import REnvelopeLocator
 from rootfilespec.rntuple.footer import FooterEnvelope
 from rootfilespec.rntuple.header import HeaderEnvelope
 from rootfilespec.rntuple.RLocator import LargeLocator
-from rootfilespec.serializable import DataFetcher, serializable
+from rootfilespec.serializable import (
+    Locator,
+    ReadBuffer,
+    ROOTSerializable,
+    serializable,
+)
 from rootfilespec.structutil import Fmt
 
 
@@ -23,18 +29,36 @@ class ROOT3a3aRNTuple(StreamedObject):
     fLenFooter: Annotated[int, Fmt(">Q")]
     fMaxKeySize: Annotated[int, Fmt(">Q")]
 
-    def get_header(self, fetch_data: DataFetcher) -> HeaderEnvelope:
+    @property
+    def header_locator(self) -> REnvelopeLocator[HeaderEnvelope]:
+        """Get a locator for the RNTuple Header Envelope."""
+        return REnvelopeLocator(
+            self.fLenHeader,
+            LargeLocator(self.fNBytesHeader, self.fSeekHeader),
+            HeaderEnvelope,
+        )
+
+    @property
+    def footer_locator(self) -> REnvelopeLocator[FooterEnvelope]:
+        """Get a locator for the RNTuple Footer Envelope."""
+        return REnvelopeLocator(
+            self.fLenFooter,
+            LargeLocator(self.fNBytesFooter, self.fSeekFooter),
+            FooterEnvelope,
+        )
+
+    def get_header(
+        self, fetch_data: Callable[[Locator[ROOTSerializable]], ReadBuffer]
+    ) -> HeaderEnvelope:
         """Reads the RNTuple Header Envelope from the given buffer."""
-        headerLink = REnvelopeLink(
-            self.fLenHeader, LargeLocator(self.fNBytesHeader, self.fSeekHeader)
-        )
+        loc = self.header_locator
+        buffer = fetch_data(loc)
+        return loc.read_from(buffer)
 
-        return headerLink.read_envelope(fetch_data, HeaderEnvelope)
-
-    def get_footer(self, fetch_data: DataFetcher) -> FooterEnvelope:
+    def get_footer(
+        self, fetch_data: Callable[[Locator[ROOTSerializable]], ReadBuffer]
+    ) -> FooterEnvelope:
         """Reads the RNTuple Footer Envelope from the given buffer."""
-        footerLink = REnvelopeLink(
-            self.fLenFooter, LargeLocator(self.fNBytesFooter, self.fSeekFooter)
-        )
-
-        return footerLink.read_envelope(fetch_data, FooterEnvelope)
+        loc = self.footer_locator
+        buffer = fetch_data(loc)
+        return loc.read_from(buffer)

@@ -5,6 +5,7 @@ from inspect import get_annotations
 from typing import (
     Annotated,
     Any,
+    Protocol,
     TypeVar,
     get_args,
     get_origin,
@@ -166,14 +167,13 @@ def _get_annotations(cls: type) -> dict[str, Any]:
     return get_annotations(cls)
 
 
-@dataclasses.dataclass
 class ROOTSerializable:
     """
     A base class for objects that can be serialized and deserialized from a buffer.
     """
 
     @classmethod
-    def read(cls, buffer: ReadBuffer):
+    def read(cls: type[RT], buffer: ReadBuffer) -> tuple[RT, ReadBuffer]:
         members: Members = {}
         # TODO: always loop through base classes? StreamedObject does this a special way
         members, buffer = cls.update_members(members, buffer)
@@ -351,3 +351,47 @@ def serializable(cls: type[RT]) -> type[RT]:
 
 
 DataFetcher = Callable[[int, int], ReadBuffer]
+
+T_co = TypeVar("T_co", bound=ROOTSerializable, covariant=True)
+
+
+class Locator(Protocol[T_co]):
+    """A protocol for acquiring data buffers for a given object.
+
+    This locator can be used to fetch the data and subsequently deserialize the
+    object from the buffer using the appropriate type information. It can then
+    be wrapped by a synchronous or asynchronous fetcher to get the data.
+
+    Example synchronous fetcher:
+
+    .. code-block:: python
+
+        def fetch(loc: Locator[T]) -> T:
+            seek, size = loc.offset, loc.size
+            buffer = fetch_data(seek, size)
+            return loc.read_from(buffer)
+
+    Example asynchronous fetcher:
+
+    .. code-block:: python
+
+        async def fetch(loc: Locator[T]) -> T:
+            seek, size = loc.offset, loc.size
+            buffer = await fetch_data(seek, size)
+            return loc.read_from(buffer)
+
+    """
+
+    @property
+    def offset(self) -> int:
+        """Absolute byte offset in the file where the object is located."""
+        ...
+
+    @property
+    def size(self) -> int:
+        """Size of the object in bytes."""
+        ...
+
+    def read_from(self, buffer: ReadBuffer) -> T_co:
+        """Read the object from the given buffer."""
+        ...

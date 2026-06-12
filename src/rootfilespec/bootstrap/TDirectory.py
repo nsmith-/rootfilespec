@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Annotated
 
 from rootfilespec.bootstrap.TDatime import TDatime, TDatime_to_datetime
-from rootfilespec.bootstrap.TKey import TKey
+from rootfilespec.bootstrap.TKey import TKey, TypedTKey
 from rootfilespec.bootstrap.TUUID import TUUID
 from rootfilespec.serializable import (
     DataFetcher,
@@ -104,19 +107,20 @@ class TDirectory(ROOTSerializable):
         return members, buffer
 
     def get_KeyList(self, fetch_data: DataFetcher):
-        buffer = fetch_data(
-            self.fSeekKeys, self.header.fNbytesName + self.header.fNbytesKeys
-        )
+        buffer = fetch_data(self.fSeekKeys, self.header.fNbytesKeys)
 
         key, _ = TKey.read(buffer)
         if key.fSeekKey == 0:
-            msg = f"TDirectory.get_KeyList: fSeekKey is 0 {key.fSeekKey} (bad key but KeyList is valid, e.g. uproot-issue261.root)"
+            msg = f"fSeekKey is 0 {key.fSeekKey} (bad key but KeyList is valid, e.g. uproot-issue261.root)"
             raise NotImplementedError(msg)
         if key.fSeekKey != self.fSeekKeys:
-            msg = f"TDirectory.read_keylist: fSeekKey mismatch {key.fSeekKey} != {self.fSeekKeys}"
+            msg = f"fSeekKey mismatch {key.fSeekKey} != {self.fSeekKeys}"
+            raise ValueError(msg)
+        if key.header.fNbytes != self.header.fNbytesKeys:
+            msg = f"fNbytes mismatch {key.header.fNbytes} != {self.header.fNbytesKeys}"
             raise ValueError(msg)
         if key.fSeekPdir != self.fSeekDir:
-            msg = f"TDirectory.read_keylist: fSeekPdir mismatch {key.fSeekPdir} != {self.fSeekDir}"
+            msg = f"fSeekPdir mismatch {key.fSeekPdir} != {self.fSeekDir}"
             raise ValueError(msg)
 
         def fetch_cached(seek: int, size: int):
@@ -127,6 +131,35 @@ class TDirectory(ROOTSerializable):
             raise ValueError(msg)
 
         return key.read_object(fetch_cached, objtype=TKeyList)
+
+    @property
+    def keylist_locator(self) -> KeyListLocator:
+        return KeyListLocator(
+            offset=self.fSeekKeys,
+            size=self.header.fNbytesKeys,
+            parent_offset=self.fSeekDir,
+        )
+
+
+@dataclass(frozen=True)
+class KeyListLocator:
+    offset: int
+    size: int
+    parent_offset: int
+
+    def read_from(self, buffer: ReadBuffer) -> TypedTKey[TKeyList]:
+        key, _ = TKey.read(buffer)
+        if key.fSeekKey == 0:
+            msg = f"fSeekKey is 0 {key.fSeekKey} (bad key but KeyList is valid, e.g. uproot-issue261.root)"
+            # note: fSeekPdir will also be 0, this is when there is no streamerinfo for the file
+            raise NotImplementedError(msg)
+        if key.fSeekKey != self.offset:
+            msg = f"fSeekKey mismatch {key.fSeekKey} != {self.offset}"
+            raise ValueError(msg)
+        if key.fSeekPdir != self.parent_offset:
+            msg = f"Parent offset mismatch {key.fSeekPdir} != {self.parent_offset}"
+            raise ValueError(msg)
+        return TypedTKey(key, TKeyList)
 
 
 # TODO: are these different? Both are encountered

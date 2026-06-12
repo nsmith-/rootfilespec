@@ -1,9 +1,11 @@
+from collections.abc import Callable
 from typing import Annotated
 
 from rootfilespec.rntuple.envelope import (
     ENVELOPE_TYPE_MAP,
     REnvelope,
     REnvelopeLink,
+    REnvelopeLocator,
     RFeatureFlags,
 )
 from rootfilespec.rntuple.pagelist import PageListEnvelope
@@ -14,7 +16,12 @@ from rootfilespec.rntuple.schema import (
     ExtraTypeInformation,
     FieldDescription,
 )
-from rootfilespec.serializable import DataFetcher, serializable
+from rootfilespec.serializable import (
+    Locator,
+    ReadBuffer,
+    ROOTSerializable,
+    serializable,
+)
 from rootfilespec.structutil import Fmt
 
 
@@ -85,17 +92,22 @@ class FooterEnvelope(REnvelope):
     clusterGroups: ListFrame[ClusterGroup]
     """The List Frame of Cluster Group Record Frames"""
 
-    def get_pagelists(self, fetch_data: DataFetcher) -> list[PageListEnvelope]:
+    @property
+    def pagelist_locators(self) -> list[REnvelopeLocator[PageListEnvelope]]:
+        """Get locators for all page lists in this footer."""
+        return [
+            g.pagelistLink.envelope_locator(PageListEnvelope)
+            for g in self.clusterGroups
+        ]
+
+    def get_pagelists(
+        self, fetch_data: Callable[[Locator[ROOTSerializable]], ReadBuffer]
+    ) -> list[PageListEnvelope]:
         """Get the RNTuple Page List Envelopes from the Footer Envelope.
 
         Page List Envelope Links are stored in the Cluster Group Record Frames in the Footer Envelope Payload.
         """
-
-        #### Return the Page List Envelopes
-        return [
-            g.pagelistLink.read_envelope(fetch_data, PageListEnvelope)
-            for g in self.clusterGroups
-        ]
+        return [loc.read_from(fetch_data(loc)) for loc in self.pagelist_locators]
 
 
 ENVELOPE_TYPE_MAP[0x02] = "FooterEnvelope"
