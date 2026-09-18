@@ -61,11 +61,14 @@ class StreamHeader(ROOTSerializable):
         if not (tmp1 & _StreamConstants.kNotAVersion):
             fVersion = tmp1
             if fVersion & _StreamConstants.kStreamedMemberwise:
+                # What remains is not a constant: in a collection frame it is the
+                # TStreamerInfo class version of the writing ROOT (8 before 5.26,
+                # 9 until 6.35, 10 from 6.36). See root-io-spec Collections §2
                 fVersion &= ~_StreamConstants.kStreamedMemberwise
                 memberwise = True
-                if fVersion != 9:
-                    # It seems all STL collections are v9?
-                    # These are the only ones we know how to read memberwise so far
+                if fVersion < 8:
+                    # Below 8 no value class version word follows this one
+                    # (root-io-spec Collections §6), which all readers assume
                     msg = f"Memberwise streaming not implemented for version {fVersion}"
                     raise NotImplementedError(msg)
             if fVersion == 0 and fByteCount >= 6:
