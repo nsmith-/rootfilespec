@@ -32,27 +32,26 @@ class TList(TSeqCollection):
 
     items: list[TObject | Ref[TObject]]
     """List of objects."""
+    options: list[bytes]
+    """Option string of each entry in items (e.g. the draw option in a TPad)."""
 
     @classmethod
     def update_members(cls, members: Members, buffer: ReadBuffer):
         items: list[TObject | Ref[TObject]] = []
+        options: list[bytes] = []
         fSize: int = members["fSize"]
         for _ in range(fSize):
             item, buffer = read_streamed_item(buffer)
             if not (isinstance(item, TObject | Ref)):
                 msg = f"Expected TObject but got {item!r}"
                 raise ValueError(msg)
-            # No idea why there is a null pad byte here
-            pad, buffer = buffer.consume(1)
-            if pad != b"\x00":
-                if pad == b"\x01":
-                    # TODO: understand this case (e.g. uproot-issue-350.root)
-                    (mystery,), buffer = buffer.unpack(">B")
-                else:
-                    msg = f"Unexpected pad byte in TList: {pad!r}"
-                    raise ValueError(msg)
+            # Each entry is followed by its option string (counted, usually empty)
+            # TODO: version gates, see root-io-spec StreamerInfo.md §4 (issue #103)
+            option, buffer = TString.read(buffer)
             items.append(item)
+            options.append(option.fString)
         members["items"] = items
+        members["options"] = options
         return members, buffer
 
 
