@@ -260,9 +260,12 @@ def fetch_cached(buffer: ReadBuffer, loc: Locator[T_co]) -> T_co:
     raise ValueError(msg)
 
 
-@pytest.mark.parametrize("filename", TESTABLE_FILES)
-def test_read_file(filename: str):
-    path = Path(data_path(filename))
+def read_file(path: Path) -> None:
+    """Read everything we know how to read from the ROOT file at ``path``
+
+    Raises NotImplementedError if any part of the file could not be read because
+    of a known-unimplemented feature; any other exception is a genuine failure.
+    """
     with path.open("rb") as filehandle:
 
         def fetch_buffer(loc: Locator):
@@ -290,6 +293,10 @@ def test_read_file(filename: str):
             print(f"NotImplementedError: {ex}")
             failures.append(str(ex))
 
+        def raise_failures() -> None:
+            if failures:
+                raise NotImplementedError(",".join(set(failures)))
+
         buffer = None
         # Read all StreamerInfo (class definitions) from the file
         # two test files have non-null locators but they point beyond the end of
@@ -300,9 +307,8 @@ def test_read_file(filename: str):
         if not buffer:
             # Try to read all objects anyway
             _walk(rootdir, fetch_buffer, fail_cb)
-            if failures:
-                return pytest.xfail(reason=",".join(set(failures)))
-            return None
+            raise_failures()
+            return
 
         assert file.streamerinfo_locator is not None
         # this buffer should contain the key and the TList of StreamerInfo
@@ -310,10 +316,7 @@ def test_read_file(filename: str):
         streamerinfo = streamerinfokey.read_from(buffer)
 
         # Render the class definitions into python code
-        try:
-            file_context = build_file_context(streamerinfo)
-        except NotImplementedError as ex:
-            return pytest.xfail(reason=str(ex))
+        file_context = build_file_context(streamerinfo)
 
         # Define a new fetcher now that we can interpret the file data
         def fetch_after_streamers(loc: Locator) -> ReadBuffer:
@@ -330,9 +333,14 @@ def test_read_file(filename: str):
         # Read all objects from the file
         try:
             _walk(rootdir, fetch_after_streamers, fail_cb)
-            if failures:
-                return pytest.xfail(reason=",".join(set(failures)))
-        except NotImplementedError as ex:
-            return pytest.xfail(reason=str(ex))
         finally:
             file_context.purge_module()
+        raise_failures()
+
+
+@pytest.mark.parametrize("filename", TESTABLE_FILES)
+def test_read_file(filename: str):
+    try:
+        read_file(Path(data_path(filename)))
+    except NotImplementedError as ex:
+        pytest.xfail(reason=str(ex))

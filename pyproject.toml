@@ -58,6 +58,8 @@ Changelog = "https://github.com/nsmith-/rootfilespec/releases"
 [tool.hatch]
 version.source = "vcs"
 build.hooks.vcs.version-file = "src/rootfilespec/_version.py"
+# The root-io-spec submodule (and the ROOT source nested in it) is test data only
+build.targets.sdist.exclude = ["/reference"]
 
 [tool.hatch.envs.default]
 features = ["test"]
@@ -109,6 +111,9 @@ module = ["numpy", "numpy.*"]
 follow_imports = "skip"
 follow_imports_for_stubs = true
 
+
+[tool.ruff]
+extend-exclude = ["reference"]
 
 [tool.ruff.lint]
 extend-select = [
