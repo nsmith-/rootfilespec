@@ -1,0 +1,3 @@
+[submodule "reference/root-io-spec"]
+	path = reference/root-io-spec
+	url = https://github.com/ariostas/root-io-spec.git
