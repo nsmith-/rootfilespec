@@ -10,16 +10,10 @@ from typing import NamedTuple
 
 import pytest
 
-from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT, TBasket
-from rootfilespec.bootstrap.TFile import InitialReadLocator
+from rootfilespec.bootstrap import TBasket
 from rootfilespec.bootstrap.TList import TList
-from rootfilespec.bootstrap.TStreamerInfo import (
-    ArrayDim,
-    TStreamerBase,
-    TStreamerElement,
-    TStreamerInfo,
-)
-from rootfilespec.serializable import BufferContext, Locator, ReadBuffer, T_co
+from rootfilespec.bootstrap.TStreamerInfo import ArrayDim, TStreamerBase
+from rootfilespec.reader import open_path
 from tests.test_read import read_file
 
 DATA = Path(__file__).parent.parent / "reference" / "root-io-spec" / "data"
@@ -141,49 +135,10 @@ def test_read_fixture(fixture: str):
     pytest.xfail(reason=f"{issues}: {expected.match}")
 
 
-def _buffer(fixture: str, offset: int, size: int) -> ReadBuffer:
-    """A buffer in which only objects of the bootstrap classes can be read"""
-    with (DATA / fixture).open("rb") as filehandle:
-        filehandle.seek(offset)
-        return ReadBuffer(
-            memoryview(filehandle.read(size)),
-            0,
-            BOOTSTRAP_CONTEXT,
-            BufferContext(abspos=offset),
-        )
-
-
-def _fetch(fixture: str, loc: Locator[T_co]) -> T_co:
-    return loc.read_from(_buffer(fixture, loc.offset, loc.size))
-
-
-def _streamerinfo(fixture: str) -> dict[bytes, TStreamerInfo]:
-    file = _fetch(fixture, InitialReadLocator())
-    assert file.streamerinfo_locator is not None
-    streamerinfo = _fetch(fixture, _fetch(fixture, file.streamerinfo_locator))
-    return {
-        item.fName.fString: item
-        for item in streamerinfo.items
-        if isinstance(item, TStreamerInfo)
-    }
-
-
-def _element(info: TStreamerInfo, name: bytes) -> TStreamerElement:
-    (element,) = (
-        element
-        for element in info.fObjects.objects
-        if isinstance(element, TStreamerElement) and element.fName.fString == name
-    )
-    return element
-
-
 def test_tlist_options():
     """Issue #108: each TList entry is followed by its option string"""
-    fixture = "serialization/object-tags.root"
-    file = _fetch(fixture, InitialReadLocator())
-    tfile = _fetch(fixture, _fetch(fixture, file.tfile_locator))
-    keylist = _fetch(fixture, _fetch(fixture, tfile.rootdir.keylist_locator))
-    lst = _fetch(fixture, keylist["lst"])
+    with open_path(DATA / "serialization/object-tags.root") as reader:
+        lst = reader.fetch(reader.keylist()["lst"])
     assert isinstance(lst, TList)
     assert lst.fName.fString == b"lst"
     assert len(lst.items) == 4
@@ -192,12 +147,13 @@ def test_tlist_options():
 
 def test_streamerelement_maxindex():
     """Issue #92: fMaxIndex is big-endian like everything else"""
-    info = _streamerinfo("serialization/arrays.root")[b"Arrays"]
-    fixed = _element(info, b"fFixed")
+    with open_path(DATA / "serialization/arrays.root") as reader:
+        info = reader.streamerinfos()[b"Arrays"]
+    fixed = info.element(b"fFixed")
     assert fixed.fArrayDim == 1
     assert fixed.fArrayLength == 3
     assert fixed.fMaxIndex == ArrayDim(3, 0, 0, 0, 0)
-    grid = _element(info, b"fGrid")
+    grid = info.element(b"fGrid")
     assert grid.fArrayDim == 2
     assert grid.fArrayLength == 4
     assert grid.fMaxIndex == ArrayDim(2, 2, 0, 0, 0)
@@ -205,8 +161,8 @@ def test_streamerelement_maxindex():
 
 def test_streamerbase_checksum():
     """Issue #92: a TStreamerBase keeps the checksum of the base in fMaxIndex[1]"""
-    info = _streamerinfo("serialization/objects.root")[b"TNamed"]
-    base = _element(info, b"TObject")
+    with open_path(DATA / "serialization/objects.root") as reader:
+        base = reader.streamerinfos()[b"TNamed"].element(b"TObject")
     assert isinstance(base, TStreamerBase)
     assert base.fBaseCheckSum == 0x901BC02D
 
@@ -220,8 +176,8 @@ def test_basket_iobits():
     """Issue #96: the walker of test_read.py does not read the baskets of a branch
     of a fundamental type, so test_read_fixture cannot see this one
     """
-    # The basket of branch n, see gen/cases/ttree/basket-iofeatures/case.toml
-    buffer = _buffer("ttree/basket-iofeatures.root", offset=302, size=78)
-    basket, _ = TBasket.read(buffer)
+    with open_path(DATA / "ttree/basket-iofeatures.root") as reader:
+        # The basket of branch n, see gen/cases/ttree/basket-iofeatures/case.toml
+        basket, _ = TBasket.read(reader.fetch.buffer_at(offset=302, size=78))
     assert basket.bheader.fNevBuf == 3
     assert basket.bheader.flag == 0
