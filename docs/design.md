@@ -173,3 +173,27 @@ buffers = [fetch_data(loc.offset, loc.size) for loc in locators]
 tfile = tfile_loc.read_from(buffers[0])
 streamerinfo = si_loc.read_from(buffers[1]) if si_loc else None
 ```
+
+### A minimal synchronous reader
+
+For the common case of one blocking read per locator, `rootfilespec.reader`
+wraps the pattern above. It still does no I/O of its own: `FileReader.open`
+takes a function returning the bytes at `(offset, size)`, and `open_path` is
+that function for a local file.
+
+```python
+from rootfilespec.reader import open_path
+
+with open_path("file.root") as reader:
+    # reader.file, reader.tfile and reader.streamerinfo are already read, and
+    # reader.fetch interprets data with the classes of the StreamerInfo record
+    keylist = reader.keylist()  # of reader.rootdir, or of any TDirectory
+    obj = reader.fetch(keylist["name"])  # a TKey is a locator
+    element = reader.streamerinfos()[b"TNamed"].element(b"fName")
+```
+
+`reader.fetch(loc)` is `loc.read_from(buffer)` on the fetched bytes;
+`reader.fetch.resolve(loc)` is for the locators that return the key at the front
+of a record (`tfile_locator`, `streamerinfo_locator`, `keylist_locator`) and
+reads the record as well; `reader.fetch.buffer(loc)` only fetches, which is the
+callable `RNTuple.from_anchor` expects.

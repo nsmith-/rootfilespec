@@ -67,6 +67,14 @@ class TStreamerInfo(TNamed):
                 bases.append("StreamedObject")
         return bases
 
+    def element(self, name: bytes) -> "TStreamerElement":
+        """Get the streamer element of the member (or base class) with this name."""
+        for element in self.fObjects.objects:
+            if isinstance(element, TStreamerElement) and element.fName.fString == name:
+                return element
+        msg = f"{self.fName.fString!r} has no element named {name!r}"
+        raise KeyError(msg)
+
     def class_definition(self) -> ClassDef:
         """Get the class definition code of this streamer info."""
         self.check_classname()

@@ -108,7 +108,8 @@ class DynamicFileContext(FileContext):
 
     def purge_module(self) -> None:
         """Purge the dynamic module from sys.modules that this context refers to"""
-        del sys.modules[self.module.__name__]
+        # Contexts of files with the same StreamerInfo share their module
+        sys.modules.pop(self.module.__name__, None)
 
 
 def build_file_context(streamerinfo: bootstrap.TList) -> DynamicFileContext:
