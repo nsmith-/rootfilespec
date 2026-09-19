@@ -212,8 +212,11 @@ class StdVector(ContainerSerDe, Generic[T]):
             if header.fVersion == 1:
                 # seen in RooVectorDataStore3a3aRealVector _vec: StdVector[Annotated[float, Fmt('>d')]]
                 header, buffer = StreamHeader.read(buffer)
-            if header.fVersion != 9:
-                msg = f"Unexpected StdVector version {header.fVersion}"
+            # The version is the TStreamerInfo class version of the writing ROOT
+            # (8 before 5.26, 9 until 6.35, 10 from 6.36), not a constant to
+            # compare against. See root-io-spec Collections §2
+            if header.fVersion is None:
+                msg = f"Expected a version in the StdVector header but got {header}"
                 raise ValueError(msg)
             # TODO: byte count check
             if header.memberwise:

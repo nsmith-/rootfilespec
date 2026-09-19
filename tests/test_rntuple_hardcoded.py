@@ -5,6 +5,7 @@ from skhep_testdata import data_path  # type: ignore[import-not-found]
 from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT, ROOT3a3aRNTuple, ROOTFile
 from rootfilespec.bootstrap.compression import RCompressionSettings
 from rootfilespec.bootstrap.strings import RString
+from rootfilespec.reader import open_path
 from rootfilespec.rntuple.envelope import REnvelopeLink, RFeatureFlags
 from rootfilespec.rntuple.footer import ClusterGroup, FooterEnvelope, SchemaExtension
 from rootfilespec.rntuple.header import HeaderEnvelope
@@ -25,26 +26,8 @@ from rootfilespec.serializable import BufferContext, ReadBuffer
 
 def test_read_contributors():
     filename = "rntviewer-testfile-uncomp-single-rntuple-v1-0-0-0.root"
-    path = Path(data_path(filename))
-    with path.open("rb") as filehandle:
-
-        def fetch_data(seek: int, size: int):
-            filehandle.seek(seek)
-            return ReadBuffer(
-                memoryview(filehandle.read(size)),
-                0,
-                BOOTSTRAP_CONTEXT,
-                BufferContext(abspos=seek),
-            )
-
-        def fetch_from_locator(loc):
-            return fetch_data(loc.offset, loc.size)
-
-        buffer = fetch_data(0, 512)
-        file, _ = ROOTFile.read(buffer)
-        tfile = file.get_TFile(fetch_data)
-        keylist = tfile.get_KeyList(fetch_data)
-        anchor = keylist["Contributors"].read_object(fetch_data, ROOT3a3aRNTuple)
+    with open_path(data_path(filename)) as reader:
+        anchor = reader.fetch(reader.keylist()["Contributors"])
 
         assert anchor == ROOT3a3aRNTuple(
             fVersionEpoch=1,
@@ -60,7 +43,8 @@ def test_read_contributors():
             fMaxKeySize=1073741824,
         )
 
-        rntuple = RNTuple.from_anchor(anchor, fetch_from_locator)
+        assert isinstance(anchor, ROOT3a3aRNTuple)
+        rntuple = RNTuple.from_anchor(anchor, reader.fetch.buffer)
         assert rntuple == RNTuple(
             headerEnvelope=HeaderEnvelope(
                 typeID=1,
@@ -405,6 +389,8 @@ def test_read_contributors():
 
 
 def test_read_multiple_rntuples():
+    # This one keeps to the DataFetcher interface (get_TFile, get_KeyList and
+    # read_object) rather than rootfilespec.reader, as long as that exists (#114)
     filename = "rntviewer-testfile-multiple-rntuples-v1-0-0-0.root"
     path = Path(data_path(filename))
     with path.open("rb") as filehandle:

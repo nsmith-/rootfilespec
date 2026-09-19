@@ -67,6 +67,14 @@ class TStreamerInfo(TNamed):
                 bases.append("StreamedObject")
         return bases
 
+    def element(self, name: bytes) -> "TStreamerElement":
+        """Get the streamer element of the member (or base class) with this name."""
+        for element in self.fObjects.objects:
+            if isinstance(element, TStreamerElement) and element.fName.fString == name:
+                return element
+        msg = f"{self.fName.fString!r} has no element named {name!r}"
+        raise KeyError(msg)
+
     def class_definition(self) -> ClassDef:
         """Get the class definition code of this streamer info."""
         self.check_classname()
@@ -308,7 +316,7 @@ class TStreamerElement(TNamed):
     fSize: Annotated[int, Fmt(">i")]
     fArrayLength: Annotated[int, Fmt(">i")]
     fArrayDim: Annotated[int, Fmt(">i")]
-    fMaxIndex: Annotated[ArrayDim, Fmt("5i")]
+    fMaxIndex: Annotated[ArrayDim, Fmt(">5i")]
     fTypeName: TString
 
     def member_name(self) -> str:
@@ -337,6 +345,14 @@ class TStreamerBase(TStreamerElement):
     """
 
     fBaseVersion: Annotated[int, Fmt(">i")]
+
+    @property
+    def fBaseCheckSum(self) -> int:
+        """Checksum of the base class (0 if not recorded, e.g. ROOT 5 files).
+
+        ROOT stores this UInt_t in the (signed) fMaxIndex[1] slot.
+        """
+        return self.fMaxIndex.dim1 & 0xFFFFFFFF
 
 
 @serializable
