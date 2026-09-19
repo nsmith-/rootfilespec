@@ -66,6 +66,14 @@ jobs:
       - name: Install package
         run: uv sync --group test
 
+      # The tests download their files one by one from raw.githubusercontent.com,
+      # which times out or resets the connection often enough to fail a job
+      - name: Cache scikit-hep-testdata downloads
+        uses: actions/cache@v6
+        with:
+          path: ~/.local/skhepdata
+          key: skhepdata-${{ runner.os }}-v1
+
       - name: Test package
         run: >-
           uv run pytest -ra --cov --cov-report=xml --cov-report=term
