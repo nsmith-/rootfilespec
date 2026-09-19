@@ -35,6 +35,7 @@ test = [
   "pytest >=6",
   "pytest-cov >=3",
   "scikit-hep-testdata",
+  "tomli",
 ]
 dev = [
   { include-group = "test" },

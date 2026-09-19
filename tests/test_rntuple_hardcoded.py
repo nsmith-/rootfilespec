@@ -390,7 +390,7 @@ def test_read_contributors():
 
 def test_read_multiple_rntuples():
     # This one keeps to the DataFetcher interface (get_TFile, get_KeyList and
-    # read_object) rather than rootfilespec.reader, as long as that exists
+    # read_object) rather than rootfilespec.reader, as long as that exists (#114)
     filename = "rntviewer-testfile-multiple-rntuples-v1-0-0-0.root"
     path = Path(data_path(filename))
     with path.open("rb") as filehandle:
