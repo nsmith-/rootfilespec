@@ -33,6 +33,34 @@ class Fmt(MemberSerDe):
 
 
 @dataclasses.dataclass
+class _CountedStringReader:
+    fname: str
+    length_fmt: str
+
+    def __call__(
+        self, members: Members, buffer: ReadBuffer
+    ) -> tuple[Members, ReadBuffer]:
+        (length,), buffer = buffer.unpack(self.length_fmt)
+        members[self.fname], buffer = buffer.consume(length)
+        return members, buffer
+
+
+@dataclasses.dataclass
+class CountedString(MemberSerDe):
+    """A string stored as its length, then that many bytes, read as plain ``bytes``
+
+    ``length_fmt`` is the struct format of the length, e.g. ``"<I"`` for an
+    RNTuple string (a 32-bit little-endian unsigned length). The bytes are not
+    decoded: a reader should not assume an encoding the format does not promise.
+    """
+
+    length_fmt: str
+
+    def build_reader(self, fname: str, ftype: type):  # noqa: ARG002
+        return _CountedStringReader(fname, self.length_fmt)
+
+
+@dataclasses.dataclass
 class _OptionalFieldReader:
     """A class to read an optional field from a buffer."""
 
