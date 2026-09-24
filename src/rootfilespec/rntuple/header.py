@@ -1,4 +1,3 @@
-from rootfilespec.bootstrap.strings import RString
 from rootfilespec.rntuple.envelope import ENVELOPE_TYPE_MAP, REnvelope, RFeatureFlags
 from rootfilespec.rntuple.RFrame import ListFrame
 from rootfilespec.rntuple.schema import (
@@ -6,6 +5,7 @@ from rootfilespec.rntuple.schema import (
     ColumnDescription,
     ExtraTypeInformation,
     FieldDescription,
+    RNTupleString,
 )
 from rootfilespec.serializable import serializable
 
@@ -16,11 +16,11 @@ class HeaderEnvelope(REnvelope):
 
     featureFlags: RFeatureFlags
     """The RNTuple Feature Flags (verify this file can be read)"""
-    fName: RString
+    fName: RNTupleString
     """The name of the RNTuple."""
-    fDescription: RString
+    fDescription: RNTupleString
     """The description of the RNTuple."""
-    fLibrary: RString
+    fLibrary: RNTupleString
     """The library or program used to create the RNTuple."""
     fieldDescriptions: ListFrame[FieldDescription]
     """The List Frame of Field Description Record Frames. Part of the RNTuple schema description.
