@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-import xxhash
+import xxhash  # type: ignore[import-not-found]
 
 from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT
 from rootfilespec.reader import open_path

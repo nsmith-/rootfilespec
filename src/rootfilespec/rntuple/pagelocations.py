@@ -2,7 +2,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Annotated, cast
 
-import xxhash
+import xxhash  # type: ignore[import-not-found]
 
 from rootfilespec.bootstrap.compression import RCompressionSettings
 from rootfilespec.rntuple.RFrame import Item, ListFrame
