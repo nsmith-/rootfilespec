@@ -2,7 +2,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Annotated, Generic, TypeVar, cast
 
-import xxhash
+import xxhash  # type: ignore[import-not-found]
 from typing_extensions import Self
 
 from rootfilespec.bootstrap.compression import decompress
