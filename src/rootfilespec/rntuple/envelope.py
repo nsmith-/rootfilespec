@@ -2,6 +2,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Annotated, Generic, TypeVar, cast
 
+import xxhash  # type: ignore[import-not-found]
 from typing_extensions import Self
 
 from rootfilespec.bootstrap.compression import decompress
@@ -76,6 +77,8 @@ class REnvelope(ROOTSerializable):
         """Reads an REnvelope from the given buffer."""
         #### Save initial buffer position (for checking unknown bytes)
         payload_start_pos = buffer.relpos
+        # The whole envelope, for the checksum, which covers everything before it
+        envelope_bytes = buffer.data
 
         #### Get the first 64bit integer (lengthType) which contains the length and type of the envelope
         # lengthType, buffer = buffer.consume(8)
@@ -108,6 +111,16 @@ class REnvelope(ROOTSerializable):
 
         #### Get the checksum (appended to envelope when writing to disk)
         (checksum,), buffer = buffer.unpack("<Q")  # Last 8 bytes of the envelope
+        # The length includes the checksum, and the checksum covers [0, length - 8)
+        # of the uncompressed envelope (root-io-spec ERRATA 5). Unknown bytes count
+        # too: "Checksum verification ... must include both known and unknown contents"
+        computed = xxhash.xxh3_64_intdigest(envelope_bytes[: length - 8])
+        if computed != checksum:
+            msg = (
+                f"{cls.__name__} checksum mismatch: "
+                f"stored {checksum:#018x}, computed {computed:#018x}"
+            )
+            raise ValueError(msg)
         members["checksum"] = checksum
         envelope = cls(**members)
         envelope._unknown = _unknown
@@ -150,7 +163,16 @@ class REnvelopeLocator(Generic[EnvType]):
         Envelopes are compressed, so this decompresses and deserializes.
         """
         #### Decompress the buffer if necessary
-        if len(buffer) != self.length:
+        # RNTuple decompression tests equality: a stored size equal to the length
+        # means stored raw, a smaller one compressed, and a larger one is an error
+        # (root-io-spec NOTES 2; RNTupleZip.hxx:106-113)
+        if len(buffer) > self.length:
+            msg = (
+                f"{self.envtype.__name__} at offset {self.offset}: stored size "
+                f"{len(buffer)} is larger than its uncompressed length {self.length}"
+            )
+            raise ValueError(msg)
+        if len(buffer) < self.length:
             buffer = decompress(buffer, self.length)
 
         #### Now read the envelope

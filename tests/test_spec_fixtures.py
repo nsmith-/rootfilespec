@@ -5,6 +5,7 @@ with byte-level assertions, by the ``case.toml`` of the same name under
 ``gen/cases/``. The submodule is optional: without it this module is skipped.
 """
 
+import struct
 from pathlib import Path
 from typing import NamedTuple
 
@@ -48,6 +49,9 @@ EXPECTED_FAILURES: dict[str, ExpectedFailure] = {
     "classes/matrix.root": ExpectedFailure(
         (73,), ValueError, "Unknown type TMatrixTSym3cfloat3e"
     ),
+    "classes/roofit.root": ExpectedFailure(
+        (71,), ValueError, "buffer not empty after reading object of type RooLinkedList"
+    ),
     "classes/tarray.root": ExpectedFailure((107,), ValueError, "Unknown type TArrayL "),
     "serialization/clones-array.root": ExpectedFailure(
         (101,), ValueError, "Unknown type TClonesArray"
@@ -73,6 +77,9 @@ EXPECTED_FAILURES: dict[str, ExpectedFailure] = {
     ),
     # A bare assert on the end of a column in the member-wise branch of StdMap
     "serialization/pairs.root": ExpectedFailure((70,), AssertionError, "^$"),
+    "serialization/pointer-collection.root": ExpectedFailure(
+        (105,), ValueError, "Expected a version in the StdVector header"
+    ),
     "serialization/pointer-forms.root": ExpectedFailure(
         (91,), ValueError, "85 is not a valid ElementType"
     ),
@@ -89,6 +96,9 @@ EXPECTED_FAILURES: dict[str, ExpectedFailure] = {
     ),
     # TH1L derives from the missing TArrayL64 (#107); its version word of 0 is
     # also misread as announcing a checksum (#111)
+    "serialization/unframed-records.root": ExpectedFailure(
+        (123, 101), AttributeError, "type object 'int' has no attribute 'read'"
+    ),
     "serialization/version-zero.root": ExpectedFailure(
         (107, 111), TypeError, r"__init__\(\) missing 36 required positional arguments"
     ),
@@ -112,6 +122,9 @@ EXPECTED_FAILURES: dict[str, ExpectedFailure] = {
     ),
     "ttree/tree-index.root": ExpectedFailure(
         (101,), ValueError, "Unknown type TTreeIndex"
+    ),
+    "written/two-versions.root": ExpectedFailure(
+        (22,), struct.error, "unpack requires a buffer of 8 bytes"
     ),
 }
 
