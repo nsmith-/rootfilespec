@@ -37,12 +37,22 @@ class TKey_header(ROOTSerializable):
         return TDatime_to_datetime(self.fDatime)
 
     def is_short(self) -> bool:
-        """Return if the key is short (i.e. the seeks are 32 bit)"""
-        return self.fVersion < 1000
+        """Return if the key is short (i.e. the seeks are 32 bit)
+
+        A key is large when fVersion > 1000 (TKey.cxx:660, :1269; root-io-spec
+        Record §2). RNTuple's own mini-file parser uses >= 1000, but a reader
+        should follow TKey (root-io-spec Record erratum 9).
+        """
+        return self.fVersion <= 1000
 
     def is_compressed(self) -> bool:
-        """Return if the key is compressed"""
-        return self.fNbytes != self.fObjlen + self.fKeylen
+        """Return if the key's payload is compressed
+
+        It is compressed if fObjLen > fNbytes - fKeyLen, the test at all of
+        ROOT's read sites (root-io-spec Compression §1). A raw payload may be
+        longer than fObjLen; the extra bytes are slack.
+        """
+        return self.fObjlen > self.fNbytes - self.fKeylen
 
     def is_embedded(self) -> bool:
         """Return if the key's payload is embedded"""
@@ -76,7 +86,7 @@ class TKey(ROOTSerializable):
         cls, members: Members, buffer: ReadBuffer
     ) -> tuple[Members, ReadBuffer]:
         header, buffer = TKey_header.read(buffer)
-        if header.fVersion < 1000:
+        if header.is_short():
             (fSeekKey, fSeekPdir), buffer = buffer.unpack(">ii")
         else:
             (fSeekKey, fSeekPdir), buffer = buffer.unpack(">qq")
@@ -107,15 +117,26 @@ class TKey(ROOTSerializable):
         fetch_data: DataFetcher,
         objtype: type[ObjType] | None = None,
     ) -> ObjType | ROOTSerializable:
+        if self.fClassName.fString == b"RBlob":
+            # An RBlob key's fObjLen is decorative, and one blob can hold several
+            # pages, each with a checksum fObjLen does not count (root-io-spec
+            # RNTuple NOTES 1). Reading it as a key payload silently truncates it.
+            msg = (
+                f"TKey at {self.fSeekKey} is an RBlob: RNTuple bytes are found with "
+                "the anchor's envelope locators and the page lists, not through their keys"
+            )
+            raise ValueError(msg)
         buffer = fetch_data(self.fSeekKey, self.header.fNbytes)
         # TODO: should we compare the key in the buffer with ourself?
         buffer = buffer[self.header.fKeylen :]
 
         compressed = None
-        # The length of the buffer is the number of bytes of compressed data
-        if len(buffer) != self.header.fObjlen:
-            # This is a compressed object
+        # Compressed iff fObjLen > fNbytes - fKeyLen (root-io-spec Compression §1);
+        # a raw payload longer than fObjLen has slack, which is not part of it
+        if self.header.fObjlen > len(buffer):
             buffer = decompress(buffer, self.header.fObjlen)
+        else:
+            buffer = buffer[: self.header.fObjlen]
         if objtype is not None:
             typename = objtype.__name__
             obj, buffer = objtype.read(buffer)
