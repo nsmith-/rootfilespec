@@ -194,11 +194,16 @@ class TKeyList(ROOTSerializable, Mapping[str, TKey]):
     def __len__(self):
         return len(self.fKeys)
 
+    # Key names are uninterpreted bytes (root-io-spec Conventions §5.1). They are
+    # shown as UTF-8, and any other byte is kept as a surrogate escape, so every
+    # name can be listed and looked up, and maps back to exactly its bytes.
     def __iter__(self):
-        return (key.fName.fString.decode("ascii") for key in self.fKeys)
+        return (
+            key.fName.fString.decode("utf-8", "surrogateescape") for key in self.fKeys
+        )
 
     def __getitem__(self, key: str):
-        bkey = key.encode("ascii")
+        bkey = key.encode("utf-8", "surrogateescape")
         matches = [k for k in self.fKeys if k.fName.fString == bkey]
         if not matches:
             raise KeyError(key)
