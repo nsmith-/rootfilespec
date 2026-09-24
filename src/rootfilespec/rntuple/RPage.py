@@ -8,7 +8,9 @@ class RPage(ROOTSerializable):
     """A class to represent an RNTuple page."""
 
     page: bytes
-    """The RNTuple page raw data."""
+    """The RNTuple page raw data, as stored (still compressed if the page is)."""
+    checksum: int | None = None
+    """The page's XXH3-64 checksum, verified against ``page``, or None if it has none."""
 
     # TODO: Flush out RPage class
     @classmethod

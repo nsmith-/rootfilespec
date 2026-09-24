@@ -8,6 +8,7 @@ from rootfilespec.rntuple.envelope import (
 from rootfilespec.rntuple.pagelocations import (
     PageLocations,
     RPageDescription,
+    RPageLocator,
 )
 from rootfilespec.rntuple.RFrame import ListFrame, RecordFrame
 from rootfilespec.rntuple.RPage import RPage
@@ -66,8 +67,11 @@ class PageListEnvelope(REnvelope):
     """The Page Locations Triple Nested List Frame"""
 
     @property
-    def page_locators(self) -> list[list[list[RPageDescription]]]:
+    def page_locators(self) -> list[list[list[RPageLocator]]]:
         """Get locators for all pages in this page list.
+
+        Each locator covers a page's stored bytes, checksum included, and verifies
+        the checksum when read (see ``RPageDescription.page_locator``).
 
         Returns a triple-nested list structure:
         - Top level: clusters
@@ -75,7 +79,7 @@ class PageListEnvelope(REnvelope):
         - Inner level: pages
         """
         return [
-            [list(pagelist) for pagelist in columnlist]
+            [[page.page_locator for page in pagelist] for pagelist in columnlist]
             for columnlist in self.pageLocations
         ]
 
