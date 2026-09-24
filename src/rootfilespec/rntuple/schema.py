@@ -129,7 +129,9 @@ class FieldDescription(RecordFrame):
         - Bit:   Meaning
         - 0x01:  Repetitive field, i.e. for every entry `n` copies of the field are stored
         - 0x02:  Projected field
-        - 0x04:  Has ROOT type checksum as reported by TClass"""
+        - 0x04:  Has ROOT type checksum as reported by TClass
+        - 0x08:  The field is a collection that was stored using a SoA layout
+                 (no effect on the on-disk representation; adds no optional field)"""
     fFieldName: RString
     """The name of the field."""
     fTypeName: RString
@@ -178,13 +180,15 @@ class ColumnDescription(RecordFrame):
         - 0x02:  Column with a range of possible values"""
     fRepresentationIndex: Annotated[int, Fmt("<H")]
     """The index of the representation of the column in the list of representations for the field."""
-    # abbott TODO: verify the below are signed. make PR updating ROOT documentation if so (indicate signed bit in table)
     fFirstElementIndex: Annotated[int | None, OptionalField("<q", "fFlags", "&", 0x01)]
-    """The index of the first element in the column. Present only if flag 0x01 is set (deferred column)."""
-    fMinValue: Annotated[int | None, OptionalField("<q", "fFlags", "&", 0x02)]
-    """The minimum value of the column. Present only if flag 0x02 is set (column with range of values)."""
-    fMaxValue: Annotated[int | None, OptionalField("<q", "fFlags", "&", 0x02)]
-    """The maximum value of the column. Present only if flag 0x02 is set (column with range of values)."""
+    """The index of the first element in the column. Present only if flag 0x01 is set (deferred column).
+    Signed: a negative value means the column is deferred and suppressed."""
+    fMinValue: Annotated[float | None, OptionalField("<d", "fFlags", "&", 0x02)]
+    """The minimum value of the column, an IEEE 754 double.
+    Present only if flag 0x02 is set (column with range of values)."""
+    fMaxValue: Annotated[float | None, OptionalField("<d", "fFlags", "&", 0x02)]
+    """The maximum value of the column, an IEEE 754 double.
+    Present only if flag 0x02 is set (column with range of values)."""
 
 
 @serializable
