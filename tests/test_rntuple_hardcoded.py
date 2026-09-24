@@ -4,7 +4,6 @@ from skhep_testdata import data_path  # type: ignore[import-not-found]
 
 from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT, ROOT3a3aRNTuple, ROOTFile
 from rootfilespec.bootstrap.compression import RCompressionSettings
-from rootfilespec.bootstrap.strings import RString
 from rootfilespec.reader import open_path
 from rootfilespec.rntuple.envelope import REnvelopeLink, RFeatureFlags
 from rootfilespec.rntuple.footer import ClusterGroup, FooterEnvelope, SchemaExtension
@@ -51,9 +50,9 @@ def test_read_contributors():
                 length=332,
                 checksum=9346497350689737328,
                 featureFlags=RFeatureFlags(flags=0),
-                fName=RString(fString=b"Contributors"),
-                fDescription=RString(fString=b"The first ever RNTuple."),
-                fLibrary=RString(fString=b"ROOT v6.35.001"),
+                fName=b"Contributors",
+                fDescription=b"The first ever RNTuple.",
+                fLibrary=b"ROOT v6.35.001",
                 fieldDescriptions=ListFrame(
                     fSize=131,
                     items=[
@@ -64,10 +63,10 @@ def test_read_contributors():
                             fParentFieldID=0,
                             fStructuralRole=0,
                             fFlags=0,
-                            fFieldName=RString(fString=b"firstName"),
-                            fTypeName=RString(fString=b"std::string"),
-                            fTypeAlias=RString(fString=b""),
-                            fFieldDescription=RString(fString=b""),
+                            fFieldName=b"firstName",
+                            fTypeName=b"std::string",
+                            fTypeAlias=b"",
+                            fFieldDescription=b"",
                             fArraySize=None,
                             fSourceFieldID=None,
                             fTypeChecksum=None,
@@ -79,10 +78,10 @@ def test_read_contributors():
                             fParentFieldID=1,
                             fStructuralRole=0,
                             fFlags=0,
-                            fFieldName=RString(fString=b"lastName"),
-                            fTypeName=RString(fString=b"std::string"),
-                            fTypeAlias=RString(fString=b""),
-                            fFieldDescription=RString(fString=b""),
+                            fFieldName=b"lastName",
+                            fTypeName=b"std::string",
+                            fTypeAlias=b"",
+                            fFieldDescription=b"",
                             fArraySize=None,
                             fSourceFieldID=None,
                             fTypeChecksum=None,
@@ -265,10 +264,10 @@ def test_read_contributors():
                     fParentFieldID=0,
                     fStructuralRole=0,
                     fFlags=0,
-                    fFieldName=RString(fString=b"firstName"),
-                    fTypeName=RString(fString=b"std::string"),
-                    fTypeAlias=RString(fString=b""),
-                    fFieldDescription=RString(fString=b""),
+                    fFieldName=b"firstName",
+                    fTypeName=b"std::string",
+                    fTypeAlias=b"",
+                    fFieldDescription=b"",
                     fArraySize=None,
                     fSourceFieldID=None,
                     fTypeChecksum=None,
@@ -280,10 +279,10 @@ def test_read_contributors():
                     fParentFieldID=1,
                     fStructuralRole=0,
                     fFlags=0,
-                    fFieldName=RString(fString=b"lastName"),
-                    fTypeName=RString(fString=b"std::string"),
-                    fTypeAlias=RString(fString=b""),
-                    fFieldDescription=RString(fString=b""),
+                    fFieldName=b"lastName",
+                    fTypeName=b"std::string",
+                    fTypeAlias=b"",
+                    fFieldDescription=b"",
                     fArraySize=None,
                     fSourceFieldID=None,
                     fTypeChecksum=None,
@@ -351,6 +350,13 @@ def test_read_contributors():
                             ),
                             uncompressedSize=176,
                             columnType=ColumnType.kIndex64,
+                            clusterID=0,
+                            columnID=0,
+                            fieldID=0,
+                            fieldDescription=rntuple.schemaDescription.fieldDescriptions[
+                                0
+                            ],
+                            fieldPath=b"firstName",
                         )
                     ],
                     [
@@ -361,6 +367,13 @@ def test_read_contributors():
                             ),
                             uncompressedSize=178,
                             columnType=ColumnType.kChar,
+                            clusterID=0,
+                            columnID=1,
+                            fieldID=0,
+                            fieldDescription=rntuple.schemaDescription.fieldDescriptions[
+                                0
+                            ],
+                            fieldPath=b"firstName",
                         )
                     ],
                     [
@@ -371,6 +384,13 @@ def test_read_contributors():
                             ),
                             uncompressedSize=176,
                             columnType=ColumnType.kIndex64,
+                            clusterID=0,
+                            columnID=2,
+                            fieldID=1,
+                            fieldDescription=rntuple.schemaDescription.fieldDescriptions[
+                                1
+                            ],
+                            fieldPath=b"lastName",
                         )
                     ],
                     [
@@ -381,6 +401,13 @@ def test_read_contributors():
                             ),
                             uncompressedSize=193,
                             columnType=ColumnType.kChar,
+                            clusterID=0,
+                            columnID=3,
+                            fieldID=1,
+                            fieldDescription=rntuple.schemaDescription.fieldDescriptions[
+                                1
+                            ],
+                            fieldPath=b"lastName",
                         )
                     ],
                 ]
@@ -434,9 +461,9 @@ def test_read_multiple_rntuples():
                 length=164,
                 checksum=1772847515747675522,
                 featureFlags=RFeatureFlags(flags=0),
-                fName=RString(fString=b"A"),
-                fDescription=RString(fString=b""),
-                fLibrary=RString(fString=b"ROOT v6.35.01"),
+                fName=b"A",
+                fDescription=b"",
+                fLibrary=b"ROOT v6.35.01",
                 fieldDescriptions=ListFrame(
                     fSize=58,
                     items=[
@@ -447,10 +474,10 @@ def test_read_multiple_rntuples():
                             fParentFieldID=0,
                             fStructuralRole=0,
                             fFlags=0,
-                            fFieldName=RString(fString=b"f"),
-                            fTypeName=RString(fString=b"float"),
-                            fTypeAlias=RString(fString=b""),
-                            fFieldDescription=RString(fString=b""),
+                            fFieldName=b"f",
+                            fTypeName=b"float",
+                            fTypeAlias=b"",
+                            fFieldDescription=b"",
                             fArraySize=None,
                             fSourceFieldID=None,
                             fTypeChecksum=None,
@@ -561,10 +588,10 @@ def test_read_multiple_rntuples():
                     fParentFieldID=0,
                     fStructuralRole=0,
                     fFlags=0,
-                    fFieldName=RString(fString=b"f"),
-                    fTypeName=RString(fString=b"float"),
-                    fTypeAlias=RString(fString=b""),
-                    fFieldDescription=RString(fString=b""),
+                    fFieldName=b"f",
+                    fTypeName=b"float",
+                    fTypeAlias=b"",
+                    fFieldDescription=b"",
                     fArraySize=None,
                     fSourceFieldID=None,
                     fTypeChecksum=None,
@@ -599,6 +626,13 @@ def test_read_multiple_rntuples():
                             ),
                             uncompressedSize=400,
                             columnType=ColumnType.kSplitReal32,
+                            clusterID=0,
+                            columnID=0,
+                            fieldID=0,
+                            fieldDescription=rntuple_a.schemaDescription.fieldDescriptions[
+                                0
+                            ],
+                            fieldPath=b"f",
                         )
                     ]
                 ]
@@ -627,9 +661,9 @@ def test_read_multiple_rntuples():
                 length=171,
                 checksum=14068653553654343426,
                 featureFlags=RFeatureFlags(flags=0),
-                fName=RString(fString=b"B"),
-                fDescription=RString(fString=b""),
-                fLibrary=RString(fString=b"ROOT v6.35.01"),
+                fName=b"B",
+                fDescription=b"",
+                fLibrary=b"ROOT v6.35.01",
                 fieldDescriptions=ListFrame(
                     fSize=65,
                     items=[
@@ -640,10 +674,10 @@ def test_read_multiple_rntuples():
                             fParentFieldID=0,
                             fStructuralRole=0,
                             fFlags=0,
-                            fFieldName=RString(fString=b"g"),
-                            fTypeName=RString(fString=b"std::int32_t"),
-                            fTypeAlias=RString(fString=b""),
-                            fFieldDescription=RString(fString=b""),
+                            fFieldName=b"g",
+                            fTypeName=b"std::int32_t",
+                            fTypeAlias=b"",
+                            fFieldDescription=b"",
                             fArraySize=None,
                             fSourceFieldID=None,
                             fTypeChecksum=None,
@@ -754,10 +788,10 @@ def test_read_multiple_rntuples():
                     fParentFieldID=0,
                     fStructuralRole=0,
                     fFlags=0,
-                    fFieldName=RString(fString=b"g"),
-                    fTypeName=RString(fString=b"std::int32_t"),
-                    fTypeAlias=RString(fString=b""),
-                    fFieldDescription=RString(fString=b""),
+                    fFieldName=b"g",
+                    fTypeName=b"std::int32_t",
+                    fTypeAlias=b"",
+                    fFieldDescription=b"",
                     fArraySize=None,
                     fSourceFieldID=None,
                     fTypeChecksum=None,
@@ -792,6 +826,13 @@ def test_read_multiple_rntuples():
                             ),
                             uncompressedSize=400,
                             columnType=ColumnType.kSplitInt32,
+                            clusterID=0,
+                            columnID=0,
+                            fieldID=0,
+                            fieldDescription=rntuple_b.schemaDescription.fieldDescriptions[
+                                0
+                            ],
+                            fieldPath=b"g",
                         )
                     ]
                 ]
