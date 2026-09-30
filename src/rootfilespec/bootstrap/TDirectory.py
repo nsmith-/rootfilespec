@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Annotated
 
 from rootfilespec.bootstrap.TDatime import TDatime, TDatime_to_datetime
@@ -59,11 +60,11 @@ class TDirectory_header_v622(ROOTSerializable):
         """True if the file is larger than 2GB"""
         return self.fVersion > 1000
 
-    def create_time(self):
+    def create_time(self) -> datetime | None:
         """Date and time when directory was created"""
         return TDatime_to_datetime(self.fDatimeC)
 
-    def modify_time(self):
+    def modify_time(self) -> datetime | None:
         """Date and time when directory was last modified"""
         return TDatime_to_datetime(self.fDatimeM)
 

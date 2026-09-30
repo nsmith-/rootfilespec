@@ -152,7 +152,10 @@ class RCompressed(ROOTSerializable):
         return members, buffer
 
     def compressed_size(self) -> int:
-        return sum(chunk.header.compressed_size() for chunk in self.chunks)
+        """The payload's length on disk: each block's 9-byte header plus its
+        compressed size, which for LZ4 includes the 8-byte checksum
+        (root-io-spec Compression §4-§5)"""
+        return sum(9 + chunk.header.fCompressedSize for chunk in self.chunks)
 
     def uncompressed_size(self) -> int:
         return sum(chunk.header.uncompressed_size() for chunk in self.chunks)

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Annotated, Generic, TypeVar, overload
 
 from rootfilespec.bootstrap.compression import decompress
@@ -32,7 +33,7 @@ class TKey_header(ROOTSerializable):
     fCycle: Annotated[int, Fmt(">h")]
     """Cycle of key"""
 
-    def write_time(self):
+    def write_time(self) -> datetime | None:
         """Date and time when record was written to file"""
         return TDatime_to_datetime(self.fDatime)
 

@@ -38,7 +38,7 @@ class VersionInfo(ROOTSerializable):
             major=version // 10_000 % 100,
             minor=version // 100 % 100,
             cycle=version % 100,
-            large=version > 1_000_000,
+            large=version >= 1_000_000,
         ), buffer
 
 
@@ -62,7 +62,7 @@ class ROOTFile_header_v302(ROOTSerializable):
     """Number of free data records"""
     fNbytesName: Annotated[int, Fmt(">i")]
     """Number of bytes in TKey+TNamed for ROOTFile at creation"""
-    fUnits: Annotated[int, Fmt(">b")]
+    fUnits: Annotated[int, Fmt(">B")]
     """Number of bytes for file pointers (4)"""
     fCompress: Annotated[int, Fmt(">i")]
     """Zip compression level (i.e. 0-9)"""
@@ -96,7 +96,7 @@ class ROOTFile_header_v622_small(ROOTSerializable):
     """Number of free data records"""
     fNbytesName: Annotated[int, Fmt(">i")]
     """Number of bytes in TKey+TNamed for ROOTFile at creation"""
-    fUnits: Annotated[int, Fmt(">b")]
+    fUnits: Annotated[int, Fmt(">B")]
     """Number of bytes for file pointers (4 or 8)"""
     fCompress: Annotated[int, Fmt(">i")]
     """Zip compression level (i.e. 0-9)"""
@@ -124,7 +124,7 @@ class ROOTFile_header_v622_large(ROOTSerializable):
     """Number of free data records"""
     fNbytesName: Annotated[int, Fmt(">i")]
     """Number of bytes in TKey+TNamed for ROOTFile at creation"""
-    fUnits: Annotated[int, Fmt("b")]
+    fUnits: Annotated[int, Fmt(">B")]
     """Number of bytes for file pointers (4 or 8)"""
     fCompress: Annotated[int, Fmt(">i")]
     """Zip compression level (i.e. 0-9)"""
