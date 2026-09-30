@@ -20,9 +20,7 @@ def test_streamer_info_content():
     path = DATA / "streamed.root"
     with open_path(path) as reader:
         keylist = reader.keylist()
-        (name,) = [
-            n for n in keylist if keylist[n].fClassName.fString == b"ROOT::RNTuple"
-        ]
+        (name,) = [n for n in keylist if keylist[n].fClassName == b"ROOT::RNTuple"]
         rntuple = RNTuple.from_anchor(reader.fetch(keylist[name]), reader.fetch.buffer)
 
     assert rntuple.headerEnvelope.extraTypeInformations.items == []
