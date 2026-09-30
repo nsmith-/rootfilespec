@@ -151,7 +151,7 @@ def test_read_fixture(fixture: str):
 def test_tlist_options():
     """Issue #108: each TList entry is followed by its option string"""
     with open_path(DATA / "serialization/object-tags.root") as reader:
-        lst = reader.fetch(reader.keylist()["lst"])
+        lst = reader.fetch(reader.keylist()[b"lst"])
     assert isinstance(lst, TList)
     assert lst.fName.fString == b"lst"
     assert len(lst.items) == 4

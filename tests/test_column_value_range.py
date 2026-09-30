@@ -15,7 +15,7 @@ def test_column_value_range_is_double():
     """
     filename = "test_float_types_rntuple_v1-0-0-0.root"
     with open_path(data_path(filename)) as reader:
-        anchor = reader.fetch(reader.keylist()["ntuple"])
+        anchor = reader.fetch(reader.keylist()[b"ntuple"])
         assert isinstance(anchor, ROOT3a3aRNTuple)
         rntuple = RNTuple.from_anchor(anchor, reader.fetch.buffer)
 

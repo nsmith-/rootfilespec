@@ -167,7 +167,7 @@ TDirectoryFile = TDirectory
 
 
 @serializable
-class TKeyList(ROOTSerializable, Mapping[str, TKey]):
+class TKeyList(ROOTSerializable, Mapping[bytes, TKey]):
     """The TKeyList for a TDirectory contains all the (visible) TKeys
     For RNTuples, it will only contain the RNTuple Anchor TKey(s)
     Binary Spec: https://root.cern.ch/doc/master/keyslist.html
@@ -194,17 +194,13 @@ class TKeyList(ROOTSerializable, Mapping[str, TKey]):
     def __len__(self):
         return len(self.fKeys)
 
-    # Key names are uninterpreted bytes (root-io-spec Conventions §5.1). They are
-    # shown as UTF-8, and any other byte is kept as a surrogate escape, so every
-    # name can be listed and looked up, and maps back to exactly its bytes.
+    # Key names are uninterpreted bytes (root-io-spec Conventions §5.1), so the
+    # mapping is keyed by the bytes as stored, with no decoding.
     def __iter__(self):
-        return (
-            key.fName.fString.decode("utf-8", "surrogateescape") for key in self.fKeys
-        )
+        return (key.fName.fString for key in self.fKeys)
 
-    def __getitem__(self, key: str):
-        bkey = key.encode("utf-8", "surrogateescape")
-        matches = [k for k in self.fKeys if k.fName.fString == bkey]
+    def __getitem__(self, key: bytes):
+        matches = [k for k in self.fKeys if k.fName.fString == key]
         if not matches:
             raise KeyError(key)
         return max(matches, key=lambda k: k.header.fCycle)

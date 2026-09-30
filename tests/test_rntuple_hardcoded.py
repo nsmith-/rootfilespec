@@ -27,7 +27,7 @@ from rootfilespec.serializable import BufferContext, ReadBuffer
 def test_read_contributors():
     filename = "rntviewer-testfile-uncomp-single-rntuple-v1-0-0-0.root"
     with open_path(data_path(filename)) as reader:
-        anchor = reader.fetch(reader.keylist()["Contributors"])
+        anchor = reader.fetch(reader.keylist()[b"Contributors"])
 
         assert anchor == ROOT3a3aRNTuple(
             fVersionEpoch=1,
@@ -412,7 +412,7 @@ def test_read_multiple_rntuples():
         tfile = file.get_TFile(fetch_data)
         keylist = tfile.get_KeyList(fetch_data)
 
-        anchor_a = keylist["A"].read_object(fetch_data, ROOT3a3aRNTuple)
+        anchor_a = keylist[b"A"].read_object(fetch_data, ROOT3a3aRNTuple)
         assert anchor_a == ROOT3a3aRNTuple(
             fVersionEpoch=1,
             fVersionMajor=0,
@@ -605,7 +605,7 @@ def test_read_multiple_rntuples():
             ]
         ]
 
-        anchor_b = keylist["B"].read_object(fetch_data, ROOT3a3aRNTuple)
+        anchor_b = keylist[b"B"].read_object(fetch_data, ROOT3a3aRNTuple)
         assert anchor_b == ROOT3a3aRNTuple(
             fVersionEpoch=1,
             fVersionMajor=0,
