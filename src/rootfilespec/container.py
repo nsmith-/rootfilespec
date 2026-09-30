@@ -4,7 +4,6 @@ from typing import Any, Generic, TypeVar, get_args, get_origin
 
 import numpy as np
 
-from rootfilespec.bootstrap.streamedobject import StreamHeader
 from rootfilespec.serializable import (
     AssociativeContainerSerDe,
     ContainerSerDe,
@@ -139,6 +138,9 @@ class _ObjectArrayReader:
     def __call__(
         self, members: Members, buffer: ReadBuffer
     ) -> tuple[Members, ReadBuffer]:
+        # Imported here: rootfilespec.bootstrap imports this module (#119)
+        from rootfilespec.bootstrap.streamedobject import StreamHeader
+
         if isinstance(self.size, int):
             n = self.size
         else:
@@ -207,6 +209,9 @@ class StdVector(ContainerSerDe, Generic[T]):
 
     @classmethod
     def read_as(cls, inner_reader: ReadObjMethod, hasheader: bool, buffer: ReadBuffer):
+        # Imported here: rootfilespec.bootstrap imports this module (#119)
+        from rootfilespec.bootstrap.streamedobject import StreamHeader
+
         if hasheader:
             header, buffer = StreamHeader.read(buffer)
             if header.fVersion == 1:
@@ -271,6 +276,9 @@ class StdSet(ContainerSerDe, Generic[T]):
 
     @classmethod
     def read_as(cls, inner_reader: ReadObjMethod, buffer: ReadBuffer):
+        # Imported here: rootfilespec.bootstrap imports this module (#119)
+        from rootfilespec.bootstrap.streamedobject import StreamHeader
+
         header, buffer = StreamHeader.read(buffer)
         if header.memberwise:
             msg = "Set with memberwise reading"
@@ -324,6 +332,9 @@ class StdMap(AssociativeContainerSerDe, Generic[K, V]):
     def read_as(
         cls, key_reader: ReadObjMethod, value_reader: ReadObjMethod, buffer: ReadBuffer
     ):
+        # Imported here: rootfilespec.bootstrap imports this module (#119)
+        from rootfilespec.bootstrap.streamedobject import StreamHeader
+
         # TODO: split this function out into a _StdMapReader with flags
         header, buffer = StreamHeader.read(buffer)
         items: dict[K, V] = {}
