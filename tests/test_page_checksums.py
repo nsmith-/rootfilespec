@@ -5,7 +5,8 @@ import xxhash  # type: ignore[import-not-found]
 
 from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT
 from rootfilespec.reader import open_path
-from rootfilespec.rntuple.pagelocations import RPageDescription, RPageLocator
+from rootfilespec.rntuple.pagelocations import RPageDescription
+from rootfilespec.rntuple.RLocator import StandardLocator
 from rootfilespec.rntuple.RNTuple import RNTuple
 from rootfilespec.serializable import BufferContext, ReadBuffer
 
@@ -44,7 +45,8 @@ def test_page_with_checksum():
     """Issue #55: the page at 550 in rntuple/anchor.root, checked against its bytes
 
     Its fNElements is -3 (the sign flags a checksum), its locator says 12 bytes,
-    and the XXH3-64 of those 12 bytes is stored little-endian at 562..570.
+    and the XXH3-64 of those 12 bytes is stored little-endian at 562..570. The
+    page description's size covers both, so one fetch gets what read_from needs.
     """
     path = DATA / "anchor.root"
     raw = path.read_bytes()
@@ -52,13 +54,11 @@ def test_page_with_checksum():
     assert page.fNElements == -3
     assert page.n_elements == 3
     assert page.has_checksum
-    assert page.size == 12
-    assert page.stored_size == 20
+    assert page.locator.size == 12
+    assert page.size == 20
 
-    loc = page.page_locator
-    assert (loc.offset, loc.size, loc.has_checksum) == (550, 20, True)
     assert raw[562:570].hex() == "de3ce2c4a5a407be"
-    read = loc.read_from(_buffer(raw, loc.offset, loc.size))
+    read = page.read_from(_buffer(raw, page.offset, page.size))
     assert read.page == raw[550:562]
     assert read.checksum == int.from_bytes(raw[562:570], "little")
     assert read.checksum == xxhash.xxh3_64_intdigest(raw[550:562])
@@ -69,24 +69,24 @@ def test_corrupted_page_raises():
     raw = bytearray(path.read_bytes())
     (page,) = [p for p in _page_descriptions(path) if p.offset == 550]
     raw[555] ^= 0x01
-    loc = page.page_locator
-    with pytest.raises(ValueError, match="Page checksum mismatch at offset 550"):
-        loc.read_from(_buffer(bytes(raw), loc.offset, loc.size))
+    with pytest.raises(ValueError, match=r"Page checksum mismatch at .*offset=550"):
+        page.read_from(_buffer(bytes(raw), page.offset, page.size))
 
 
 def test_wrong_length_raises():
-    loc = RPageLocator(offset=0, size=20, has_checksum=True)
+    page = RPageDescription(-3, StandardLocator(12, 0))
     with pytest.raises(ValueError, match="expected 20 bytes"):
-        loc.read_from(_buffer(bytes(12), 0, 12))
+        page.read_from(_buffer(bytes(12), 0, 12))
 
 
 def test_page_without_checksum():
     raw = b"0123456789"
-    page = RPageLocator(offset=0, size=10, has_checksum=False).read_from(
-        _buffer(raw, 0, 10)
-    )
-    assert page.page == raw
-    assert page.checksum is None
+    page = RPageDescription(3, StandardLocator(10, 0))
+    assert not page.has_checksum
+    assert page.size == 10
+    read = page.read_from(_buffer(raw, 0, 10))
+    assert read.page == raw
+    assert read.checksum is None
 
 
 @pytest.mark.parametrize("name", sorted(p.name for p in DATA.glob("*.root")))
@@ -101,14 +101,13 @@ def test_every_page_verifies(name: str):
     pages = _page_descriptions(path)
     assert pages
     for page in pages:
-        loc = page.page_locator
-        assert loc.offset + loc.size <= len(raw)
-        read = loc.read_from(_buffer(raw, loc.offset, loc.size))
+        assert page.offset + page.size <= len(raw)
+        read = page.read_from(_buffer(raw, page.offset, page.size))
         assert read.checksum is not None
-        assert len(read.page) == page.size
+        assert len(read.page) == page.locator.size
 
 
 def test_shared_page_ranges():
     """rntuple/map.root has page descriptions that name the same bytes"""
-    ranges = [(p.offset, p.stored_size) for p in _page_descriptions(DATA / "map.root")]
+    ranges = [(p.offset, p.size) for p in _page_descriptions(DATA / "map.root")]
     assert len(set(ranges)) < len(ranges)
