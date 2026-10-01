@@ -89,3 +89,33 @@ def test_stored_size_larger_than_length_raises():
     )
     with pytest.raises(ValueError, match="larger than its uncompressed length"):
         loc.read_from(_buffer(bytes(24), 0, 24))
+
+
+def test_every_corrupted_byte_is_a_checksum_mismatch():
+    """The checksum is verified before the payload is parsed, as ROOT does, so
+    corrupting any byte the checksum covers reports the checksum, not whatever
+    the parser trips over first. Before, 136 of these 224 bytes failed with an
+    unrelated parse error (an out-of-range slice, unknown feature flags, ...)."""
+    path = DATA / "anchor.root"
+    raw = path.read_bytes()
+    (anchor,) = _anchors(path)
+    loc = anchor.header_locator
+    # The 8-byte preamble is checked first (type, length); everything after it,
+    # up to the checksum, is covered only by the checksum
+    for pos in range(loc.offset + 8, loc.offset + loc.length - 8):
+        corrupted = bytearray(raw)
+        corrupted[pos] ^= 0x80
+        with pytest.raises(ValueError, match="HeaderEnvelope checksum mismatch"):
+            _read(bytes(corrupted), loc)
+
+
+@pytest.mark.parametrize("size", [0, 200, 239])
+def test_short_read_raises(size: int):
+    """Fewer bytes than the locator's size (a truncated file) are reported as
+    such, not taken for a compressed envelope"""
+    path = DATA / "anchor.root"
+    raw = path.read_bytes()
+    (anchor,) = _anchors(path)
+    loc = anchor.header_locator
+    with pytest.raises(ValueError, match=f"expected 240 bytes, got {size}"):
+        loc.read_from(_buffer(raw, loc.offset, size))

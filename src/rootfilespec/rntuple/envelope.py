@@ -1,3 +1,4 @@
+import struct
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Annotated, Generic, TypeVar, cast
@@ -93,9 +94,27 @@ class REnvelope(ROOTSerializable):
 
         # Envelope size (uncompressed), encoded in the 48 most significant bits
         length = lengthType >> 16
+        # The preamble and the checksum alone are 16 bytes
+        if length < 16:
+            msg = f"Length of envelope ({length}) of type {typeID} is shorter than 16 bytes"
+            raise ValueError(msg)
         # Ensure that the length of the envelope matches the buffer length
         if length - 8 != len(buffer):
             msg = f"Length of envelope ({length} minus 8) of type {typeID} does not match buffer length ({len(buffer)})"
+            raise ValueError(msg)
+
+        #### Verify the checksum before trusting the payload, as ROOT does
+        # (RNTupleSerialize.cxx:909-939). The length includes the checksum, which
+        # covers [0, length - 8) of the uncompressed envelope (root-io-spec
+        # ERRATA 5), unknown trailing bytes too: "Checksum verification ... must
+        # include both known and unknown contents"
+        (checksum,) = struct.unpack("<Q", envelope_bytes[length - 8 : length])
+        computed = xxhash.xxh3_64_intdigest(envelope_bytes[: length - 8])
+        if computed != checksum:
+            msg = (
+                f"{cls.__name__} checksum mismatch: "
+                f"stored {checksum:#018x}, computed {computed:#018x}"
+            )
             raise ValueError(msg)
 
         members = {"typeID": typeID, "length": length}
@@ -109,18 +128,8 @@ class REnvelope(ROOTSerializable):
         # Unknown Bytes = Envelope Size - Envelope Bytes Read - Checksum (8 bytes)
         #   Envelope Bytes Read  = buffer.relpos - payload_start_pos
 
-        #### Get the checksum (appended to envelope when writing to disk)
-        (checksum,), buffer = buffer.unpack("<Q")  # Last 8 bytes of the envelope
-        # The length includes the checksum, and the checksum covers [0, length - 8)
-        # of the uncompressed envelope (root-io-spec ERRATA 5). Unknown bytes count
-        # too: "Checksum verification ... must include both known and unknown contents"
-        computed = xxhash.xxh3_64_intdigest(envelope_bytes[: length - 8])
-        if computed != checksum:
-            msg = (
-                f"{cls.__name__} checksum mismatch: "
-                f"stored {checksum:#018x}, computed {computed:#018x}"
-            )
-            raise ValueError(msg)
+        #### The checksum, verified above (appended to envelope when writing to disk)
+        _, buffer = buffer.consume(8)
         members["checksum"] = checksum
         envelope = cls(**members)
         envelope._unknown = _unknown
@@ -162,17 +171,24 @@ class REnvelopeLocator(Generic[EnvType]):
 
         Envelopes are compressed, so this decompresses and deserializes.
         """
-        #### Decompress the buffer if necessary
-        # RNTuple decompression tests equality: a stored size equal to the length
-        # means stored raw, a smaller one compressed, and a larger one is an error
-        # (root-io-spec NOTES 2; RNTupleZip.hxx:106-113)
-        if len(buffer) > self.length:
+        if len(buffer) != self.size:
             msg = (
-                f"{self.envtype.__name__} at offset {self.offset}: stored size "
-                f"{len(buffer)} is larger than its uncompressed length {self.length}"
+                f"{self.envtype.__name__} at {self.locator}: expected {self.size} "
+                f"bytes, got {len(buffer)}"
             )
             raise ValueError(msg)
-        if len(buffer) < self.length:
+
+        #### Decompress the buffer if necessary
+        # RNTuple decompression tests equality of the stored size (the locator's)
+        # and the length: equal means stored raw, smaller compressed, and larger
+        # is an error (root-io-spec NOTES 2; RNTupleZip.hxx:106-113)
+        if self.size > self.length:
+            msg = (
+                f"{self.envtype.__name__} at {self.locator}: stored size "
+                f"{self.size} is larger than its uncompressed length {self.length}"
+            )
+            raise ValueError(msg)
+        if self.size < self.length:
             buffer = decompress(buffer, self.length)
 
         #### Now read the envelope
