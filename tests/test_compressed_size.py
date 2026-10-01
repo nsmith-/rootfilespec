@@ -8,6 +8,9 @@ from rootfilespec.reader import open_path
 from rootfilespec.serializable import BufferContext, ReadBuffer
 
 DATA = Path(__file__).parent.parent / "reference" / "root-io-spec" / "data"
+pytestmark = pytest.mark.skipif(
+    not DATA.exists(), reason="reference/root-io-spec not checked out"
+)
 
 
 @pytest.mark.parametrize("algorithm", ["zlib", "lzma", "lz4", "zstd"])
