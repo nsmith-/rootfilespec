@@ -75,14 +75,8 @@ class REnvelope(ROOTSerializable):
     @classmethod
     def read(cls, buffer: ReadBuffer) -> tuple[Self, ReadBuffer]:
         """Reads an REnvelope from the given buffer."""
-        #### Save initial buffer position (for checking unknown bytes)
-        payload_start_pos = buffer.relpos
-        # The whole envelope, for the checksum, which covers everything before it
-        envelope_bytes = buffer.data
-
         #### Get the first 64bit integer (lengthType) which contains the length and type of the envelope
-        # lengthType, buffer = buffer.consume(8)
-        (lengthType,), buffer = buffer.unpack("<Q")
+        (lengthType,), _ = buffer.unpack("<Q")
 
         # Envelope type, encoded in the 16 least significant bits
         typeID = lengthType & 0xFFFF
@@ -91,25 +85,26 @@ class REnvelope(ROOTSerializable):
             msg = f"Envelope type {typeID} read does not match passed class {cls.__name__}"
             raise ValueError(msg)
 
-        # Envelope size (uncompressed), encoded in the 48 most significant bits
+        # Envelope size (uncompressed), encoded in the 48 most significant bits.
+        # It includes the preamble and the checksum, so it is at least 16 bytes
         length = lengthType >> 16
-        # The preamble and the checksum alone are 16 bytes
         if length < 16:
             msg = f"Length of envelope ({length}) of type {typeID} is shorter than 16 bytes"
             raise ValueError(msg)
-        # Ensure that the length of the envelope matches the buffer length
-        if length - 8 != len(buffer):
-            msg = f"Length of envelope ({length} minus 8) of type {typeID} does not match buffer length ({len(buffer)})"
+        if length != len(buffer):
+            msg = f"Length of envelope ({length}) of type {typeID} does not match buffer length ({len(buffer)})"
             raise ValueError(msg)
 
-        #### Verify the checksum before trusting the payload, as ROOT does
-        # (RNTupleSerialize.cxx:909-939). The length includes the checksum, which
-        # covers [0, length - 8) of the uncompressed envelope (root-io-spec
-        # ERRATA 5), unknown trailing bytes too: "Checksum verification ... must
-        # include both known and unknown contents"
-        # The last 8 bytes of what follows the preamble (length - 8 bytes in all)
-        (checksum,), _ = buffer[length - 16 :].unpack("<Q")
-        computed = xxhash.xxh3_64_intdigest(envelope_bytes[: length - 8])
+        #### Split the envelope once: the bytes the checksum covers, then the checksum
+        # The checksum covers [0, length - 8): the preamble, the payload and any
+        # unknown trailing bytes (root-io-spec ERRATA 5; "Checksum verification
+        # ... must include both known and unknown contents")
+        covered, trailer = buffer[: length - 8], buffer[length - 8 :]
+        (checksum,), rest = trailer.unpack("<Q")
+
+        #### Verify it before trusting the payload, as ROOT does
+        # (RNTupleSerialize.cxx:909-939)
+        computed = xxhash.xxh3_64_intdigest(covered.data)
         if computed != checksum:
             msg = (
                 f"{cls.__name__} checksum mismatch: "
@@ -117,23 +112,17 @@ class REnvelope(ROOTSerializable):
             )
             raise ValueError(msg)
 
-        members = {"typeID": typeID, "length": length}
-        #### Get the payload
-        members, buffer = cls.update_members(members, buffer)
+        #### Get the payload, after the 8-byte preamble
+        _, payload = covered.consume(8)
+        members = {"typeID": typeID, "length": length, "checksum": checksum}
+        members, payload = cls.update_members(members, payload)
 
-        #### Consume any unknown trailing information in the envelope
-        _unknown, buffer = buffer.consume(
-            length - (buffer.relpos - payload_start_pos) - 8
-        )
-        # Unknown Bytes = Envelope Size - Envelope Bytes Read - Checksum (8 bytes)
-        #   Envelope Bytes Read  = buffer.relpos - payload_start_pos
+        #### Keep any unknown trailing information in the envelope
+        _unknown, _ = payload.consume(len(payload))
 
-        #### The checksum, verified above (appended to envelope when writing to disk)
-        _, buffer = buffer.consume(8)
-        members["checksum"] = checksum
         envelope = cls(**members)
         envelope._unknown = _unknown
-        return envelope, buffer
+        return envelope, rest
 
 
 EnvType = TypeVar("EnvType", bound=REnvelope)
