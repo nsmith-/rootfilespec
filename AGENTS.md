@@ -6,9 +6,10 @@ Guidance for coding agents (and people) working on rootfilespec. Read
 ## What this package is
 
 rootfilespec parses ROOT file binary data into Python dataclasses of primitive
-types and numpy arrays. It does no I/O of its own: it takes bytes buffers and
-returns objects. The goal is a stable, complete read (and later write) backend
-for packages such as uproot.
+types and numpy arrays. Its parsing code does no I/O: it takes bytes buffers and
+returns objects (`reader.py`, below, is the one place that reads files). The
+goal is a stable, complete read (and later write) backend for packages such as
+uproot.
 
 - `src/rootfilespec/bootstrap/`: the self-describing part of a file (`TFile`,
   `TKey`, `TDirectory`, `TStreamerInfo`, strings, compression) and the RNTuple
@@ -37,9 +38,11 @@ for packages such as uproot.
 - **Don't guess.** When a file has something the parser doesn't understand (an
   unknown feature flag, an unknown type), raise a clear error or keep the bytes
   uninterpreted, rather than misread it. A class missing from the StreamerInfo
-  reads as `Uninterpreted`, skipped by its byte count (#74).
-- Generated model names carry the StreamerInfo checksum; the class version goes
-  in the docstring.
+  is to read as `Uninterpreted`, skipped by its byte count (#74, still open:
+  today it raises `Unknown type ...`).
+- Generated model names are to carry the StreamerInfo checksum, with the class
+  version in the docstring (#22, under #67, still open: today a generated class
+  has the bare class name).
 
 ## Format references
 
@@ -52,13 +55,14 @@ for packages such as uproot.
 - Do not infer the format from this parser. It can be wrong, and the fixes go
   here.
 - `reference/root-io-spec/data/` holds small, byte-documented fixtures. Each
-  case's `gen/cases/<case>/case.toml` pins values at file offsets.
+  case's `case.toml`, under `gen/cases/` or `gen/written/`, pins values at file
+  offsets.
 
 ## Setup
 
 ```sh
 git submodule update --init reference/root-io-spec   # never --recursive: it nests all of ROOT (~1.5 GB)
-uv sync --group dev                                  # as CI does, from uv.lock
+uv sync --group dev                                  # CI's test group, plus mypy
 uv tool install pre-commit && pre-commit install     # pre-commit is not in the dev group
 ```
 
@@ -75,8 +79,8 @@ Without uv: `python -m venv .venv && source .venv/bin/activate`, then
 - mypy runs in pre-commit's own environment, which has only `pytest`, `numpy`
   and `tomli`. An import of any other package (e.g. `xxhash`) needs
   `# type: ignore[import-not-found]`.
-- `pytest`: the whole suite. `tests/test_spec_fixtures.py` and
-  `tests/test_spec_cases.py` need the submodule and skip without it.
+- `pytest`: the whole suite. Check out the submodule first: the tests that use
+  its fixtures skip without it, and a test that doesn't is a bug.
 - `nox` runs both (its `lint` and `tests` sessions).
 
 ## Tests
@@ -99,8 +103,8 @@ Without uv: `python -m venv .venv && source .venv/bin/activate`, then
 - One issue per problem, with evidence: the file, the offset, the spec section,
   the error. Something new found while working on another issue gets its own
   issue, not a silent fix.
-- File a new issue as a native sub-issue of its tracker: #66 for the bootstrap
-  review, #9 for files that don't read yet.
+- File a new issue as a native sub-issue of its tracker where one fits: #66 for
+  the bootstrap review, #9 for files that don't read yet.
 - One pull request per issue, or per tight group of related issues. A PR built
   on another says **Depends on #N** and is rebased when that one merges.
 - Commits are small. The message says what changed and why, with spec citations.
