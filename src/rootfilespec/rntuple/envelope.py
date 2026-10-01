@@ -1,4 +1,3 @@
-import struct
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Annotated, Generic, TypeVar, cast
@@ -108,7 +107,8 @@ class REnvelope(ROOTSerializable):
         # covers [0, length - 8) of the uncompressed envelope (root-io-spec
         # ERRATA 5), unknown trailing bytes too: "Checksum verification ... must
         # include both known and unknown contents"
-        (checksum,) = struct.unpack("<Q", envelope_bytes[length - 8 : length])
+        # The last 8 bytes of what follows the preamble (length - 8 bytes in all)
+        (checksum,), _ = buffer[length - 16 :].unpack("<Q")
         computed = xxhash.xxh3_64_intdigest(envelope_bytes[: length - 8])
         if computed != checksum:
             msg = (
