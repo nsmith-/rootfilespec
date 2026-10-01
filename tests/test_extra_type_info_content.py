@@ -1,11 +1,19 @@
+import dataclasses
 from pathlib import Path
 
 import pytest
 
-from rootfilespec.reader import open_path
+from rootfilespec.bootstrap.TStreamerInfo import TStreamerElement, TStreamerInfo
+from rootfilespec.reader import FileReader, open_path
 from rootfilespec.rntuple.RNTuple import RNTuple
 
 DATA = Path(__file__).parent.parent / "reference" / "root-io-spec" / "data" / "rntuple"
+
+
+def _rntuple(reader: FileReader) -> RNTuple:
+    keylist = reader.keylist()
+    (name,) = [n for n in keylist if keylist[n].fClassName == b"ROOT::RNTuple"]
+    return RNTuple.from_anchor(reader.fetch(keylist[name]), reader.fetch.buffer)
 
 
 @pytest.mark.skipif(not DATA.exists(), reason="reference/root-io-spec not checked out")
@@ -21,9 +29,7 @@ def test_streamer_info_content():
     path = DATA / "streamed.root"
     raw = path.read_bytes()
     with open_path(path) as reader:
-        keylist = reader.keylist()
-        (name,) = [n for n in keylist if keylist[n].fClassName == b"ROOT::RNTuple"]
-        rntuple = RNTuple.from_anchor(reader.fetch(keylist[name]), reader.fetch.buffer)
+        rntuple = _rntuple(reader)
 
     assert rntuple.headerEnvelope.extraTypeInformations.items == []
     (info,) = rntuple.footerEnvelope.schemaExtension.extraTypeInformations.items
@@ -40,3 +46,52 @@ def test_streamer_info_content():
     # 8 (size) + 4 (content ID) + 4 (type version) + 4 + 0 (type name) + 4 + 438
     assert info.fSize == 462
     assert info._unknown == b""
+
+
+def _element_names(info: TStreamerInfo) -> list[bytes]:
+    elements = info.fObjects.objects
+    assert all(isinstance(element, TStreamerElement) for element in elements)
+    return [
+        element.fName for element in elements if isinstance(element, TStreamerElement)
+    ]
+
+
+@pytest.mark.skipif(not DATA.exists(), reason="reference/root-io-spec not checked out")
+def test_streamer_infos():
+    """The content decodes to the TStreamerInfo of RNStreamedInner, which the
+    file's own StreamerInfo record also holds: the two must agree"""
+    with open_path(DATA / "streamed.root") as reader:
+        infos = _rntuple(reader).streamer_infos()
+        in_file = reader.streamerinfos()[b"RNStreamedInner"]
+
+    assert list(infos) == [b"RNStreamedInner"]
+    info = infos[b"RNStreamedInner"]
+    assert info.fClassVersion == in_file.fClassVersion == 1
+    assert info.fCheckSum == in_file.fCheckSum
+    assert _element_names(info) == _element_names(in_file)
+    assert len(_element_names(info)) == 3
+
+
+@pytest.mark.skipif(not DATA.exists(), reason="reference/root-io-spec not checked out")
+def test_streamer_infos_without_streamed_fields():
+    with open_path(DATA / "user-class.root") as reader:
+        rntuple = _rntuple(reader)
+    assert rntuple.schemaDescription.extraTypeInformations == []
+    assert rntuple.streamer_infos() == {}
+
+
+@pytest.mark.skipif(not DATA.exists(), reason="reference/root-io-spec not checked out")
+def test_streamer_infos_ignores_other_ids_and_rejects_duplicates():
+    with open_path(DATA / "streamed.root") as reader:
+        rntuple = _rntuple(reader)
+    records = rntuple.footerEnvelope.schemaExtension.extraTypeInformations.items
+    (info,) = records
+
+    # An unknown content identifier is ignored (spec: forward compatibility)
+    records.append(dataclasses.replace(info, fContentIdentifier=1, fContent=b"?"))
+    assert list(rntuple.streamer_infos()) == [b"RNStreamedInner"]
+
+    # The same class twice would be merged by name: refuse it
+    records.append(info)
+    with pytest.raises(ValueError, match="Two TStreamerInfo for class"):
+        rntuple.streamer_infos()
