@@ -15,37 +15,27 @@ uproot.
   `TKey`, `TDirectory`, `TStreamerInfo`, strings, compression) and the RNTuple
   anchor.
 - `src/rootfilespec/rntuple/`: RNTuple envelopes, schema and page locations.
-- `src/rootfilespec/dynamic.py`: generates classes from a file's
-  `TStreamerInfo`. The agreed direction (#67) is for the streamer info to steer
-  deserialization at runtime, with the generated dataclasses kept only as the
-  result; don't build more on annotations and inheritance as the serialization
-  definition.
+- `src/rootfilespec/dynamic.py`: generates classes from a file's `TStreamerInfo`
+  (see Design rules below for its direction, #67).
 - `src/rootfilespec/reader.py`: `FileReader` and `Fetcher`, the I/O side.
 
 ## Design rules
 
-- **Objects describe where data is; callers fetch.** A locator has an `offset`,
-  a `size` and `read_from(buffer)`. Parsing code never reads from a file itself.
-- **Builtin types only where the context holds the ROOT type.** A value may be a
-  Python builtin (`Annotated[T, fmt]`) only inside a context that records its
-  ROOT type and encoding: a member (its annotation), a container element (the
-  container's type), data written with a `TKey` (its `fClassName`), or a pointee
-  (its `Ref`, which is to keep the stream header: #105, still open, today a
-  pointee with a class tag comes back bare). Decoding must be injective on every
-  input the reader accepts: inputs that would decode to the same value are
-  rejected or kept, not merged. Every string, key names included, is `bytes`
-  this way, never decoded.
-- **Keep what is on disk.** Keep everything a writer would need to write the
-  bytes back: stored values as stored (a sign that carries a flag, a checksum,
-  unknown trailing bytes), with convenience properties derived from them.
-- **Don't guess.** When a file has something the parser doesn't understand (an
-  unknown feature flag, an unknown type), raise a clear error or keep the bytes
-  uninterpreted, rather than misread it. A class missing from the StreamerInfo
-  is to read as `Uninterpreted`, skipped by its byte count (#74, still open:
-  today it raises `Unknown type ...`).
-- Generated model names are to carry the StreamerInfo checksum, with the class
-  version in the docstring (#22, under #67, still open: today a generated class
-  has the bare class name).
+`docs/design.md` has each rule in full, with its reasons and the issues still
+open against it. In short:
+
+- **Objects describe where data is; callers fetch.** Parsing code never reads
+  from a file itself ([locators](docs/design.md#data-fetching-and-locators)).
+- **A builtin only where the context records the ROOT type**: a member's
+  annotation, a container's element type, a `TKey`, or a pointee's `Ref`. Its
+  decoding must be injective. Every string, key names included, is `bytes`,
+  never decoded ([builtins](docs/design.md#annotated-builtin-types-vs-objects)).
+- **Keep what is on disk**: everything a writer needs to write the bytes back
+  ([on disk](docs/design.md#keeping-what-is-on-disk)).
+- **Don't guess**: raise a clear error or keep the bytes uninterpreted
+  ([unknown content](docs/design.md#content-the-parser-does-not-understand)).
+- **Generated classes**: don't build more on annotations and inheritance (#67)
+  ([generated classes](docs/design.md#generated-classes)).
 
 ## Format references
 

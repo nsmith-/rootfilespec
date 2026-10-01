@@ -116,12 +116,62 @@ encoding per length format (`"TString"`, `"charstar"` and `"RNTuple"`), and
 `std::string` data member. `bootstrap.TString` is the alias
 `Annotated[bytes, ROOTString("TString")]` for hand-written classes.
 
-A design assumption follows: the bytes do not record which ROOT type or encoding
-they came from. A member keeps it in its annotation, a container element in the
-container's type, and a record of its own in its key's `fClassName`, so writing
-those back needs that context, not just the `bytes`. A string read through a
-pointer keeps it nowhere: the stream's class tag is read to find the type and
-then dropped, so such a value cannot be written back as read (#135).
+A builtin does not record which ROOT type or encoding it came from, so the rule
+is: **a value may be a builtin only inside a context that records its ROOT type
+and encoding**. Writing it back needs that context, not just the value. The
+contexts are:
+
+- a data member: its annotation;
+- a container element (e.g. `vector<string>`): the container's element type;
+- data written with a `TKey`: the key's `fClassName`. The caller keeps the key
+  and the value it located as a pair, so a key of class `TString` reads as
+  `bytes`;
+- an object reached through a pointer: its `Ref`, which keeps the stream header
+  (the class tag or back-reference, the byte count, the version). Every pointee
+  is wrapped, so a `TList` reads as a list of `Ref`s. This is #105, still open:
+  today a pointee with a new class tag comes back bare and its header is
+  dropped, so a string read through a pointer cannot be written back as read.
+
+#139 surveys every way an object reaches a file, including those not read yet
+(unsplit `TTree` branches, RNTuple streamer fields, `TClonesArray` elements). A
+reader for one of them keeps the record of the type next to the values.
+
+Which builtin to use is a matter of ergonomics: `bytes` for strings, never
+decoded; and for example a `datetime` rather than the packed `int` for a
+`TDatime` (#123).
+
+The conversion from the bytes on disk to the builtin must be injective on every
+input the reader accepts: inputs that would decode to the same value are
+rejected with a clear error, or kept, never merged, because a writer could not
+tell which one to put back. For example, a `kBool` byte can be `0x99` in files
+ROOT writes (root-io-spec ElementTypes §2.5), so reading it as `bool` loses the
+byte; and a `TString` can be read from the long form even when it is short
+(#140).
+
+## Keeping what is on disk
+
+Writing files is a goal, so a deserialized object keeps everything a writer
+would need to write the same bytes back: stored values as stored (a sign that
+carries a flag, a checksum, unknown trailing bytes), with convenience properties
+derived from them rather than in their place.
+
+## Content the parser does not understand
+
+When a file holds something the parser does not understand (an unknown feature
+flag, an unknown type), it raises a clear error or keeps the bytes
+uninterpreted, rather than guessing. A class missing from the StreamerInfo is to
+read as `Uninterpreted`, skipped by its byte count (#74, still open: today it
+raises `Unknown type ...`).
+
+## Generated classes
+
+`dynamic.py` generates dataclasses from a file's `TStreamerInfo`. The agreed
+direction (#67) is for the streamer info to steer deserialization at runtime,
+with the generated dataclasses kept only as the result, so new work should not
+build more on annotations and inheritance as the serialization definition.
+Generated model names are to carry the StreamerInfo checksum, with the class
+version in the docstring (#22, still open: today a generated class has the bare
+class name).
 
 ## Data Fetching and Locators
 
