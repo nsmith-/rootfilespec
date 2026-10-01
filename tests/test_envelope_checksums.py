@@ -21,7 +21,7 @@ def _anchors(path: Path) -> list[ROOT3a3aRNTuple]:
         return [
             reader.fetch(keylist[name])
             for name in keylist
-            if keylist[name].fClassName.fString == b"ROOT::RNTuple"
+            if keylist[name].fClassName == b"ROOT::RNTuple"
         ]
 
 
