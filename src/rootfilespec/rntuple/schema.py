@@ -229,7 +229,9 @@ class ExtraTypeInformation(RecordFrame):
     fTypeName: RNTupleString
     """The name of the type for which this extra type information is provided."""
     fContent: RNTupleString
-    """The content, a string like the type name (root-io-spec ERRATA 9).
+    """The content, laid out as an RNTuple string like the type name (root-io-spec
+    ERRATA 9): a 32-bit little-endian length, then the bytes. The bytes are binary,
+    not UTF-8 text.
 
     For content identifier 0 it is the ROOT-streamed TList of TStreamerInfo
     of the streamed fields. ROOT writes that record in the footer's schema

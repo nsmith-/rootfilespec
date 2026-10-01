@@ -13,11 +13,13 @@ def test_streamer_info_content():
     """Issue #118: the extra type information's content is a string after the
     type name (root-io-spec ERRATA 9), in the footer's schema extension (ERRATA 10)
 
-    rntuple/streamed.root's case.toml asserts the content length 438 and the
-    streamed object's first bytes: byte count 434 with the 0x40000000 flag, the
-    new-class tag, then "TList".
+    rntuple/streamed.root's case.toml pins the content length 438 at offset 1236,
+    the streamed object's first bytes at 1240 (byte count 434 with the 0x40000000
+    flag, then the new-class tag and "TList"), and the length byte 15 of the
+    TStreamerInfo name "RNStreamedInner" at 1319.
     """
     path = DATA / "streamed.root"
+    raw = path.read_bytes()
     with open_path(path) as reader:
         keylist = reader.keylist()
         (name,) = [n for n in keylist if keylist[n].fClassName == b"ROOT::RNTuple"]
@@ -29,8 +31,12 @@ def test_streamer_info_content():
     assert info.fTypeVersion == 0
     assert info.fTypeName == b""
     assert type(info.fContent) is bytes
-    assert len(info.fContent) == 438
+    assert int.from_bytes(raw[1236:1240], "little") == 438
+    assert info.fContent == raw[1240 : 1240 + 438]
     assert info.fContent[:8] == bytes.fromhex("400001b2ffffffff")
     assert info.fContent[8:13] == b"TList"
+    assert info.fContent[1319 - 1240] == 15
+    assert info.fContent[1320 - 1240 : 1320 - 1240 + 15] == b"RNStreamedInner"
+    # 8 (size) + 4 (content ID) + 4 (type version) + 4 + 0 (type name) + 4 + 438
+    assert info.fSize == 462
     assert info._unknown == b""
-    assert b"RNStreamedInner" in info.fContent
