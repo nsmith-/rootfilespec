@@ -26,12 +26,15 @@ uproot.
 
 - **Objects describe where data is; callers fetch.** A locator has an `offset`,
   a `size` and `read_from(buffer)`. Parsing code never reads from a file itself.
-- **Builtin types where they capture the ROOT type, as long as the ROOT type
-  stays recoverable.** Every string (key names included) is `bytes`, never
-  decoded. Its encoding lives in the annotation
-  (`Annotated[bytes, ROOTString(...)]`) or in the enclosing record (a key's
-  `fClassName`), not in a wrapper class. Where neither holds it, keep something
-  that does, or document that the value cannot be written back as read.
+- **Builtin types only where the context holds the ROOT type.** A value may be a
+  Python builtin (`Annotated[T, fmt]`) only inside a context that records its
+  ROOT type and encoding: a member (its annotation), a container element (the
+  container's type), data written with a `TKey` (its `fClassName`), or a pointee
+  (its `Ref`, which is to keep the stream header: #105, still open, today a
+  pointee with a class tag comes back bare). Decoding must be injective on every
+  input the reader accepts: inputs that would decode to the same value are
+  rejected or kept, not merged. Every string, key names included, is `bytes`
+  this way, never decoded.
 - **Keep what is on disk.** Keep everything a writer would need to write the
   bytes back: stored values as stored (a sign that carries a flag, a checksum,
   unknown trailing bytes), with convenience properties derived from them.
