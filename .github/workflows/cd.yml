@@ -44,8 +44,10 @@ jobs:
       name: pypi
       url: https://pypi.org/p/rootfilespec
     permissions:
-      # Trusted Publishing; the action also uploads PEP 740 attestations
+      # Trusted Publishing, and the signing of both attestations
       id-token: write
+      # Store the provenance in GitHub, for `gh attestation verify`
+      attestations: write
     runs-on: ubuntu-latest
     if: github.event_name == 'release' && github.event.action == 'published'
 
@@ -54,5 +56,12 @@ jobs:
         with:
           name: Packages
           path: dist
+
+      # gh-action-pypi-publish uploads PEP 740 attestations to PyPI only; this
+      # one goes to GitHub's attestation store
+      - name: Generate artifact attestation for sdist and wheel
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: "dist/*"
 
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
