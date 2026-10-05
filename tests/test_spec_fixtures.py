@@ -5,7 +5,6 @@ with byte-level assertions, by the ``case.toml`` of the same name under
 ``gen/cases/``. The submodule is optional: without it this module is skipped.
 """
 
-import struct
 from pathlib import Path
 from typing import NamedTuple
 
@@ -121,7 +120,7 @@ EXPECTED_FAILURES: dict[str, ExpectedFailure] = {
         (101,), ValueError, "Unknown type TTreeIndex"
     ),
     "written/two-versions.root": ExpectedFailure(
-        (22,), struct.error, "unpack requires a buffer of 8 bytes"
+        (22,), IndexError, r"Cannot unpack '>d' \(8 bytes\) from buffer of length 0"
     ),
 }
 

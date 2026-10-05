@@ -132,7 +132,12 @@ class ReadBuffer:
     def unpack(self, fmt: str) -> tuple[tuple[Any, ...], "ReadBuffer"]:
         """Unpack the buffer according to the given format."""
         size = struct.calcsize(fmt)
-        out = struct.unpack(fmt, self.data[:size])
+        try:
+            out = struct.unpack(fmt, self.data[:size])
+        except struct.error as err:
+            # As slicing past the end does: a short buffer is an IndexError
+            msg = f"Cannot unpack {fmt!r} ({size} bytes) from buffer of length {len(self.data)}"
+            raise IndexError(msg) from err
         return out, self[size:]
 
     def consume(self, size: int) -> tuple[bytes, "ReadBuffer"]:
