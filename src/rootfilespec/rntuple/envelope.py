@@ -1,4 +1,3 @@
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Annotated, Generic, TypeVar, cast
 
@@ -210,13 +209,3 @@ class REnvelopeLink(ROOTSerializable):
     def envelope_locator(self, envtype: type[EnvType]) -> REnvelopeLocator[EnvType]:
         """Get a locator for the envelope."""
         return REnvelopeLocator(self.length, self.locator, envtype)
-
-    def read_envelope(
-        self,
-        fetch_data: Callable[[Locator[ROOTSerializable]], ReadBuffer],
-        envtype: type[EnvType],
-    ) -> EnvType:
-        """Reads the Envelope from the given data source using the locator."""
-        loc = self.envelope_locator(envtype)
-        buffer = fetch_data(loc)
-        return loc.read_from(buffer)

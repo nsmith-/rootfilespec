@@ -13,7 +13,7 @@ DATA = Path(__file__).parent.parent / "reference" / "root-io-spec" / "data" / "r
 def _rntuple(reader: FileReader) -> RNTuple:
     keylist = reader.keylist()
     (name,) = [n for n in keylist if keylist[n].fClassName == b"ROOT::RNTuple"]
-    return RNTuple.from_anchor(reader.fetch(keylist[name]), reader.fetch.buffer)
+    return reader.fetch.rntuple(reader.fetch(keylist[name]))
 
 
 @pytest.mark.skipif(not DATA.exists(), reason="reference/root-io-spec not checked out")

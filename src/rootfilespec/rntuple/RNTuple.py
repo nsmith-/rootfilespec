@@ -1,9 +1,8 @@
 import dataclasses
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from math import ceil
 
 from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT
-from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
 from rootfilespec.bootstrap.streamedobject import Ref, read_streamed_item
 from rootfilespec.bootstrap.TList import TList
 from rootfilespec.bootstrap.TStreamerInfo import TStreamerInfo
@@ -20,9 +19,7 @@ from rootfilespec.rntuple.schema import (
 )
 from rootfilespec.serializable import (
     BufferContext,
-    Locator,
     ReadBuffer,
-    ROOTSerializable,
 )
 
 
@@ -270,27 +267,27 @@ class RNTuple:
     pagelistEnvelopes: list[PageListEnvelope]
 
     @classmethod
-    def from_anchor(
+    def from_envelopes(
         cls,
-        anchor: ROOT3a3aRNTuple,
-        fetch_data: Callable[[Locator[ROOTSerializable]], ReadBuffer],
+        headerEnvelope: HeaderEnvelope,
+        footerEnvelope: FooterEnvelope,
+        pagelistEnvelopes: list[PageListEnvelope],
     ) -> "RNTuple":
-        """Reads the RNTuple from the given anchor."""
-        headerEnvelope = anchor.get_header(fetch_data)
-        footerEnvelope = anchor.get_footer(fetch_data)
+        """The RNTuple of the given envelopes, once they are checked to belong together
 
-        # Verify header checksum in footer
+        The footer and every page list record the checksum of the header they go
+        with (spec, *Footer Envelope* and *Page List Envelope*). Fetch the
+        envelopes with the anchor's ``header_locator`` and ``footer_locator`` and
+        the footer's ``pagelist_locators``, in the order they are listed;
+        ``rootfilespec.reader.Fetcher.rntuple`` does that one read at a time.
+        """
         if footerEnvelope.headerChecksum != headerEnvelope.checksum:
             msg = f"Header checksum mismatch: {footerEnvelope.headerChecksum} != {headerEnvelope.checksum}"
             raise ValueError(msg)
-        pagelistEnvelopes = footerEnvelope.get_pagelists(fetch_data)
-
-        # Verify header checksum in each PageListEnvelope
         for pagelistEnvelope in pagelistEnvelopes:
             if pagelistEnvelope.headerChecksum != headerEnvelope.checksum:
                 msg = f"PageListEnvelope header checksum mismatch: {pagelistEnvelope.headerChecksum} != {headerEnvelope.checksum}"
                 raise ValueError(msg)
-
         return cls(headerEnvelope, footerEnvelope, pagelistEnvelopes)
 
     @property

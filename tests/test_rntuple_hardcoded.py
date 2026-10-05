@@ -43,7 +43,7 @@ def test_read_contributors():
         )
 
         assert isinstance(anchor, ROOT3a3aRNTuple)
-        rntuple = RNTuple.from_anchor(anchor, reader.fetch.buffer)
+        rntuple = reader.fetch.rntuple(anchor)
         assert rntuple == RNTuple(
             headerEnvelope=HeaderEnvelope(
                 typeID=1,
@@ -429,7 +429,7 @@ def test_read_multiple_rntuples():
             fMaxKeySize=1073741824,
         )
 
-        rntuple_a = RNTuple.from_anchor(anchor_a, fetch.buffer)
+        rntuple_a = fetch.rntuple(anchor_a)
         assert rntuple_a == RNTuple(
             headerEnvelope=HeaderEnvelope(
                 typeID=1,
@@ -628,7 +628,7 @@ def test_read_multiple_rntuples():
             fMaxKeySize=1073741824,
         )
 
-        rntuple_b = RNTuple.from_anchor(anchor_b, fetch.buffer)
+        rntuple_b = fetch.rntuple(anchor_b)
         assert rntuple_b == RNTuple(
             headerEnvelope=HeaderEnvelope(
                 typeID=1,

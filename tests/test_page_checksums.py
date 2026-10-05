@@ -7,7 +7,6 @@ from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT
 from rootfilespec.reader import open_path
 from rootfilespec.rntuple.pagelocations import RPageDescription
 from rootfilespec.rntuple.RLocator import StandardLocator
-from rootfilespec.rntuple.RNTuple import RNTuple
 from rootfilespec.serializable import BufferContext, ReadBuffer
 
 DATA = Path(__file__).parent.parent / "reference" / "root-io-spec" / "data" / "rntuple"
@@ -24,7 +23,7 @@ def _page_descriptions(path: Path) -> list[RPageDescription]:
             key = keylist[name]
             if key.fClassName != b"ROOT::RNTuple":
                 continue
-            rntuple = RNTuple.from_anchor(reader.fetch(key), reader.fetch.buffer)
+            rntuple = reader.fetch.rntuple(reader.fetch(key))
             for pagelist in rntuple.pagelistEnvelopes:
                 for cluster in pagelist.pageLocations:
                     for column in cluster:

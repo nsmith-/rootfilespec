@@ -1,4 +1,3 @@
-from collections.abc import Callable
 from typing import Annotated, cast
 
 import xxhash  # type: ignore[import-not-found]
@@ -94,15 +93,6 @@ class RPageDescription(ROOTSerializable):
             )
             raise ValueError(msg)
         return RPage(data, checksum)
-
-    def get_page(
-        self, fetch_data: Callable[[Locator[ROOTSerializable]], ReadBuffer]
-    ) -> RPage:
-        """Reads the page data from the data source using the locator.
-        Pages are wrapped in compression blocks (like envelopes).
-        """
-        buffer = fetch_data(self)
-        return self.read_from(buffer)
 
 
 @serializable

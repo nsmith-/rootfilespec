@@ -22,7 +22,7 @@ def _load(path: str | Path) -> RNTuple:
     with open_path(path) as reader:
         keylist = reader.keylist()
         (name,) = [n for n in keylist if keylist[n].fClassName == b"ROOT::RNTuple"]
-        return RNTuple.from_anchor(reader.fetch(keylist[name]), reader.fetch.buffer)
+        return reader.fetch.rntuple(reader.fetch(keylist[name]))
 
 
 def _ranges(rntuple: RNTuple) -> list[list[tuple[bool, int, int, int, int]]]:

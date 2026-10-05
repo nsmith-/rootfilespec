@@ -10,7 +10,6 @@ from rootfilespec.bootstrap.TStreamerInfo import TStreamerInfo
 from rootfilespec.container import StdVector
 from rootfilespec.dynamic import streamerinfo_to_classes
 from rootfilespec.reader import Fetcher, open_path
-from rootfilespec.rntuple.RNTuple import RNTuple
 from rootfilespec.serializable import (
     BufferContext,
     ReadBuffer,
@@ -118,7 +117,7 @@ def test_rntuple_strings_are_bytes():
                 key = keylist[name]
                 if key.fClassName != b"ROOT::RNTuple":
                     continue
-                rntuple = RNTuple.from_anchor(reader.fetch(key), reader.fetch.buffer)
+                rntuple = reader.fetch.rntuple(reader.fetch(key))
                 header = rntuple.headerEnvelope
                 assert type(header.fName) is bytes
                 assert header.fName == name

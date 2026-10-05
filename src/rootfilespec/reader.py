@@ -14,13 +14,14 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any
 
-from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT
+from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT, ROOT3a3aRNTuple
 from rootfilespec.bootstrap.TDirectory import TDirectory, TKeyList
 from rootfilespec.bootstrap.TFile import InitialReadLocator, ROOTFile, TFile
 from rootfilespec.bootstrap.TKey import ObjType, TypedTKey
 from rootfilespec.bootstrap.TList import TList
 from rootfilespec.bootstrap.TStreamerInfo import TStreamerInfo
 from rootfilespec.dynamic import build_file_context
+from rootfilespec.rntuple.RNTuple import RNTuple
 from rootfilespec.serializable import (
     BufferContext,
     FileContext,
@@ -68,6 +69,20 @@ class Fetcher:
         if key.offset == loc.offset and key.size <= len(buffer):
             return key.read_from(buffer[: key.size])
         return self(key)
+
+    def rntuple(self, anchor: ROOT3a3aRNTuple) -> RNTuple:
+        """Fetch the envelopes of the RNTuple that the anchor locates
+
+        The header and the footer, then each page list the footer lists, one
+        read each, checked to belong together by ``RNTuple.from_envelopes``. Only
+        the bootstrap classes are needed, so a fetcher on ``BOOTSTRAP_CONTEXT``
+        reads the RNTuples of a file whose StreamerInfo can't be turned into
+        classes (#41). Pages are not fetched.
+        """
+        header = self(anchor.header_locator)
+        footer = self(anchor.footer_locator)
+        pagelists = [self(loc) for loc in footer.pagelist_locators]
+        return RNTuple.from_envelopes(header, footer, pagelists)
 
 
 @dataclass
