@@ -338,9 +338,10 @@ def test_read_contributors():
             extraTypeInformations=[],
         )
 
-        clusters = rntuple.clusters()
+        clusters = list(rntuple.clusters())
         assert [
-            [column.pages for column in cluster.columns] for cluster in clusters
+            [columnRange.pages for columnRange in cluster.columnRanges]
+            for cluster in clusters
         ] == [  # Clusters (columnlists)
             [  # Columns (pagelists)
                 [  # Pages (page descriptions)
@@ -387,7 +388,7 @@ def test_read_contributors():
         ]
         assert [
             (column.columnDescription.fColumnType, column.fieldPath)
-            for column in clusters[0].columns
+            for column in rntuple.columns()
         ] == [
             (ColumnType.kIndex64, b"firstName"),
             (ColumnType.kChar, b"firstName"),
@@ -595,9 +596,10 @@ def test_read_multiple_rntuples():
             extraTypeInformations=[],
         )
 
-        clusters_a = rntuple_a.clusters()
+        clusters_a = list(rntuple_a.clusters())
         assert [
-            [column.pages for column in cluster.columns] for cluster in clusters_a
+            [columnRange.pages for columnRange in cluster.columnRanges]
+            for cluster in clusters_a
         ] == [  # Clusters (columnlists)
             [  # Columns (pagelists)
                 [  # Pages (page descriptions)
@@ -614,7 +616,7 @@ def test_read_multiple_rntuples():
         ]
         assert [
             (column.columnDescription.fColumnType, column.fieldPath)
-            for column in clusters_a[0].columns
+            for column in rntuple_a.columns()
         ] == [(ColumnType.kSplitReal32, b"f")]
 
         anchor_b = keylist[b"B"].read_object(fetch_data, ROOT3a3aRNTuple)
@@ -792,9 +794,10 @@ def test_read_multiple_rntuples():
             extraTypeInformations=[],
         )
 
-        clusters_b = rntuple_b.clusters()
+        clusters_b = list(rntuple_b.clusters())
         assert [
-            [column.pages for column in cluster.columns] for cluster in clusters_b
+            [columnRange.pages for columnRange in cluster.columnRanges]
+            for cluster in clusters_b
         ] == [  # Clusters (columnlists)
             [  # Columns (pagelists)
                 [  # Pages (page descriptions)
@@ -811,5 +814,5 @@ def test_read_multiple_rntuples():
         ]
         assert [
             (column.columnDescription.fColumnType, column.fieldPath)
-            for column in clusters_b[0].columns
+            for column in rntuple_b.columns()
         ] == [(ColumnType.kSplitInt32, b"g")]

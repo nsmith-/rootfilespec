@@ -1,5 +1,5 @@
 import dataclasses
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from math import ceil
 
 from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT
@@ -148,6 +148,31 @@ class SchemaDescription:
 
 
 @dataclasses.dataclass
+class InterpretableColumn:
+    """One physical column of the RNTuple, the same in every cluster
+
+    Like ROOT's ``RColumnDescriptor``: the column's description, its field, and
+    its place among the field's columns. ``RNTuple.columns()`` lists them, and
+    each cluster's ``InterpretableColumnRange`` refers to one.
+    """
+
+    columnID: int
+    """The ID of the physical column (its position in the combined column list)."""
+    columnDescription: ColumnDescription
+    """The description of the column, as stored. Its field is ``fFieldID`` and
+    its representation ``fRepresentationIndex``."""
+    fieldDescription: FieldDescription
+    """The description of the column's field."""
+    fieldPath: bytes
+    """The field's qualified name (see ``SchemaDescription.field_path``)."""
+    index: int
+    """The column's index among the columns of its representation, as ROOT
+    numbers them (``RColumnDescriptor::GetIndex``). Columns of the field's other
+    representations with the same index correspond to this one (see
+    ``SchemaDescription.field_columns``)."""
+
+
+@dataclasses.dataclass
 class InterpretablePage:
     """One page of a column in a cluster
 
@@ -163,13 +188,13 @@ class InterpretablePage:
     cluster, as ROOT counts it.
 
     It belongs to the cluster (see ``InterpretableCluster``); the index within
-    the column is ``InterpretableColumn.firstElementIndex`` plus this."""
+    the column is ``InterpretableColumnRange.firstElementIndex`` plus this."""
     uncompressedSize: int
     """The size of the page's elements packed for storage, before compression, in bytes."""
 
 
 @dataclasses.dataclass
-class InterpretableColumn:
+class InterpretableColumnRange:
     """One physical column in one cluster: its element range and its pages
 
     Like ROOT's ``RClusterDescriptor::RColumnRange`` with its ``RPageRange``,
@@ -181,14 +206,8 @@ class InterpretableColumn:
     Description* for deferred columns).
     """
 
-    columnID: int
-    """The ID of the physical column (its position in the combined column list)."""
-    columnDescription: ColumnDescription
-    """The description of the column; its field is ``columnDescription.fFieldID``."""
-    fieldDescription: FieldDescription
-    """The description of the column's field."""
-    fieldPath: bytes
-    """The field's qualified name (see ``SchemaDescription.field_path``)."""
+    column: InterpretableColumn
+    """The column, as ``RNTuple.columns()`` lists it."""
     pageLocations: PageLocations[RPageDescription] | None
     """The column's entry in the cluster's page list, as stored: its pages,
     element offset and compression settings.
@@ -223,10 +242,10 @@ class InterpretableCluster:
     """One cluster: its entries, and every column's elements and pages in it
 
     Like ROOT's ``RClusterDescriptor``. ``clusterID``,
-    ``summary.fFirstEntryNumber`` and each column's ``firstElementIndex`` are
-    positions in this RNTuple. Everything else belongs to the cluster, which can
-    be reused unchanged in another RNTuple: offset columns count from the start
-    of the cluster (spec, *Column Description* and *Stdlib Types and
+    ``summary.fFirstEntryNumber`` and each column range's ``firstElementIndex``
+    are positions in this RNTuple. Everything else belongs to the cluster, which
+    can be reused unchanged in another RNTuple: offset columns count from the
+    start of the cluster (spec, *Column Description* and *Stdlib Types and
     Collections*).
     """
 
@@ -237,7 +256,7 @@ class InterpretableCluster:
     """The position of the cluster's group in the footer's list of cluster groups."""
     summary: ClusterSummary
     """The cluster's summary, as stored: its first entry and number of entries."""
-    columns: list[InterpretableColumn]
+    columnRanges: list[InterpretableColumnRange]
     """One per physical column, in column-ID order, as the spec guarantees
     (*Page Locations*): a position is the column ID."""
 
@@ -321,47 +340,136 @@ class RNTuple:
                 infos[info.fName] = info
         return infos
 
-    def clusters(self) -> list[InterpretableCluster]:
-        """Every cluster, in cluster-ID order, with every column's elements and pages
+    def columns(self) -> list[InterpretableColumn]:
+        """Every physical column, in column-ID order, with its field and its place among the field's columns
 
-        Each cluster has one entry per physical column, so that each is enough
-        on its own to read the column in that cluster; see
-        ``InterpretableColumn``.
-
-        Raises ``ValueError`` where the page lists contradict the footer or the
-        schema.
+        They are the same in every cluster, so a caller can, say, store them
+        before going through the clusters with ``clusters()``. Raises
+        ``ValueError`` where the schema contradicts itself (see
+        ``SchemaDescription.field_columns``).
         """
         schema = self.schemaDescription
-        nColumns = len(schema.columnDescriptions)
-        nHeaderColumns = len(self.headerEnvelope.columnDescriptions.items)
-        groups = self.footerEnvelope.clusterGroups
-        if len(self.pagelistEnvelopes) != len(groups):
-            msg = f"{len(self.pagelistEnvelopes)} page lists for {len(groups)} cluster groups"
+        return _columns(schema, schema.field_columns())
+
+    def clusters(self) -> Iterator[InterpretableCluster]:
+        """Every cluster, in cluster-ID order, with every column's elements and pages
+
+        Each cluster has one range per physical column, enough on its own to read
+        the column in that cluster; see ``InterpretableColumnRange``. Clusters
+        are built one at a time, as the iterator reaches them, so a caller that
+        goes through them in turn holds one cluster's ranges at a time.
+
+        Raises ``ValueError`` where the page lists contradict the footer or the
+        schema. The schema, and the number of page lists and of their clusters,
+        are checked when this is called; each cluster's page list, when the
+        iterator reaches it.
+        """
+        return _ClusterReader(self).clusters()
+
+
+def _columns(
+    schema: SchemaDescription, fieldColumns: list[list[list[int]]]
+) -> list[InterpretableColumn]:
+    """The physical columns of a schema, with their fields and indices"""
+    paths: dict[int, bytes] = {}
+    columns: list[InterpretableColumn] = []
+    for columnID, description in enumerate(schema.columnDescriptions):
+        fieldID = description.fFieldID
+        if fieldID not in paths:
+            paths[fieldID] = schema.field_path(fieldID)
+        representation = fieldColumns[fieldID][description.fRepresentationIndex]
+        columns.append(
+            InterpretableColumn(
+                columnID=columnID,
+                columnDescription=description,
+                fieldDescription=schema.fieldDescriptions[fieldID],
+                fieldPath=paths[fieldID],
+                index=representation.index(columnID),
+            )
+        )
+    return columns
+
+
+def _repetitions(schema: SchemaDescription, columnID: int) -> int:
+    """The elements per entry of a deferred column of the first representation
+
+    The product of the array sizes of its field and its ancestors. The spec
+    allows an unsuppressed deferred column only where no ancestor is a
+    collection or a variant (*Column Description*); there, the number of
+    elements cannot be known.
+    """
+    fields = schema.fieldDescriptions
+    fieldID = schema.columnDescriptions[columnID].fFieldID
+    chain = schema._field_chain(fieldID)
+    for fid in chain[1:]:
+        if fields[fid].fStructuralRole in (0x01, 0x03):  # collection, variant
+            msg = (
+                f"Column {columnID} is deferred, but its field "
+                f"{schema.field_path(fieldID)!r} is inside the collection or "
+                f"variant {schema.field_path(fid)!r}"
+            )
             raise ValueError(msg)
-        columns = _Columns(schema)
-        clusters: list[InterpretableCluster] = []
+    repetitions = 1
+    for fid in chain:
+        repetitions *= max(fields[fid].fArraySize or 0, 1)
+    return repetitions
+
+
+class _ClusterReader:
+    """Builds the clusters of an RNTuple one at a time, from what is computed once"""
+
+    def __init__(self, rntuple: RNTuple):
+        schema = rntuple.schemaDescription
+        fieldColumns = schema.field_columns()
+        self.columns = _columns(schema, fieldColumns)
+        # The columns of each column's field, by representation and index
+        self.representations = [
+            fieldColumns[column.columnDescription.fFieldID] for column in self.columns
+        ]
+        # The elements per entry of each deferred column of the first representation
+        self.repetitions = [
+            _repetitions(schema, column.columnID)
+            if column.columnDescription.fFirstElementIndex
+            and column.columnDescription.fRepresentationIndex == 0
+            else None
+            for column in self.columns
+        ]
+        self.nHeaderColumns = len(rntuple.headerEnvelope.columnDescriptions.items)
+        groups = rntuple.footerEnvelope.clusterGroups
+        if len(rntuple.pagelistEnvelopes) != len(groups):
+            msg = f"{len(rntuple.pagelistEnvelopes)} page lists for {len(groups)} cluster groups"
+            raise ValueError(msg)
+        for clusterGroupID, (pagelistEnvelope, group) in enumerate(
+            zip(rntuple.pagelistEnvelopes, groups, strict=True)
+        ):
+            nLocations = len(pagelistEnvelope.pageLocations.items)
+            nSummaries = len(pagelistEnvelope.clusterSummaries.items)
+            if not nLocations == nSummaries == group.fNClusters:
+                msg = (
+                    f"Page list of cluster group {clusterGroupID} has "
+                    f"{nSummaries} cluster summaries and page locations for "
+                    f"{nLocations} clusters, the group says {group.fNClusters}"
+                )
+                raise ValueError(msg)
+        self.pagelistEnvelopes = rntuple.pagelistEnvelopes
+
+    def clusters(self) -> Iterator[InterpretableCluster]:
+        nColumns = len(self.columns)
+        clusterID = 0
         # The cluster that lists the most columns so far, and how many: only a
         # model extension adds columns, so no later cluster lists fewer
         widestClusterID, widest = 0, 0
-        for clusterGroupID, (pagelistEnvelope, group) in enumerate(
-            zip(self.pagelistEnvelopes, groups, strict=True)
-        ):
-            pageLocations = pagelistEnvelope.pageLocations.items
-            summaries = pagelistEnvelope.clusterSummaries.items
-            if not len(pageLocations) == len(summaries) == group.fNClusters:
-                msg = (
-                    f"Page list of cluster group {clusterGroupID} has "
-                    f"{len(summaries)} cluster summaries and page locations for "
-                    f"{len(pageLocations)} clusters, the group says {group.fNClusters}"
-                )
-                raise ValueError(msg)
-            for columnlist, summary in zip(pageLocations, summaries, strict=True):
-                clusterID = len(clusters)
+        for clusterGroupID, pagelistEnvelope in enumerate(self.pagelistEnvelopes):
+            for columnlist, summary in zip(
+                pagelistEnvelope.pageLocations.items,
+                pagelistEnvelope.clusterSummaries.items,
+                strict=True,
+            ):
                 listed = columnlist.items
-                if not nHeaderColumns <= len(listed) <= nColumns:
+                if not self.nHeaderColumns <= len(listed) <= nColumns:
                     msg = (
                         f"Cluster {clusterID} lists {len(listed)} columns; the "
-                        f"schema has {nHeaderColumns} in the header and "
+                        f"schema has {self.nHeaderColumns} in the header and "
                         f"{nColumns} in all"
                     )
                     raise ValueError(msg)
@@ -373,91 +481,21 @@ class RNTuple:
                     raise ValueError(msg)
                 if len(listed) > widest:
                     widestClusterID, widest = clusterID, len(listed)
-                clusters.append(
-                    InterpretableCluster(
-                        clusterID=clusterID,
-                        clusterGroupID=clusterGroupID,
-                        summary=summary,
-                        columns=columns.in_cluster(clusterID, summary, listed),
-                    )
+                yield InterpretableCluster(
+                    clusterID=clusterID,
+                    clusterGroupID=clusterGroupID,
+                    summary=summary,
+                    columnRanges=self._ranges(clusterID, summary, listed),
                 )
-        return clusters
+                clusterID += 1
 
-
-@dataclasses.dataclass
-class _Column:
-    """What ``RNTuple.clusters`` needs to know of a column, the same in every cluster"""
-
-    description: ColumnDescription
-    field: FieldDescription
-    path: bytes
-    representations: list[list[int]]
-    """The columns of the column's field, by representation and index"""
-    index: int
-    """The column's index within its representation"""
-    repetitions: int | None
-    """For a deferred column of the first representation, its elements per entry"""
-
-
-class _Columns:
-    """The columns of a schema, and how to find their ranges in a cluster"""
-
-    def __init__(self, schema: SchemaDescription):
-        fieldColumns = schema.field_columns()
-        paths: dict[int, bytes] = {}
-        self.columns: list[_Column] = []
-        for columnID, description in enumerate(schema.columnDescriptions):
-            fieldID = description.fFieldID
-            if fieldID not in paths:
-                paths[fieldID] = schema.field_path(fieldID)
-            representations = fieldColumns[fieldID]
-            index = representations[description.fRepresentationIndex].index(columnID)
-            repetitions = None
-            if description.fFirstElementIndex and description.fRepresentationIndex == 0:
-                repetitions = self._repetitions(schema, columnID)
-            self.columns.append(
-                _Column(
-                    description=description,
-                    field=schema.fieldDescriptions[fieldID],
-                    path=paths[fieldID],
-                    representations=representations,
-                    index=index,
-                    repetitions=repetitions,
-                )
-            )
-
-    @staticmethod
-    def _repetitions(schema: SchemaDescription, columnID: int) -> int:
-        """The elements per entry of a deferred column of the first representation
-
-        The product of the array sizes of its field and its ancestors. The spec
-        allows an unsuppressed deferred column only where no ancestor is a
-        collection or a variant (*Column Description*); there, the number of
-        elements cannot be known.
-        """
-        fields = schema.fieldDescriptions
-        fieldID = schema.columnDescriptions[columnID].fFieldID
-        chain = schema._field_chain(fieldID)
-        for fid in chain[1:]:
-            if fields[fid].fStructuralRole in (0x01, 0x03):  # collection, variant
-                msg = (
-                    f"Column {columnID} is deferred, but its field "
-                    f"{schema.field_path(fieldID)!r} is inside the collection or "
-                    f"variant {schema.field_path(fid)!r}"
-                )
-                raise ValueError(msg)
-        repetitions = 1
-        for fid in chain:
-            repetitions *= max(fields[fid].fArraySize or 0, 1)
-        return repetitions
-
-    def in_cluster(
+    def _ranges(
         self,
         clusterID: int,
         summary: ClusterSummary,
         listed: list[PageLocations[RPageDescription]],
-    ) -> list[InterpretableColumn]:
-        """The columns of one cluster, built in the three steps of ROOT's reader"""
+    ) -> list[InterpretableColumnRange]:
+        """The column ranges of one cluster, built in the three steps of ROOT's reader"""
         columns = self.columns
         locations: list[PageLocations[RPageDescription] | None] = [
             *listed,
@@ -472,7 +510,9 @@ class _Columns:
             zip(locations, columns, strict=True)
         ):
             if location is None:
-                suppressed.append((column.description.fFirstElementIndex or 0) < 0)
+                suppressed.append(
+                    (column.columnDescription.fFirstElementIndex or 0) < 0
+                )
                 ranges.append((0, 0))
             elif location.elementoffset < 0:
                 if location.items:
@@ -493,7 +533,7 @@ class _Columns:
         for columnID, column in enumerate(columns):
             if ranges[columnID] is not None:
                 continue
-            for representation in column.representations:
+            for representation in self.representations[columnID]:
                 other = representation[column.index]
                 if locations[other] is not None and not suppressed[other]:
                     ranges[columnID] = ranges[other]
@@ -501,24 +541,28 @@ class _Columns:
             else:
                 msg = (
                     f"Cluster {clusterID}: column {columnID} is suppressed, and no "
-                    f"other representation of field {column.path!r} is active"
+                    f"other representation of field {column.fieldPath!r} is active"
                 )
                 raise ValueError(msg)
 
         # 3. A deferred column covers the whole cluster, the elements before its
         # first stored one being zeros; a later representation copies the range
         # of the first, once that is known
-        for columnID, column in enumerate(columns):
-            if column.repetitions is not None:
+        for columnID, repetitions in enumerate(self.repetitions):
+            if repetitions is not None:
                 ranges[columnID] = (
-                    summary.fFirstEntryNumber * column.repetitions,
-                    summary.fNEntries * column.repetitions,
+                    summary.fFirstEntryNumber * repetitions,
+                    summary.fNEntries * repetitions,
                 )
         for columnID, column in enumerate(columns):
-            if column.repetitions is None and column.description.fFirstElementIndex:
-                ranges[columnID] = ranges[column.representations[0][column.index]]
+            if (
+                self.repetitions[columnID] is None
+                and column.columnDescription.fFirstElementIndex
+            ):
+                first = self.representations[columnID][0][column.index]
+                ranges[columnID] = ranges[first]
 
-        out: list[InterpretableColumn] = []
+        out: list[InterpretableColumnRange] = []
         for columnID, (location, column) in enumerate(
             zip(locations, columns, strict=True)
         ):
@@ -553,18 +597,15 @@ class _Columns:
                         firstElementInCluster=nextElement,
                         uncompressedSize=ceil(
                             description.n_elements
-                            * column.description.fBitsOnStorage
+                            * column.columnDescription.fBitsOnStorage
                             / 8
                         ),  # Convert bits to bytes
                     )
                 )
                 nextElement += description.n_elements
             out.append(
-                InterpretableColumn(
-                    columnID=columnID,
-                    columnDescription=column.description,
-                    fieldDescription=column.field,
-                    fieldPath=column.path,
+                InterpretableColumnRange(
+                    column=column,
                     pageLocations=location,
                     suppressed=suppressed[columnID],
                     firstElementIndex=firstElementIndex,

@@ -30,13 +30,13 @@ def _ranges(rntuple: RNTuple) -> list[list[tuple[bool, int, int, int, int]]]:
     return [
         [
             (
-                column.suppressed,
-                column.firstElementIndex,
-                column.nElements,
-                column.nZeroElements,
-                len(column.pages),
+                columnRange.suppressed,
+                columnRange.firstElementIndex,
+                columnRange.nElements,
+                columnRange.nZeroElements,
+                len(columnRange.pages),
             )
-            for column in cluster.columns
+            for columnRange in cluster.columnRanges
         ]
         for cluster in rntuple.clusters()
     ]
@@ -56,18 +56,19 @@ def test_suppressed_columns_keep_their_position():
         [(True, 1, 1, 0, 0), (False, 1, 1, 0, 1)],
         [(False, 2, 1, 0, 1), (True, 2, 1, 0, 0)],
     ]
-    cluster = rntuple.clusters()[1]
-    assert cluster.columns[1].columnDescription.fColumnType == ColumnType.kReal16
-    (page,) = cluster.columns[1].pages
+    cluster = list(rntuple.clusters())[1]
+    column = cluster.columnRanges[1].column
+    assert column.columnDescription.fColumnType == ColumnType.kReal16
+    (page,) = cluster.columnRanges[1].pages
     assert page.firstElementInCluster == 0
     suppressed = rntuple.pagelistEnvelopes[0].pageLocations[1][0]
     assert suppressed.elementoffset < 0
-    assert cluster.columns[0].pageLocations is suppressed
+    assert cluster.columnRanges[0].pageLocations is suppressed
 
 
 def test_cluster_ids_continue_across_cluster_groups():
     """Issue #116: 3 cluster groups of 5, 4 and 3 clusters are clusters 0 to 11"""
-    clusters = _load(data_path(MULTIPLE_CLUSTER_GROUPS)).clusters()
+    clusters = list(_load(data_path(MULTIPLE_CLUSTER_GROUPS)).clusters())
     assert [cluster.clusterID for cluster in clusters] == list(range(12))
     assert [cluster.clusterGroupID for cluster in clusters] == [0] * 5 + [1] * 4 + [
         2
@@ -78,11 +79,11 @@ def test_cluster_ids_continue_across_cluster_groups():
         *(750, 800, 900),
     ]
     # Column 2 has two elements per entry; its pages count from its cluster's start
-    assert [cluster.columns[2].firstElementIndex for cluster in clusters] == [
+    assert [cluster.columnRanges[2].firstElementIndex for cluster in clusters] == [
         2 * cluster.summary.fFirstEntryNumber for cluster in clusters
     ]
     assert {
-        cluster.columns[2].pages[0].firstElementInCluster for cluster in clusters
+        cluster.columnRanges[2].pages[0].firstElementInCluster for cluster in clusters
     } == {0}
 
 
@@ -120,11 +121,20 @@ def test_columns_user_class():
         )
     )
     assert len(pinned) == 19
-    for cluster in _load(DATA / "user-class.root").clusters():
-        assert [
-            (column.fieldPath, column.columnDescription.fColumnType)
-            for column in cluster.columns
-        ] == [(path, type_) for _, path, type_ in pinned]
+    rntuple = _load(DATA / "user-class.root")
+    columns = rntuple.columns()
+    assert [
+        (column.fieldPath, column.columnDescription.fColumnType) for column in columns
+    ] == [(path, type_) for _, path, type_ in pinned]
+    # A std::string has an index column and a character column
+    assert [
+        column.index for column in columns if column.fieldPath == b"fHit.fLabel"
+    ] == [
+        0,
+        1,
+    ]
+    for cluster in rntuple.clusters():
+        assert [columnRange.column for columnRange in cluster.columnRanges] == columns
 
 
 def test_field_paths_schema_extension():
@@ -186,6 +196,37 @@ def test_field_columns_with_a_missing_representation_raise():
         rntuple.clusters()
 
 
+def test_columns_are_described_once():
+    """RNTuple.columns() describes each physical column once, with its field and
+    its index among its representation's columns; every cluster refers to them"""
+    rntuple = _load(data_path(MULTIPLE_REPRESENTATIONS))
+    columns = rntuple.columns()
+    assert [
+        (
+            column.columnID,
+            column.fieldPath,
+            column.columnDescription.fRepresentationIndex,
+            column.index,
+        )
+        for column in columns
+    ] == [(0, b"real", 0, 0), (1, b"real", 1, 0)]
+    for cluster in rntuple.clusters():
+        assert [columnRange.column for columnRange in cluster.columnRanges] == columns
+
+
+def test_clusters_are_built_one_at_a_time():
+    """clusters() is an iterator: the schema and the number of page lists and
+    clusters are checked when it is called, and each cluster's page list when
+    the iterator reaches it, after the clusters before it were yielded"""
+    rntuple = _load(data_path(EXTENSION_COLUMNS))
+    (pagelist,) = rntuple.pagelistEnvelopes
+    pagelist.pageLocations.items[2].items.pop()
+    clusters = rntuple.clusters()
+    assert [next(clusters).clusterID, next(clusters).clusterID] == [0, 1]
+    with pytest.raises(ValueError, match="Cluster 2 lists 3 columns"):
+        next(clusters)
+
+
 def test_columns_added_by_model_extension():
     """A cluster committed before the model was extended lists only the columns
     that existed then: here 2 of the 4. The view still has all 4, with the
@@ -229,8 +270,11 @@ def test_columns_added_by_model_extension():
             (False, 302, 98, 0, 1),
         ],
     ]
-    first = rntuple.clusters()[0]
-    assert [column.pageLocations is None for column in first.columns] == [
+    clusters = list(rntuple.clusters())
+    first = clusters[0]
+    assert [
+        columnRange.pageLocations is None for columnRange in first.columnRanges
+    ] == [
         False,
         False,
         True,
@@ -239,11 +283,11 @@ def test_columns_added_by_model_extension():
     # A first stored page starts after the zeros: float_field's at element 200 of
     # cluster 0, and intvec_field's at element 50 of cluster 1, element 400 of
     # the column
-    assert [page.firstElementInCluster for page in first.columns[1].pages] == [200]
-    column = rntuple.clusters()[1].columns[2]
-    (page,) = column.pages
+    assert [page.firstElementInCluster for page in first.columnRanges[1].pages] == [200]
+    columnRange = clusters[1].columnRanges[2]
+    (page,) = columnRange.pages
     assert page.firstElementInCluster == 50
-    assert column.firstElementIndex + page.firstElementInCluster == 400
+    assert columnRange.firstElementIndex + page.firstElementInCluster == 400
 
 
 @pytest.mark.parametrize(
@@ -275,20 +319,22 @@ def test_every_column_is_complete(path: Path | str):
         rntuple = _load(data_path(path))
     nColumns = len(rntuple.schemaDescription.columnDescriptions)
     nextElement = [0] * nColumns
+    columns = rntuple.columns()
+    assert [column.columnID for column in columns] == list(range(nColumns))
     for cluster in rntuple.clusters():
-        assert [column.columnID for column in cluster.columns] == list(range(nColumns))
-        for column in cluster.columns:
-            if column.suppressed:
-                assert column.pages == []
-                assert column.nZeroElements == 0
+        assert [columnRange.column for columnRange in cluster.columnRanges] == columns
+        for columnID, columnRange in enumerate(cluster.columnRanges):
+            if columnRange.suppressed:
+                assert columnRange.pages == []
+                assert columnRange.nZeroElements == 0
             else:
-                start = column.nZeroElements
-                for page in column.pages:
+                start = columnRange.nZeroElements
+                for page in columnRange.pages:
                     assert page.firstElementInCluster == start
                     start += page.pageDescription.n_elements
-                assert start == column.nElements
-            assert column.firstElementIndex == nextElement[column.columnID]
-            nextElement[column.columnID] += column.nElements
+                assert start == columnRange.nElements
+            assert columnRange.firstElementIndex == nextElement[columnID]
+            nextElement[columnID] += columnRange.nElements
 
 
 def test_page_list_with_a_missing_header_column_raises():
@@ -297,7 +343,7 @@ def test_page_list_with_a_missing_header_column_raises():
     (pagelist,) = rntuple.pagelistEnvelopes
     pagelist.pageLocations.items[0].items = []
     with pytest.raises(ValueError, match="Cluster 0 lists 0 columns"):
-        rntuple.clusters()
+        list(rntuple.clusters())
 
 
 def test_page_list_with_an_extra_column_raises():
@@ -305,7 +351,7 @@ def test_page_list_with_an_extra_column_raises():
     columnlist = rntuple.pagelistEnvelopes[1].pageLocations.items[2]
     columnlist.items.append(columnlist.items[0])
     with pytest.raises(ValueError, match="Cluster 7 lists 4 columns"):
-        rntuple.clusters()
+        list(rntuple.clusters())
 
 
 def test_page_list_with_fewer_columns_than_an_earlier_one_raises():
@@ -316,7 +362,7 @@ def test_page_list_with_fewer_columns_than_an_earlier_one_raises():
     with pytest.raises(
         ValueError, match="Cluster 2 lists 3 columns, fewer than the 4 of cluster 1"
     ):
-        rntuple.clusters()
+        list(rntuple.clusters())
 
 
 def test_page_lists_must_match_the_cluster_groups():
@@ -350,7 +396,7 @@ def test_suppressed_column_with_pages_raises():
     clusters = rntuple.pagelistEnvelopes[0].pageLocations.items
     clusters[1].items[0].items = list(clusters[0].items[0].items)
     with pytest.raises(ValueError, match="column 0 is suppressed but has 1 pages"):
-        rntuple.clusters()
+        list(rntuple.clusters())
 
 
 def test_field_with_every_representation_suppressed_raises():
@@ -359,7 +405,7 @@ def test_field_with_every_representation_suppressed_raises():
     clusters = rntuple.pagelistEnvelopes[0].pageLocations.items
     clusters[1].items[1] = clusters[1].items[0]
     with pytest.raises(ValueError, match="no other representation of field b'real'"):
-        rntuple.clusters()
+        list(rntuple.clusters())
 
 
 def test_deferred_column_whose_pages_disagree_raises():
@@ -370,7 +416,7 @@ def test_deferred_column_whose_pages_disagree_raises():
     with pytest.raises(
         ValueError, match="column 2 has elements 350 to 467, but its pages hold 67"
     ):
-        rntuple.clusters()
+        list(rntuple.clusters())
 
 
 def test_deferred_column_inside_a_collection_raises():
