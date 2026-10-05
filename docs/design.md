@@ -249,7 +249,8 @@ with open_path("file.root") as reader:
     # reader.file, reader.tfile and reader.streamerinfo are already read, and
     # reader.fetch interprets data with the classes of the StreamerInfo record
     keylist = reader.keylist()  # of reader.rootdir, or of any TDirectory
-    obj = reader.fetch(keylist[b"name"])  # a TKey is a locator
+    obj = reader.fetch(keylist.get_by_name(b"name"))  # a TKey is a locator
+    older = reader.fetch(keylist[b"name", 1])  # keyed by (name, cycle)
     element = reader.streamerinfos()[b"TNamed"].element(b"fName")
 ```
 
