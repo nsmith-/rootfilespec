@@ -53,7 +53,7 @@ def test_page_with_checksum():
     assert page.fNElements == -3
     assert page.n_elements == 3
     assert page.has_checksum
-    assert page.locator.size == 12
+    assert page.page_locator.locator.size == 12
     loc = page.page_locator
     assert loc == RPageLocator(StandardLocator(12, 550), has_checksum=True)
     assert (loc.offset, loc.size) == (550, 20)
@@ -108,7 +108,7 @@ def test_every_page_verifies(name: str):
         assert loc.offset + loc.size <= len(raw)
         read = loc.read_from(_buffer(raw, loc.offset, loc.size))
         assert read.checksum is not None
-        assert len(read.page) == page.locator.size
+        assert len(read.page) == loc.locator.size
 
 
 def test_shared_page_ranges():

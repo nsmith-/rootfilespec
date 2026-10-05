@@ -18,21 +18,22 @@ class RLocator(ROOTSerializable):
     If the integer is negative, the locator is a non-standard locator.
     Size and type mean different things for standard and non-standard locators.
 
-    This base class checks the type of the locator and reads the appropriate subclass.
+    This base class checks the type of the locator and reads the appropriate subclass:
+    StandardLocator, LargeLocator (type 0x01), or UnknownLocator for any other
+    non-standard type, as ROOT reads them (``RNTupleSerializer::DeserializeLocator``,
+    ``tree/ntuple/src/RNTupleSerialize.cxx:1112-1155`` at 6.40.04).
 
     All Envelope Links will have an RLocator, but an RLocator doesn't require an Envelope Link.
     (See the Page Location in the Page List Envelopes for an example of an RLocator without an Envelope Link.)
 
-    Note: RLocator itself is just a data structure holding offset/size information.
+    Note: RLocator itself is just a data structure.
     It is used as a building block by full locators like REnvelopeLocator and RPageLocator,
     which implement the Locator protocol with offset, size, and read_from() methods.
+    Only the locators of a byte range in the file (FileLocator) can be fetched that way.
     """
 
-    size: int
-    """The (compressed) size of the byte range to locate."""
-
     @classmethod
-    def read(cls, buffer: ReadBuffer):
+    def read(cls, buffer: ReadBuffer) -> tuple["RLocator", ReadBuffer]:
         """Reads a RNTuple locator from the given buffer."""
 
         #### Peek (don't update buffer) at the first 32 bit integer in the buffer to determine the locator type
@@ -47,31 +48,35 @@ class RLocator(ROOTSerializable):
             return StandardLocator.read(buffer)
 
         #### Non-standard locator
-        # The first 32 bit signed integer contains the locator size, reserved, and locator type
-        # For non-standard locators, the first 32 bits contain metadata about the locator itself
-        #    (i.e. it doesn't contain any info about the byte range to locate)
-        # Thus any derived classes will not need to consume it
-        (locatorSizeReservedType,), buffer = buffer.unpack("<i")
-
-        # # The locator size is the 16 least significant bits
-        # locatorSize = locatorSizeReservedType & 0xFFFF  # Size of locator itself
-
-        # # The reserved field is the next 8 least significant bits
-        # reserved = (
-        #     locatorSizeReservedType >> 16
-        # ) & 0xFF  # Reserved by ROOT developers for future use
-
-        # The locator type is the 8 most significant bits (the final 8 bits)
-        locatorType = (
-            locatorSizeReservedType >> 24
-        ) & 0xFF  # Type of non-standard locator
+        # The first 32 bit signed integer is the negated (size, reserved, type)
+        # word: ROOT negates the whole word, then splits it (SerializeLocator and
+        # DeserializeLocator, RNTupleSerialize.cxx:1104-1107 and :1124-1127 at
+        # 6.40.04). The spec's "absolute value of the 8bit integer" is that type
+        # only when the low 24 bits are zero; they never are, since they hold
+        # the locator's size.
+        (negatedHead,), buffer = buffer.unpack("<i")
+        head = -negatedHead
+        # The 16 least significant bits: the size of the locator itself, this
+        # word included; the payload follows the word
+        locatorSize = head & 0xFFFF
+        # The next 8 bits are reserved for the storage backend of the type
+        reserved = (head >> 16) & 0xFF
+        # The 8 most significant bits (of which the top one is the sign): the type
+        locatorType = head >> 24
+        payloadSize = locatorSize - 4
+        if payloadSize < 0:
+            msg = f"Non-standard locator of type {locatorType:#04x} has size {locatorSize}, less than its own 4-byte header"
+            raise ValueError(msg)
+        payload, buffer = buffer.consume(payloadSize)
 
         # Read the payload based on the locator type
         if locatorType == 0x01:
-            return LargeLocator.read(buffer)
+            return LargeLocator.from_payload(payload, reserved), buffer
 
-        msg = f"Unknown non-standard locator type: {locatorType=}"
-        raise ValueError(msg)
+        # Any other type, 0x02 (DAOS Object64, root-io-spec ERRATA 4; reading it
+        # is #148) included, is kept as stored, as ROOT keeps a locator of a type
+        # it doesn't know (kTypeUnknown); only fetching through it fails (#122)
+        return UnknownLocator(locatorType, reserved, payload), buffer
 
 
 @dataclass
@@ -81,11 +86,13 @@ class StandardLocator(RLocator):
     A standard locator is a locator that specifies a byte size and byte offset. (simple on-disk or in-file locator).
     """
 
+    size: int
+    """The (compressed) size of the byte range to locate."""
     offset: int
     """The byte offset to the byte range to locate."""
 
     @classmethod
-    def read(cls, buffer: ReadBuffer):
+    def read(cls, buffer: ReadBuffer) -> tuple["StandardLocator", ReadBuffer]:
         """Reads a standard RNTuple locator from the given buffer."""
 
         # Size is the absolute value of a signed 32 bit integer
@@ -105,20 +112,40 @@ class LargeLocator(RLocator):
     The type for the Large Locator is 0x01.
     """
 
+    size: int
+    """The (compressed) size of the byte range to locate."""
     offset: int
     """The byte offset to the byte range to locate."""
+    reserved: int = 0
+    """The locator's reserved byte, as stored (ROOT writes 0)."""
 
     @classmethod
-    def read(cls, buffer: ReadBuffer):
-        """Reads a payload for a "Large" type of Non-Standard RNTuple locator from the given buffer."""
+    def from_payload(cls, payload: bytes, reserved: int) -> "LargeLocator":
+        """Reads the payload of a "Large" non-standard locator: a 64 bit size, then a 64 bit offset."""
+        if len(payload) != 16:
+            msg = f"Large locator payload is {len(payload)} bytes, expected 16"
+            raise ValueError(msg)
+        size = int.from_bytes(payload[:8], "little")
+        offset = int.from_bytes(payload[8:], "little")
+        return cls(size, offset, reserved)
 
-        # Size is a 64 bit unsigned integer
-        (size,), buffer = buffer.unpack("<Q")
 
-        # Offset is a 64 bit unsigned integer
-        (offset,), buffer = buffer.unpack("<Q")
+@dataclass
+class UnknownLocator(RLocator):
+    """A non-standard locator of a type that rootfilespec does not read (#122)
 
-        return cls(size, offset), buffer
+    Kept as stored, so that the page list or footer holding it still reads, as
+    in ROOT, which reads such a locator as ``kTypeUnknown``. What it locates
+    can't be fetched: ``page_locator`` and ``envelope_locator`` raise on it.
+    """
+
+    locatorType: int
+    """The locator type: not 0x01. 0x02 is ROOT's DAOS locator (root-io-spec
+    ERRATA 4; reading it is #148), 0x7e the one ROOT's tests write."""
+    reserved: int
+    """The locator's reserved byte, as stored."""
+    payload: bytes
+    """The payload, as stored: the locator's size, less its 4-byte header."""
 
 
 FileLocator = StandardLocator | LargeLocator
