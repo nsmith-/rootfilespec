@@ -9,7 +9,6 @@ from rootfilespec.bootstrap.TDatime import TDatime, TDatime_to_datetime
 from rootfilespec.bootstrap.TKey import TKey, TypedTKey
 from rootfilespec.bootstrap.TUUID import TUUID
 from rootfilespec.serializable import (
-    DataFetcher,
     Members,
     ReadBuffer,
     ROOTSerializable,
@@ -106,32 +105,6 @@ class TDirectory(ROOTSerializable):
         members["fSeekKeys"] = fSeekKeys
         members["fUUID"] = fUUID
         return members, buffer
-
-    def get_KeyList(self, fetch_data: DataFetcher):
-        buffer = fetch_data(self.fSeekKeys, self.header.fNbytesKeys)
-
-        key, _ = TKey.read(buffer)
-        if key.fSeekKey == 0:
-            msg = f"fSeekKey is 0 {key.fSeekKey} (bad key but KeyList is valid, e.g. uproot-issue261.root)"
-            raise NotImplementedError(msg)
-        if key.fSeekKey != self.fSeekKeys:
-            msg = f"fSeekKey mismatch {key.fSeekKey} != {self.fSeekKeys}"
-            raise ValueError(msg)
-        if key.header.fNbytes != self.header.fNbytesKeys:
-            msg = f"fNbytes mismatch {key.header.fNbytes} != {self.header.fNbytesKeys}"
-            raise ValueError(msg)
-        if key.fSeekPdir != self.fSeekDir:
-            msg = f"fSeekPdir mismatch {key.fSeekPdir} != {self.fSeekDir}"
-            raise ValueError(msg)
-
-        def fetch_cached(seek: int, size: int):
-            seek -= key.fSeekKey
-            if seek + size <= len(buffer):
-                return buffer[seek : seek + size]
-            msg = f"TDirectory.read_keylist: fetch_cached: {seek=} {size=} out of range"
-            raise ValueError(msg)
-
-        return key.read_object(fetch_cached, objtype=TKeyList)
 
     @property
     def keylist_locator(self) -> KeyListLocator:

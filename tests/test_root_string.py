@@ -226,7 +226,7 @@ def test_string_records():
 
 def test_typed_key_string_record():
     """A TypedTKey reads a string record too: the looked-up type is the
-    TString alias, not a class, and read_object reads both kinds alike"""
+    TString alias, not a class, and read_from reads both kinds alike"""
     with open_path(DATA / "serialization" / "unframed-records.root") as reader:
         key = reader.keylist()[b"tstring"]
         buffer = reader.fetch.buffer(key)

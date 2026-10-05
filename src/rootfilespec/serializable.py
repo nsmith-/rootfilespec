@@ -362,8 +362,6 @@ def serializable(cls: type[RT]) -> type[RT]:
     return cls
 
 
-DataFetcher = Callable[[int, int], ReadBuffer]
-
 T_co = TypeVar("T_co", bound=ROOTSerializable, covariant=True)
 
 

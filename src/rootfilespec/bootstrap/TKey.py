@@ -7,7 +7,6 @@ from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TDatime import TDatime, TDatime_to_datetime
 from rootfilespec.dispatch import normalize
 from rootfilespec.serializable import (
-    DataFetcher,
     Members,
     ReadBuffer,
     ROOTSerializable,
@@ -107,23 +106,6 @@ class TKey(ROOTSerializable):
         return members, buffer
 
     @overload
-    def read_object(self, fetch_data: DataFetcher) -> ROOTSerializable: ...
-
-    @overload
-    def read_object(
-        self, fetch_data: DataFetcher, objtype: type[ObjType]
-    ) -> ObjType: ...
-
-    def read_object(
-        self,
-        fetch_data: DataFetcher,
-        objtype: type[ObjType] | None = None,
-    ) -> ObjType | ROOTSerializable:
-        return self._read_payload(
-            fetch_data(self.fSeekKey, self.header.fNbytes), objtype
-        )
-
-    @overload
     def _read_payload(self, buffer: ReadBuffer, objtype: None) -> ROOTSerializable: ...
 
     @overload
@@ -187,7 +169,7 @@ class TKey(ROOTSerializable):
             # TODO: implement checksum verification
             buffer = buffer[8:]
         if buffer:
-            msg = f"TKey.read_object: buffer not empty after reading object of type {typename}."
+            msg = f"TKey.read_from: buffer not empty after reading object of type {typename}."
             msg += f"\n{self=}"
             msg += f"\n{compressed=}"
             msg += f"\n{obj=}"
