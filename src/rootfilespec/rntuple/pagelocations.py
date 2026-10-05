@@ -1,13 +1,13 @@
-from typing import Annotated, cast
+from dataclasses import dataclass
+from typing import Annotated
 
 import xxhash  # type: ignore[import-not-found]
 
 from rootfilespec.bootstrap.compression import RCompressionSettings
 from rootfilespec.rntuple.RFrame import Item, ListFrame
-from rootfilespec.rntuple.RLocator import RLocator
+from rootfilespec.rntuple.RLocator import FileLocator, RLocator, in_file
 from rootfilespec.rntuple.RPage import RPage
 from rootfilespec.serializable import (
-    Locator,
     ReadBuffer,
     ROOTSerializable,
     serializable,
@@ -21,7 +21,8 @@ PAGE_CHECKSUM_SIZE = 8
 @serializable
 class RPageDescription(ROOTSerializable):
     """A class representing an RNTuple Page Description.
-    This class represents the location of a page for a column for a cluster.
+    This class represents the location of a page for a column for a cluster,
+    as stored. Fetch the page through its ``page_locator``.
 
     Notes:
     This class is the Inner Item in the triple nested List Frame of RNTuple page locations.
@@ -43,20 +44,6 @@ class RPageDescription(ROOTSerializable):
     """The locator for the page."""
 
     @property
-    def offset(self) -> int:
-        """The byte offset of the page in the file."""
-        # Note: self.locator is always StandardLocator or LargeLocator at runtime,
-        # which have offset fields. Cast needed because base RLocator doesn't have offset.
-        return cast(Locator[ROOTSerializable], self.locator).offset
-
-    @property
-    def size(self) -> int:
-        """The number of bytes to fetch: the page as stored, then its checksum if it has one.
-
-        The spec's page size, which excludes the checksum, is ``locator.size``."""
-        return self.locator.size + (PAGE_CHECKSUM_SIZE if self.has_checksum else 0)
-
-    @property
     def n_elements(self) -> int:
         """The number of elements in the page."""
         return abs(self.fNElements)
@@ -65,6 +52,40 @@ class RPageDescription(ROOTSerializable):
     def has_checksum(self) -> bool:
         """Whether an XXH3-64 checksum is stored right after the page."""
         return self.fNElements < 0
+
+    @property
+    def page_locator(self) -> "RPageLocator":
+        """A locator for the page, and its checksum if it has one.
+
+        Raises NotImplementedError if the page's locator is not in the file."""
+        return RPageLocator(in_file(self.locator, "Page"), self.has_checksum)
+
+
+@dataclass(frozen=True)
+class RPageLocator:
+    """A locator for an RNTuple page.
+
+    This follows the locator pattern, like REnvelopeLocator for envelopes: it
+    describes where a page is and how to read it, and the caller fetches it.
+    It covers the page as stored and, if the page has one, its checksum.
+    """
+
+    locator: FileLocator
+    """The page's locator, as stored in its page description."""
+    has_checksum: bool
+    """Whether an XXH3-64 checksum is stored right after the page."""
+
+    @property
+    def offset(self) -> int:
+        """The byte offset of the page in the file."""
+        return self.locator.offset
+
+    @property
+    def size(self) -> int:
+        """The number of bytes to fetch: the page as stored, then its checksum if it has one.
+
+        The spec's page size, which excludes the checksum, is ``locator.size``."""
+        return self.locator.size + (PAGE_CHECKSUM_SIZE if self.has_checksum else 0)
 
     def read_from(self, buffer: ReadBuffer) -> RPage:
         """Read the page from the given buffer, and verify its checksum if it has one.
@@ -75,7 +96,9 @@ class RPageDescription(ROOTSerializable):
         decompressed here.
         """
         if len(buffer) != self.size:
-            msg = f"RPageDescription.read_from: expected {self.size} bytes, got {len(buffer)}"
+            msg = (
+                f"RPageLocator.read_from: expected {self.size} bytes, got {len(buffer)}"
+            )
             raise ValueError(msg)
 
         #### Read the page from the buffer

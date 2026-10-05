@@ -179,7 +179,11 @@ class InterpretablePage:
 
     pageDescription: RPageDescription
     """The page's entry in the page list, as stored: its locator, its number of
-    elements and whether a checksum follows it."""
+    elements and whether a checksum follows it.
+
+    Its ``page_locator`` gives the bytes to fetch, checksum included, and reads
+    the page from them. Several pages can name the same bytes (same-page
+    merging, root-io-spec NOTES 7)."""
     firstElementInCluster: int
     """The index of the page's first element among the column's elements in the
     cluster, as ROOT counts it.

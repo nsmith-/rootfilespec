@@ -24,7 +24,7 @@ class RLocator(ROOTSerializable):
     (See the Page Location in the Page List Envelopes for an example of an RLocator without an Envelope Link.)
 
     Note: RLocator itself is just a data structure holding offset/size information.
-    It is used as a building block by full locators like REnvelopeLocator and RPageDescription,
+    It is used as a building block by full locators like REnvelopeLocator and RPageLocator,
     which implement the Locator protocol with offset, size, and read_from() methods.
     """
 
@@ -119,3 +119,19 @@ class LargeLocator(RLocator):
         (offset,), buffer = buffer.unpack("<Q")
 
         return cls(size, offset), buffer
+
+
+FileLocator = StandardLocator | LargeLocator
+"""The locators of a byte range in the file: an offset and a size"""
+
+
+def in_file(locator: RLocator, what: str) -> FileLocator:
+    """The locator, if it locates a byte range in the file
+
+    Only those can be fetched through the Locator protocol, which is an offset
+    and a size in the file. ``what`` names the referenced block for the error.
+    """
+    if isinstance(locator, StandardLocator | LargeLocator):
+        return locator
+    msg = f"{what} has a locator that is not in the file, which can't be fetched: {locator}"
+    raise NotImplementedError(msg)
