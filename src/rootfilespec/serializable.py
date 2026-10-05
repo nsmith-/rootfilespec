@@ -367,8 +367,10 @@ def serializable(cls: type[RT]) -> type[RT]:
 
 DataFetcher = Callable[[int, int], ReadBuffer]
 
-# Not bound to ROOTSerializable: a TKey locates a builtin when its class reads as
-# one, such as a TString record read as bytes (#68, #135)
+# The type a locator returns, so that ``Locator[RPage]`` or ``Locator[TTree]``
+# says what ``read_from`` gives. It is not bound to ROOTSerializable, because
+# some locators return a builtin: a TKey of a TString record reads as bytes
+# (#68, #135)
 T_co = TypeVar("T_co", covariant=True)
 
 
