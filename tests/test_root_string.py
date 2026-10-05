@@ -214,11 +214,9 @@ def test_string_records():
     serialization/stringlong (Conventions §5.1, §5.1.1)"""
     with open_path(DATA / "serialization" / "unframed-records.root") as reader:
         keylist = reader.keylist()
-        # TKey.read_from is annotated ROOTSerializable but reads these as bytes (#135)
-        tstring: object = reader.fetch(keylist.get_by_name(b"tstring"))
-        assert tstring == b"hello"
-        tstringlong: object = reader.fetch(keylist.get_by_name(b"tstringlong"))
-        assert tstringlong == b"a long string"
+        # A string record reads as bytes, so TKey.read_from is typed object (#135)
+        assert reader.fetch(keylist.get_by_name(b"tstring")) == b"hello"
+        assert reader.fetch(keylist.get_by_name(b"tstringlong")) == b"a long string"
     with open_path(DATA / "serialization" / "stringlong.root") as reader:
         keylist = reader.keylist()
         # Classes generated from the file's StreamerInfo have no static type

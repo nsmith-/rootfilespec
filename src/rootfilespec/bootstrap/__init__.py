@@ -57,11 +57,9 @@ from rootfilespec.serializable import FileContext, ROOTSerializable
 
 @dataclasses.dataclass
 class _BootstrapContext(FileContext):
-    types: dict[str, type[ROOTSerializable]]
+    types: dict[str, object]
 
-    def type_by_name(
-        self, name: str, expect_version: int | None = None
-    ) -> type[ROOTSerializable]:
+    def type_by_name(self, name: str, expect_version: int | None = None) -> object:
         cls = self.types.get(name)
         if cls is None:
             msg = f"Cannot find type {name} (expected version {expect_version})"

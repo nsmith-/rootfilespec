@@ -23,6 +23,7 @@ from rootfilespec.serializable import (
     BufferContext,
     ReadBuffer,
     ROOTSerializable,
+    read_value,
 )
 
 TESTABLE_FILES = [f for f in known_files if f.endswith(".root")]
@@ -55,7 +56,7 @@ class _ReadBasket:
             itemheader, _ = StreamHeader.read(buffer)
             item_end = itemheader.fByteCount + 4
             buffer, remaining = buffer[:item_end], buffer[item_end:]
-            item, buffer = dyntype.read(buffer)
+            item, buffer = read_value(dyntype, buffer)
             if buffer:
                 msg = f"Expected buffer to be empty after reading {self.typename}, but got\n{buffer}"
                 raise ValueError(msg)

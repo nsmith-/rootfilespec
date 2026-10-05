@@ -74,9 +74,7 @@ class DynamicFileContext(FileContext):
     def __repr__(self) -> str:
         return f"<DynamicFileContext(module={self.module.__name__})>"
 
-    def type_by_name(
-        self, name: str, expect_version: int | None = None
-    ) -> type[ROOTSerializable]:
+    def type_by_name(self, name: str, expect_version: int | None = None) -> object:
         cls = self.module.__dict__.get(name)
         if cls is None:
             if name == "TLeafI":
@@ -101,7 +99,7 @@ class DynamicFileContext(FileContext):
             # TODO: try to see if it is in BOOTSTRAP_CONTEXT ?
             msg = f"Unknown type {name} (version {expect_version}): not found in {self}"
             raise ValueError(msg)
-        return cls  # type: ignore[no-any-return]
+        return cls
 
     def type_by_checksum(self, checksum: bytes) -> type[ROOTSerializable]:
         return super().type_by_checksum(checksum)
