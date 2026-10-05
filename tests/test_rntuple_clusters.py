@@ -6,6 +6,7 @@ import pytest
 import tomli  # tomllib, once Python 3.10 is dropped
 from skhep_testdata import data_path  # type: ignore[import-not-found]
 
+from rootfilespec.bootstrap import ROOT3a3aRNTuple
 from rootfilespec.reader import open_path
 from rootfilespec.rntuple.RNTuple import RNTuple, SchemaDescription
 from rootfilespec.rntuple.schema import ColumnType
@@ -20,9 +21,11 @@ EXTENSION_COLUMNS = "test_extension_columns_rntuple_v1-0-0-0.root"
 
 def _load(path: str | Path) -> RNTuple:
     with open_path(path) as reader:
-        keylist = reader.keylist()
-        (name,) = [n for n in keylist if keylist[n].fClassName == b"ROOT::RNTuple"]
-        return reader.fetch.rntuple(reader.fetch(keylist[name]))
+        keys = reader.keylist().values()
+        (key,) = [k for k in keys if k.fClassName == b"ROOT::RNTuple"]
+        anchor = reader.fetch(key)
+        assert isinstance(anchor, ROOT3a3aRNTuple)
+        return reader.fetch.rntuple(anchor)
 
 
 def _ranges(rntuple: RNTuple) -> list[list[tuple[bool, int, int, int, int]]]:

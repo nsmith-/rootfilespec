@@ -5,7 +5,6 @@ with byte-level assertions, by the ``case.toml`` of the same name under
 ``gen/cases/``. The submodule is optional: without it this module is skipped.
 """
 
-import struct
 from pathlib import Path
 from typing import NamedTuple
 
@@ -121,7 +120,7 @@ EXPECTED_FAILURES: dict[str, ExpectedFailure] = {
         (101,), ValueError, "Unknown type TTreeIndex"
     ),
     "written/two-versions.root": ExpectedFailure(
-        (22,), struct.error, "unpack requires a buffer of 8 bytes"
+        (22,), IndexError, r"Cannot unpack '>d' \(8 bytes\) from buffer of length 0"
     ),
 }
 
@@ -148,7 +147,7 @@ def test_read_fixture(fixture: str):
 def test_tlist_options():
     """Issue #108: each TList entry is followed by its option string"""
     with open_path(DATA / "serialization/object-tags.root") as reader:
-        lst = reader.fetch(reader.keylist()[b"lst"])
+        lst = reader.fetch(reader.keylist().get_by_name(b"lst"))
     assert isinstance(lst, TList)
     assert lst.fName == b"lst"
     assert len(lst.items) == 4

@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from rootfilespec.bootstrap import ROOT3a3aRNTuple
 from rootfilespec.bootstrap.TStreamerInfo import TStreamerElement, TStreamerInfo
 from rootfilespec.reader import FileReader, open_path
 from rootfilespec.rntuple.RNTuple import RNTuple
@@ -11,9 +12,11 @@ DATA = Path(__file__).parent.parent / "reference" / "root-io-spec" / "data" / "r
 
 
 def _rntuple(reader: FileReader) -> RNTuple:
-    keylist = reader.keylist()
-    (name,) = [n for n in keylist if keylist[n].fClassName == b"ROOT::RNTuple"]
-    return reader.fetch.rntuple(reader.fetch(keylist[name]))
+    keys = reader.keylist().values()
+    (key,) = [k for k in keys if k.fClassName == b"ROOT::RNTuple"]
+    anchor = reader.fetch(key)
+    assert isinstance(anchor, ROOT3a3aRNTuple)
+    return reader.fetch.rntuple(anchor)
 
 
 @pytest.mark.skipif(not DATA.exists(), reason="reference/root-io-spec not checked out")

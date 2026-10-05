@@ -14,11 +14,10 @@ pytestmark = pytest.mark.skipif(
 def _first_key(name: str, compressed: bool):
     path = DATA / "container" / name
     with open_path(path) as reader:
-        keylist = reader.keylist()
         (key, *_) = [
-            keylist[n]
-            for n in keylist
-            if keylist[n].header.is_compressed() == compressed
+            key
+            for key in reader.keylist().values()
+            if key.header.is_compressed() == compressed
         ]
         context = reader.fetch.buffer(key).file_context
     return path.read_bytes(), key, context

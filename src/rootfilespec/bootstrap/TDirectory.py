@@ -144,10 +144,16 @@ TDirectoryFile = TDirectory
 
 
 @serializable
-class TKeyList(ROOTSerializable, Mapping[bytes, TKey]):
+class TKeyList(ROOTSerializable, Mapping[tuple[bytes, int], TKey]):
     """The TKeyList for a TDirectory contains all the (visible) TKeys
     For RNTuples, it will only contain the RNTuple Anchor TKey(s)
     Binary Spec: https://root.cern.ch/doc/master/keyslist.html
+
+    A directory keeps every cycle of a name (root-io-spec Record §4), so the
+    mapping is keyed by ``(name, cycle)``: ``keylist[b"name", 2]``. The cycle is
+    the magnitude of ``fCycle``, whose sign is ROOT's "keep" flag (Record §3.8).
+    A lookup by name alone is ``get_by_name``, which returns the highest cycle,
+    as ROOT's ``TDirectoryFile::Get("name")`` does.
     """
 
     fKeys: list[TKey]
@@ -159,8 +165,17 @@ class TKeyList(ROOTSerializable, Mapping[bytes, TKey]):
     def update_members(cls, members: Members, buffer: ReadBuffer):
         (nKeys,), buffer = buffer.unpack(">i")
         keys: list[TKey] = []
+        seen: set[tuple[bytes, int]] = set()
         while len(keys) < nKeys:
             key, buffer = TKey.read(buffer)
+            name_cycle = _name_cycle(key)
+            # root-io-spec Directory §9.14: images sharing a name have distinct cycles
+            if name_cycle in seen:
+                msg = (
+                    f"TKeyList: two keys named {key.fName!r} with cycle {name_cycle[1]}"
+                )
+                raise ValueError(msg)
+            seen.add(name_cycle)
             keys.append(key)
         # TODO: absorb padding bytes
         padding = b""
@@ -174,10 +189,21 @@ class TKeyList(ROOTSerializable, Mapping[bytes, TKey]):
     # Key names are uninterpreted bytes (root-io-spec Conventions §5.1), so the
     # mapping is keyed by the bytes as stored, with no decoding.
     def __iter__(self):
-        return (key.fName for key in self.fKeys)
+        return (_name_cycle(key) for key in self.fKeys)
 
-    def __getitem__(self, key: bytes):
-        matches = [k for k in self.fKeys if k.fName == key]
+    def __getitem__(self, key: tuple[bytes, int]) -> TKey:
+        for k in self.fKeys:
+            if _name_cycle(k) == key:
+                return k
+        raise KeyError(key)
+
+    def get_by_name(self, name: bytes) -> TKey:
+        """The key of the highest cycle of ``name``, as ROOT's lookup by name returns"""
+        matches = [k for k in self.fKeys if k.fName == name]
         if not matches:
-            raise KeyError(key)
-        return max(matches, key=lambda k: k.header.fCycle)
+            raise KeyError(name)
+        return max(matches, key=lambda k: abs(k.header.fCycle))
+
+
+def _name_cycle(key: TKey) -> tuple[bytes, int]:
+    return key.fName, abs(key.header.fCycle)

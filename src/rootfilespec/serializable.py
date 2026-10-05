@@ -29,12 +29,17 @@ class FileContext:
         of types will be used to read the rest of the file
     """
 
-    def type_by_name(
-        self, name: str, expect_version: int | None = None
-    ) -> type["ROOTSerializable"]:
-        """Lookup a ROOTSerializable-derived type by its name
+    def type_by_name(self, name: str, expect_version: int | None = None) -> object:
+        """Lookup the type of a class by its name
 
         The name should be normalized according to dispatch.normalize()
+
+        The result is a ROOTSerializable-derived class, or an annotated builtin
+        for a class that reads as one: ``TString`` is
+        ``Annotated[bytes, ROOTString("TString")]``, and ``TDatime`` an annotated
+        ``int``. Read a value with ``read_value(result, buffer)``, never with
+        ``result.read(buffer)``. A caller that needs the class narrows with
+        ``isinstance(result, type) and issubclass(result, ROOTSerializable)``.
 
         If expect_version is supplied, an exception is raised if the version
         does not match the version that is interpretable in this context
@@ -132,7 +137,12 @@ class ReadBuffer:
     def unpack(self, fmt: str) -> tuple[tuple[Any, ...], "ReadBuffer"]:
         """Unpack the buffer according to the given format."""
         size = struct.calcsize(fmt)
-        out = struct.unpack(fmt, self.data[:size])
+        try:
+            out = struct.unpack(fmt, self.data[:size])
+        except struct.error as err:
+            # As slicing past the end does: a short buffer is an IndexError
+            msg = f"Cannot unpack {fmt!r} ({size} bytes) from buffer of length {len(self.data)}"
+            raise IndexError(msg) from err
         return out, self[size:]
 
     def consume(self, size: int) -> tuple[bytes, "ReadBuffer"]:
@@ -275,14 +285,12 @@ class MemberSerDe:
         raise NotImplementedError(msg)
 
 
-def _build_read(ftype: type[MemberType]) -> ReadObjMethod:
+def _build_read(ftype: object) -> ReadObjMethod:
     membermethod = _build_update_members("", ftype)
     return ReadObjMethod(membermethod)
 
 
-def read_value(
-    ftype: type[MemberType] | type["ROOTSerializable"], buffer: ReadBuffer
-) -> tuple[MemberType, ReadBuffer]:
+def read_value(ftype: object, buffer: ReadBuffer) -> tuple[MemberType, ReadBuffer]:
     """Read one value of the given type from the buffer
 
     The type is a ROOTSerializable class, or an annotated builtin that a type
@@ -362,7 +370,11 @@ def serializable(cls: type[RT]) -> type[RT]:
     return cls
 
 
-T_co = TypeVar("T_co", bound=ROOTSerializable, covariant=True)
+# The type a locator returns, so that ``Locator[RPage]`` or ``Locator[TTree]``
+# says what ``read_from`` gives. It is not bound to ROOTSerializable, because
+# some locators return a builtin: a TKey of a TString record reads as bytes
+# (#68, #135)
+T_co = TypeVar("T_co", covariant=True)
 
 
 class Locator(Protocol[T_co]):

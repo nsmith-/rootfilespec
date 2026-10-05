@@ -11,6 +11,8 @@ from rootfilespec.rntuple.pagelocations import (
 )
 from rootfilespec.rntuple.RFrame import ListFrame, RecordFrame
 from rootfilespec.serializable import (
+    Members,
+    ReadBuffer,
     serializable,
 )
 from rootfilespec.structutil import Fmt
@@ -24,11 +26,6 @@ class ClusterSummary(RecordFrame):
     The order of Cluster Summaries defines the cluster IDs, starting from
         the first cluster ID of the cluster group that corresponds to the page list.
     """
-
-    # Notes:
-    # Flag 0x01 is reserved for a future specification version that will support sharded clusters.
-    # The future use of sharded clusters will break forward compatibility and thus introduce a corresponding feature flag.
-    # For now, readers should abort when this flag is set. Other flags should be ignored.
 
     fFirstEntryNumber: Annotated[int, Fmt("<Q")]
     """The first entry number in the cluster."""
@@ -48,6 +45,22 @@ class ClusterSummary(RecordFrame):
         """The feature flag for the cluster."""
         # The 8 most significant bits of the 64 bit integer
         return (self.fNEntriesAndFeatureFlag >> 56) & 0xFF
+
+    @classmethod
+    def update_members(cls, members: Members, buffer: ReadBuffer):
+        (fFirstEntryNumber, fNEntriesAndFeatureFlag), buffer = buffer.unpack("<QQ")
+        # Flag 0x01 is reserved for sharded clusters, a future and incompatible
+        # format: readers abort when it is set, and ignore other flags (spec,
+        # *Cluster Summary Record Frame*; RNTupleSerialize.cxx:1239-1240)
+        if (fNEntriesAndFeatureFlag >> 56) & 0x01:
+            msg = (
+                f"Cluster summary of entries from {fFirstEntryNumber} has the "
+                "sharded-cluster flag (0x01) set; sharded clusters are not supported"
+            )
+            raise NotImplementedError(msg)
+        members["fFirstEntryNumber"] = fFirstEntryNumber
+        members["fNEntriesAndFeatureFlag"] = fNEntriesAndFeatureFlag
+        return members, buffer
 
 
 @serializable

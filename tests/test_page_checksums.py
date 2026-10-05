@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 import xxhash  # type: ignore[import-not-found]
 
-from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT
+from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT, ROOT3a3aRNTuple
 from rootfilespec.reader import open_path
 from rootfilespec.rntuple.pagelocations import RPageDescription, RPageLocator
 from rootfilespec.rntuple.RLocator import StandardLocator
@@ -18,12 +18,12 @@ pytestmark = pytest.mark.skipif(
 def _page_descriptions(path: Path) -> list[RPageDescription]:
     out: list[RPageDescription] = []
     with open_path(path) as reader:
-        keylist = reader.keylist()
-        for name in keylist:
-            key = keylist[name]
+        for key in reader.keylist().values():
             if key.fClassName != b"ROOT::RNTuple":
                 continue
-            rntuple = reader.fetch.rntuple(reader.fetch(key))
+            anchor = reader.fetch(key)
+            assert isinstance(anchor, ROOT3a3aRNTuple)
+            rntuple = reader.fetch.rntuple(anchor)
             for pagelist in rntuple.pagelistEnvelopes:
                 for cluster in pagelist.pageLocations:
                     for column in cluster:

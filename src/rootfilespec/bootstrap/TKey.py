@@ -106,14 +106,14 @@ class TKey(ROOTSerializable):
         return members, buffer
 
     @overload
-    def _read_payload(self, buffer: ReadBuffer, objtype: None) -> ROOTSerializable: ...
+    def _read_payload(self, buffer: ReadBuffer, objtype: None) -> object: ...
 
     @overload
     def _read_payload(self, buffer: ReadBuffer, objtype: type[ObjType]) -> ObjType: ...
 
     def _read_payload(
         self, buffer: ReadBuffer, objtype: type[ObjType] | None
-    ) -> ObjType | ROOTSerializable:
+    ) -> object:
         """Read the object from a buffer holding the key and its payload
 
         The object is read as objtype, or by default as the key's class
@@ -148,7 +148,7 @@ class TKey(ROOTSerializable):
             buffer = decompress(buffer, self.header.fObjlen)
         else:
             buffer = buffer[: self.header.fObjlen]
-        readtype: type[ObjType] | type[ROOTSerializable]
+        readtype: object
         if objtype is None:
             typename = normalize(self.fClassName)
             readtype = buffer.file_context.type_by_name(typename)
@@ -156,7 +156,6 @@ class TKey(ROOTSerializable):
             typename = objtype.__name__
             readtype = objtype
         # A looked-up type may be an annotated builtin, such as TString (#68)
-        obj: ObjType | ROOTSerializable
         obj, buffer = read_value(readtype, buffer)
         # Some types we have to handle trailing bytes
         if typename == "TKeyList":
@@ -185,7 +184,9 @@ class TKey(ROOTSerializable):
     def size(self) -> int:
         return self.header.fNbytes
 
-    def read_from(self, buffer: ReadBuffer) -> ROOTSerializable:
+    def read_from(self, buffer: ReadBuffer) -> object:
+        """The key's object: a ROOTSerializable, or a builtin for a class that
+        reads as one, such as ``bytes`` for a ``TString`` (#68, #135)"""
         return self._read_payload(buffer, None)
 
 
