@@ -5,6 +5,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Let a new release age before it is proposed, in case it is compromised
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns:

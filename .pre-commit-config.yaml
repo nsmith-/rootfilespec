@@ -6,13 +6,13 @@ exclude: ^.cruft.json|.copier-answers.yml$
 
 repos:
   - repo: https://github.com/adamchainz/blacken-docs
-    rev: "1.19.1"
+    rev: 0bc601e0cc771b26b206a46d3b298ef951b43c7c # frozen: 1.19.1
     hooks:
       - id: blacken-docs
         additional_dependencies: [black==24.*]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: "v5.0.0"
+    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b # frozen: v5.0.0
     hooks:
       - id: check-added-large-files
       - id: check-case-conflict
@@ -28,28 +28,28 @@ repos:
       - id: trailing-whitespace
 
   - repo: https://github.com/pre-commit/pygrep-hooks
-    rev: "v1.10.0"
+    rev: 3a6eb0fadf60b3cccfd80bad9dbb6fae7e47b316 # frozen: v1.10.0
     hooks:
       - id: rst-backticks
       - id: rst-directive-colons
       - id: rst-inline-touching-normal
 
   - repo: https://github.com/rbubley/mirrors-prettier
-    rev: "v3.4.2"
+    rev: bc7af46104f0f5368b95878decf720f9f00c2559 # frozen: v3.4.2
     hooks:
       - id: prettier
         types_or: [yaml, markdown, html, css, scss, javascript, json]
         args: [--prose-wrap=always]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.9.2"
+    rev: 73413df07b4ab0bf103ca1ae73c7cec5c0ace593 # frozen: v0.9.2
     hooks:
       - id: ruff
         args: ["--fix", "--show-fixes"]
       - id: ruff-format
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v1.15.0"
+    rev: f40886d54c729f533f864ed6ce584e920feb0af7 # frozen: v1.15.0
     hooks:
       - id: mypy
         files: src|tests
@@ -61,12 +61,12 @@ repos:
           - tomli
 
   - repo: https://github.com/codespell-project/codespell
-    rev: "v2.3.0"
+    rev: 193cd7d27cd571f79358af09a8fb8997e54f8fff # frozen: v2.3.0
     hooks:
       - id: codespell
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: "v0.10.0.1"
+    rev: a23f6b85d0fdd5bb9d564e2579e678033debbdff # frozen: v0.10.0.1
     hooks:
       - id: shellcheck
 
@@ -79,14 +79,21 @@ repos:
         exclude: .pre-commit-config.yaml
 
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: "v0.23"
+    rev: f45606bad11ad90ddac1212fa83ebe2a4d724351 # frozen: v0.23
     hooks:
       - id: validate-pyproject
         additional_dependencies: ["validate-pyproject-schema-store[all]"]
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: "0.31.0"
+    rev: 3126ec61bc291f8b52a4214271e9411859bd7a6e # frozen: 0.31.0
     hooks:
       - id: check-dependabot
       - id: check-github-workflows
       - id: check-readthedocs
+
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: fa412071e4f5d44d44f9e365f4676f9df92456a2 # frozen: v1.30.1
+    hooks:
+      - id: zizmor
+        # Same audits locally as in CI, even with GH_TOKEN set
+        args: [--offline]
