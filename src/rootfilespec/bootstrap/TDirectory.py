@@ -157,6 +157,9 @@ class KeyListLocator:
         if key.fSeekKey != self.offset:
             msg = f"fSeekKey mismatch {key.fSeekKey} != {self.offset}"
             raise ValueError(msg)
+        if key.header.fNbytes != self.size:
+            msg = f"fNbytes mismatch {key.header.fNbytes} != {self.size}"
+            raise ValueError(msg)
         if key.fSeekPdir != self.parent_offset:
             msg = f"Parent offset mismatch {key.fSeekPdir} != {self.parent_offset}"
             raise ValueError(msg)
