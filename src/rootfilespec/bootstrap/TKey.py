@@ -107,7 +107,7 @@ class TKey(ROOTSerializable):
         return members, buffer
 
     @overload
-    def read_object(self, fetch_data: DataFetcher) -> ROOTSerializable: ...
+    def read_object(self, fetch_data: DataFetcher) -> object: ...
 
     @overload
     def read_object(
@@ -118,7 +118,7 @@ class TKey(ROOTSerializable):
         self,
         fetch_data: DataFetcher,
         objtype: type[ObjType] | None = None,
-    ) -> ObjType | ROOTSerializable:
+    ) -> object:
         if self.fClassName == b"RBlob":
             # An RBlob key's fObjLen is decorative, and one blob can hold several
             # pages, each with a checksum fObjLen does not count (root-io-spec
@@ -150,7 +150,7 @@ class TKey(ROOTSerializable):
             buffer = decompress(buffer, self.header.fObjlen)
         else:
             buffer = buffer[: self.header.fObjlen]
-        readtype: type[ObjType] | type[ROOTSerializable]
+        readtype: object
         if objtype is None:
             typename = normalize(self.fClassName)
             readtype = buffer.file_context.type_by_name(typename)
@@ -158,7 +158,6 @@ class TKey(ROOTSerializable):
             typename = objtype.__name__
             readtype = objtype
         # A looked-up type may be an annotated builtin, such as TString (#68)
-        obj: ObjType | ROOTSerializable
         obj, buffer = read_value(readtype, buffer)
         # Some types we have to handle trailing bytes
         if typename == "TKeyList":
@@ -187,7 +186,9 @@ class TKey(ROOTSerializable):
     def size(self) -> int:
         return self.header.fNbytes
 
-    def read_from(self, buffer: ReadBuffer) -> ROOTSerializable:
+    def read_from(self, buffer: ReadBuffer) -> object:
+        """The key's object: a ROOTSerializable, or a builtin for a class that
+        reads as one, such as ``bytes`` for a ``TString`` (#68, #135)"""
         return self.read_object(lambda _seek, _size: buffer)
 
 
