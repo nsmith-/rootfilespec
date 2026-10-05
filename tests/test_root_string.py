@@ -1,9 +1,9 @@
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import pytest
 
-from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT, TString
+from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT, ROOT3a3aRNTuple, TString
 from rootfilespec.bootstrap.TFile import InitialReadLocator
 from rootfilespec.bootstrap.TKey import TypedTKey
 from rootfilespec.bootstrap.TStreamerInfo import TStreamerInfo
@@ -113,15 +113,15 @@ def test_rntuple_strings_are_bytes():
     """Every RNTuple string member of every root-io-spec RNTuple fixture is bytes"""
     for path in sorted((DATA / "rntuple").glob("*.root")):
         with open_path(path) as reader:
-            keylist = reader.keylist()
-            for name in keylist:
-                key = keylist[name]
+            for key in reader.keylist().values():
                 if key.fClassName != b"ROOT::RNTuple":
                     continue
-                rntuple = RNTuple.from_anchor(reader.fetch(key), reader.fetch.buffer)
+                anchor = reader.fetch(key)
+                assert isinstance(anchor, ROOT3a3aRNTuple)
+                rntuple = RNTuple.from_anchor(anchor, reader.fetch.buffer)
                 header = rntuple.headerEnvelope
                 assert type(header.fName) is bytes
-                assert header.fName == name
+                assert header.fName == key.fName
                 assert type(header.fLibrary) is bytes
                 for field in rntuple.schemaDescription.fieldDescriptions:
                     for value in (
@@ -138,7 +138,7 @@ def test_key_and_named_strings_are_bytes():
     TObjString named `s` whose string is `hello` (Conventions §5.1)"""
     with open_path(DATA / "container" / "file-minimal.root") as reader:
         keylist = reader.keylist()
-        assert all(type(name) is bytes for name in keylist)
+        assert all(type(name) is bytes for name, _ in keylist)
         for key in keylist.values():
             assert type(key.fClassName) is bytes
             assert type(key.fTitle) is bytes
@@ -214,13 +214,17 @@ def test_string_records():
     serialization/stringlong (Conventions §5.1, §5.1.1)"""
     with open_path(DATA / "serialization" / "unframed-records.root") as reader:
         keylist = reader.keylist()
-        assert reader.fetch(keylist[b"tstring"]) == b"hello"
-        assert reader.fetch(keylist[b"tstringlong"]) == b"a long string"
+        # TKey.read_from is annotated ROOTSerializable but reads these as bytes (#135)
+        tstring: object = reader.fetch(keylist.get_by_name(b"tstring"))
+        assert tstring == b"hello"
+        tstringlong: object = reader.fetch(keylist.get_by_name(b"tstringlong"))
+        assert tstringlong == b"a long string"
     with open_path(DATA / "serialization" / "stringlong.root") as reader:
         keylist = reader.keylist()
-        small = reader.fetch(keylist[b"small"])
+        # Classes generated from the file's StreamerInfo have no static type
+        small: Any = reader.fetch(keylist.get_by_name(b"small"))
         assert (small.fLong, small.fPlain) == (b"abcdef", b"abcdef")
-        big = reader.fetch(keylist[b"big"])
+        big: Any = reader.fetch(keylist.get_by_name(b"big"))
         assert (big.fLong, big.fPlain) == (b"x" * 300, b"x" * 300)
 
 
@@ -228,7 +232,7 @@ def test_typed_key_string_record():
     """A TypedTKey reads a string record too: the looked-up type is the
     TString alias, not a class, and read_object reads both kinds alike"""
     with open_path(DATA / "serialization" / "unframed-records.root") as reader:
-        key = reader.keylist()[b"tstring"]
+        key = reader.keylist().get_by_name(b"tstring")
         buffer = reader.fetch.buffer(key)
         typed, _ = TypedTKey.read(buffer)
         assert typed.objtype == TString

@@ -17,12 +17,13 @@ pytestmark = pytest.mark.skipif(
 
 def _anchors(path: Path) -> list[ROOT3a3aRNTuple]:
     with open_path(path) as reader:
-        keylist = reader.keylist()
-        return [
-            reader.fetch(keylist[name])
-            for name in keylist
-            if keylist[name].fClassName == b"ROOT::RNTuple"
-        ]
+        anchors = []
+        for key in reader.keylist().values():
+            if key.fClassName == b"ROOT::RNTuple":
+                anchor = reader.fetch(key)
+                assert isinstance(anchor, ROOT3a3aRNTuple)
+                anchors.append(anchor)
+        return anchors
 
 
 def _buffer(raw: bytes, offset: int, size: int) -> ReadBuffer:
