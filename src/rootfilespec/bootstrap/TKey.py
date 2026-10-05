@@ -119,6 +119,23 @@ class TKey(ROOTSerializable):
         fetch_data: DataFetcher,
         objtype: type[ObjType] | None = None,
     ) -> ObjType | ROOTSerializable:
+        return self._read_payload(
+            fetch_data(self.fSeekKey, self.header.fNbytes), objtype
+        )
+
+    @overload
+    def _read_payload(self, buffer: ReadBuffer, objtype: None) -> ROOTSerializable: ...
+
+    @overload
+    def _read_payload(self, buffer: ReadBuffer, objtype: type[ObjType]) -> ObjType: ...
+
+    def _read_payload(
+        self, buffer: ReadBuffer, objtype: type[ObjType] | None
+    ) -> ObjType | ROOTSerializable:
+        """Read the object from a buffer holding the key and its payload
+
+        The object is read as objtype, or by default as the key's class
+        """
         if self.fClassName == b"RBlob":
             # An RBlob key's fObjLen is decorative, and one blob can hold several
             # pages, each with a checksum fObjLen does not count (root-io-spec
@@ -128,7 +145,6 @@ class TKey(ROOTSerializable):
                 "the anchor's envelope locators and the page lists, not through their keys"
             )
             raise ValueError(msg)
-        buffer = fetch_data(self.fSeekKey, self.header.fNbytes)
         # TODO: should we compare the key in the buffer with ourself?
         buffer = buffer[self.header.fKeylen :]
         # The payload is fNbytes - fKeyLen bytes. Decide from the key, not from
@@ -188,7 +204,7 @@ class TKey(ROOTSerializable):
         return self.header.fNbytes
 
     def read_from(self, buffer: ReadBuffer) -> ROOTSerializable:
-        return self.read_object(lambda _seek, _size: buffer)
+        return self._read_payload(buffer, None)
 
 
 @dataclass(frozen=True)
@@ -214,4 +230,4 @@ class TypedTKey(Generic[ObjType], ROOTSerializable):
         return cls(key=key, objtype=objtype), buffer  # type: ignore[arg-type]
 
     def read_from(self, buffer: ReadBuffer) -> ObjType:
-        return self.key.read_object(lambda _seek, _size: buffer, objtype=self.objtype)
+        return self.key._read_payload(buffer, self.objtype)
