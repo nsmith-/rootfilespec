@@ -82,8 +82,8 @@ def test_non_ascii_key_names():
     utf8, _ = _key(b"TString", "café".encode(), b"\x00", objlen=1)
     other, _ = _key(b"TString", b"\xffname", b"\x00", objlen=1)
     keylist = TKeyList(fKeys=[utf8, other], padding=b"")
-    assert list(keylist) == ["café".encode(), b"\xffname"]
-    assert keylist["café".encode()] is utf8
-    assert keylist[b"\xffname"] is other
+    assert list(keylist) == [("café".encode(), 1), (b"\xffname", 1)]
+    assert keylist["café".encode(), 1] is utf8
+    assert keylist.get_by_name(b"\xffname") is other
     with pytest.raises(KeyError):
-        keylist["café"]  # type: ignore[index]
+        keylist.get_by_name("café")  # type: ignore[arg-type]
