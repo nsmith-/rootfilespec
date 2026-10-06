@@ -1,5 +1,6 @@
 from typing import Annotated
 
+from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
 from rootfilespec.rntuple.envelope import (
     ENVELOPE_TYPE_MAP,
     REnvelope,
@@ -9,7 +10,7 @@ from rootfilespec.rntuple.envelope import (
 )
 from rootfilespec.rntuple.pagelist import PageListEnvelope
 from rootfilespec.rntuple.RFrame import ListFrame, RecordFrame
-from rootfilespec.rntuple.RLocator import RLocator
+from rootfilespec.rntuple.RLocator import RLocator, in_file
 from rootfilespec.rntuple.schema import (
     AliasColumnDescription,
     ColumnDescription,
@@ -100,6 +101,21 @@ class LinkedAttributeSet(RecordFrame):
     """The locator of the set's anchor: the anchor object, not its key"""
     fName: RNTupleString
     """The name of the attribute set, which is also its RNTuple's name"""
+
+    @property
+    def anchor_locator(self) -> REnvelopeLocator[ROOT3a3aRNTuple]:
+        """Get a locator for the set's anchor.
+
+        The set is an RNTuple of its own, so it opens like any other:
+        ``fetch.rntuple(fetch(record.anchor_locator))``.
+
+        Raises NotImplementedError if the anchor's locator is not in the file.
+        """
+        return REnvelopeLocator(
+            self.fAnchorLength,
+            in_file(self.locator, f"The anchor of attribute set {self.fName!r}"),
+            ROOT3a3aRNTuple,
+        )
 
 
 @serializable
