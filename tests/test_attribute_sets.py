@@ -10,6 +10,7 @@ at 6.40.04).
 import dataclasses
 import zlib
 from pathlib import Path
+from typing import Any
 
 import pytest
 import xxhash  # type: ignore[import-not-found]
@@ -121,6 +122,20 @@ def _attribute_sets() -> tuple[Fetcher, list[LinkedAttributeSet]]:
     records = fetch.rntuple(anchor).footerEnvelope.attributeSets
     assert records is not None
     return fetch, records.items
+
+
+def _main(records: list[LinkedAttributeSet]) -> None:
+    """Build attributes.root's main RNTuple with other attribute set records"""
+    fetch = _fetcher((DATA / "attributes.root").read_bytes())
+    (anchor,) = _anchors(fetch)
+    rntuple = fetch.rntuple(anchor)
+    footer = rntuple.footerEnvelope
+    assert footer.attributeSets is not None
+    footer = dataclasses.replace(
+        footer,
+        attributeSets=dataclasses.replace(footer.attributeSets, items=records),
+    )
+    RNTuple.from_envelopes(rntuple.headerEnvelope, footer, rntuple.pagelistEnvelopes)
 
 
 @pytest.mark.skipif(not FIXTURES, reason="reference/root-io-spec not checked out")
@@ -314,17 +329,34 @@ def test_restrictions_are_not_checked():
 @pytest.mark.parametrize("name", [b"runs", b""])
 def test_names_are_distinct_and_not_empty(name: bytes):
     """ROOT refuses a footer whose attribute sets have the same name, or none"""
-    fetch = _fetcher((DATA / "attributes.root").read_bytes())
-    (anchor,) = _anchors(fetch)
-    rntuple = fetch.rntuple(anchor)
-    footer = rntuple.footerEnvelope
-    assert footer.attributeSets is not None
-    runs, flags = footer.attributeSets
-    records = dataclasses.replace(
-        footer.attributeSets, items=[runs, dataclasses.replace(flags, fName=name)]
-    )
-    footer = dataclasses.replace(footer, attributeSets=records)
+    _, (runs, flags) = _attribute_sets()
     with pytest.raises(ValueError, match="not all non-empty and distinct"):
-        RNTuple.from_envelopes(
-            rntuple.headerEnvelope, footer, rntuple.pagelistEnvelopes
-        )
+        _main([runs, dataclasses.replace(flags, fName=name)])
+
+
+@pytest.mark.skipif(not FIXTURES, reason="reference/root-io-spec not checked out")
+@pytest.mark.parametrize(
+    ("change", "error"),
+    [
+        ({"fAnchorLength": 0}, "anchor length of 0"),
+        # 0x7e is ROOT's test locator type, which it reads as kTypeUnknown
+        ({"locator": UnknownLocator(0x7E, 0, bytes(12))}, "type 0x7e"),
+        ({"locator": UnknownLocator(0x40, 0, b"")}, "type 0x40"),
+    ],
+)
+def test_footer_refuses_what_root_refuses(change: dict[str, Any], error: str):
+    """ROOT refuses the footer, so the main RNTuple, for these"""
+    _, (runs, flags) = _attribute_sets()
+    with pytest.raises(ValueError, match=error):
+        _main([runs, dataclasses.replace(flags, **change)])
+
+
+@pytest.mark.skipif(not FIXTURES, reason="reference/root-io-spec not checked out")
+def test_daos_anchor_fails_when_opened():
+    """A DAOS (0x02) locator is a type ROOT knows: the footer reads, and only
+    opening the set fails"""
+    _, (runs, flags) = _attribute_sets()
+    daos = dataclasses.replace(flags, locator=UnknownLocator(0x02, 0, bytes(12)))
+    _main([runs, daos])
+    with pytest.raises(NotImplementedError, match="not in the file"):
+        _ = daos.anchor_locator
