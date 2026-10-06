@@ -210,10 +210,11 @@ previous one points to:
 Records keep what is on disk, and their locators are built from them:
 `REnvelopeLink` is the footer's record of a page list and `REnvelopeLocator`
 fetches it, as `RPageDescription` is a page's record and `RPageLocator` fetches
-it. Both keep the record's `RLocator`. Only the locators of a byte range in the
-file (`StandardLocator`, `LargeLocator`) can be fetched this way; a non-standard
-locator of another type is kept as an `UnknownLocator`, and asking for its
-locator raises.
+it, and `LinkedAttributeSet` is the footer's record of an attribute set and
+`RAnchorLocator` fetches its anchor. All keep the record's `RLocator`. Only the
+locators of a byte range in the file (`StandardLocator`, `LargeLocator`) can be
+fetched this way; a non-standard locator of another type is kept as an
+`UnknownLocator`, and asking for its locator raises.
 
 `RNTuple.from_envelopes(header, footer, pagelists)` builds the RNTuple from the
 fetched envelopes and checks that they belong together. It does no I/O.
