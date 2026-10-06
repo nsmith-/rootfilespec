@@ -25,7 +25,7 @@ def _load(path: str | Path) -> RNTuple:
         (key,) = [k for k in keys if k.fClassName == b"ROOT::RNTuple"]
         anchor = reader.fetch(key)
         assert isinstance(anchor, ROOT3a3aRNTuple)
-        return RNTuple.from_anchor(anchor, reader.fetch.buffer)
+        return reader.fetch.rntuple(anchor)
 
 
 def _ranges(rntuple: RNTuple) -> list[list[tuple[bool, int, int, int, int]]]:

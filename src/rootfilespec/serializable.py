@@ -370,8 +370,6 @@ def serializable(cls: type[RT]) -> type[RT]:
     return cls
 
 
-DataFetcher = Callable[[int, int], ReadBuffer]
-
 # The type a locator returns, so that ``Locator[RPage]`` or ``Locator[TTree]``
 # says what ``read_from`` gives. It is not bound to ROOTSerializable, because
 # some locators return a builtin: a TKey of a TString record reads as bytes

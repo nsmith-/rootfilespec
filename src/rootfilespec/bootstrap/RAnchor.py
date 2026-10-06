@@ -1,11 +1,7 @@
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Annotated
 
 from rootfilespec.bootstrap.streamedobject import StreamedObject
 from rootfilespec.serializable import (
-    Locator,
-    ReadBuffer,
-    ROOTSerializable,
     serializable,
 )
 from rootfilespec.structutil import Fmt
@@ -58,19 +54,3 @@ class ROOT3a3aRNTuple(StreamedObject):
             LargeLocator(self.fNBytesFooter, self.fSeekFooter),
             FooterEnvelope,
         )
-
-    def get_header(
-        self, fetch_data: Callable[[Locator[ROOTSerializable]], ReadBuffer]
-    ) -> "HeaderEnvelope":
-        """Reads the RNTuple Header Envelope from the given buffer."""
-        loc = self.header_locator
-        buffer = fetch_data(loc)
-        return loc.read_from(buffer)
-
-    def get_footer(
-        self, fetch_data: Callable[[Locator[ROOTSerializable]], ReadBuffer]
-    ) -> "FooterEnvelope":
-        """Reads the RNTuple Footer Envelope from the given buffer."""
-        loc = self.footer_locator
-        buffer = fetch_data(loc)
-        return loc.read_from(buffer)

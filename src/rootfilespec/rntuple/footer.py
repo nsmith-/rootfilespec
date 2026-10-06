@@ -1,4 +1,3 @@
-from collections.abc import Callable
 from typing import Annotated
 
 from rootfilespec.rntuple.envelope import (
@@ -17,9 +16,6 @@ from rootfilespec.rntuple.schema import (
     FieldDescription,
 )
 from rootfilespec.serializable import (
-    Locator,
-    ReadBuffer,
-    ROOTSerializable,
     serializable,
 )
 from rootfilespec.structutil import Fmt
@@ -99,15 +95,6 @@ class FooterEnvelope(REnvelope):
             g.pagelistLink.envelope_locator(PageListEnvelope)
             for g in self.clusterGroups
         ]
-
-    def get_pagelists(
-        self, fetch_data: Callable[[Locator[ROOTSerializable]], ReadBuffer]
-    ) -> list[PageListEnvelope]:
-        """Get the RNTuple Page List Envelopes from the Footer Envelope.
-
-        Page List Envelope Links are stored in the Cluster Group Record Frames in the Footer Envelope Payload.
-        """
-        return [loc.read_from(fetch_data(loc)) for loc in self.pagelist_locators]
 
 
 ENVELOPE_TYPE_MAP[0x02] = "FooterEnvelope"

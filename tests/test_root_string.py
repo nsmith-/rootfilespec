@@ -10,7 +10,6 @@ from rootfilespec.bootstrap.TStreamerInfo import TStreamerInfo
 from rootfilespec.container import StdVector
 from rootfilespec.dynamic import streamerinfo_to_classes
 from rootfilespec.reader import Fetcher, open_path
-from rootfilespec.rntuple.RNTuple import RNTuple
 from rootfilespec.serializable import (
     BufferContext,
     ReadBuffer,
@@ -118,7 +117,7 @@ def test_rntuple_strings_are_bytes():
                     continue
                 anchor = reader.fetch(key)
                 assert isinstance(anchor, ROOT3a3aRNTuple)
-                rntuple = RNTuple.from_anchor(anchor, reader.fetch.buffer)
+                rntuple = reader.fetch.rntuple(anchor)
                 header = rntuple.headerEnvelope
                 assert type(header.fName) is bytes
                 assert header.fName == key.fName
@@ -228,7 +227,7 @@ def test_string_records():
 
 def test_typed_key_string_record():
     """A TypedTKey reads a string record too: the looked-up type is the
-    TString alias, not a class, and read_object reads both kinds alike"""
+    TString alias, not a class, and read_from reads both kinds alike"""
     with open_path(DATA / "serialization" / "unframed-records.root") as reader:
         key = reader.keylist().get_by_name(b"tstring")
         buffer = reader.fetch.buffer(key)

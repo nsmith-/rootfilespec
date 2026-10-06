@@ -16,7 +16,7 @@ def _rntuple(reader: FileReader) -> RNTuple:
     (key,) = [k for k in keys if k.fClassName == b"ROOT::RNTuple"]
     anchor = reader.fetch(key)
     assert isinstance(anchor, ROOT3a3aRNTuple)
-    return RNTuple.from_anchor(anchor, reader.fetch.buffer)
+    return reader.fetch.rntuple(anchor)
 
 
 @pytest.mark.skipif(not DATA.exists(), reason="reference/root-io-spec not checked out")

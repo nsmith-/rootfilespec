@@ -193,6 +193,28 @@ specialized locator object. The locator has:
 - `size: int` - size of the data to be read
 - `read_from(buffer) -> T` - deserializes the specific data type from the buffer
 
+### The RNTuple locator chain
+
+An RNTuple is reached through a chain of locators, each found in what the
+previous one points to:
+
+- the anchor (`ROOT3a3aRNTuple`, read through its `TKey`) has a `header_locator`
+  and a `footer_locator`;
+- the footer (`FooterEnvelope`) has `pagelist_locators`, one per cluster group;
+- each page description (`RPageDescription`) in a page list has a
+  `page_locator`, which also fetches and verifies the page's checksum.
+
+Records keep what is on disk, and their locators are built from them:
+`REnvelopeLink` is the footer's record of a page list and `REnvelopeLocator`
+fetches it, as `RPageDescription` is a page's record and `RPageLocator` fetches
+it. Both keep the record's `RLocator`. Only the locators of a byte range in the
+file (`StandardLocator`, `LargeLocator`) can be fetched this way; a non-standard
+locator of another type is kept as an `UnknownLocator`, and asking for its
+locator raises.
+
+`RNTuple.from_envelopes(header, footer, pagelists)` builds the RNTuple from the
+fetched envelopes and checks that they belong together. It does no I/O.
+
 ### Specialized Locator Classes
 
 Even though `read_from` might appear to be implementable as `T.read(buffer)`,
@@ -235,6 +257,31 @@ tfile = tfile_loc.read_from(buffers[0])
 streamerinfo = si_loc.read_from(buffers[1]) if si_loc else None
 ```
 
+For an RNTuple, the header and the footer are independent, and the page lists
+are known once the footer is read. With an asynchronous `fetch_data`, both steps
+fetch in parallel:
+
+```python
+import asyncio
+
+from rootfilespec.rntuple.RNTuple import RNTuple
+
+
+async def read_rntuple(anchor, fetch_data):
+    async def fetch(loc):
+        return loc.read_from(await fetch_data(loc.offset, loc.size))
+
+    # The header and the footer, in parallel
+    header, footer = await asyncio.gather(
+        fetch(anchor.header_locator), fetch(anchor.footer_locator)
+    )
+    # Then every page list, in parallel
+    pagelists = await asyncio.gather(*map(fetch, footer.pagelist_locators))
+    return RNTuple.from_envelopes(header, footer, list(pagelists))
+```
+
+The pages follow in the same way, from each page description's `page_locator`.
+
 ### A minimal synchronous reader
 
 For the common case of one blocking read per locator, `rootfilespec.reader`
@@ -257,5 +304,33 @@ with open_path("file.root") as reader:
 `reader.fetch(loc)` is `loc.read_from(buffer)` on the fetched bytes;
 `reader.fetch.resolve(loc)` is for the locators that return the key at the front
 of a record (`tfile_locator`, `streamerinfo_locator`, `keylist_locator`) and
-reads the record as well; `reader.fetch.buffer(loc)` only fetches, which is the
-callable `RNTuple.from_anchor` expects.
+reads the record as well; `reader.fetch.buffer(loc)` only fetches.
+
+An RNTuple, with one read per envelope, and a page of it:
+
+```python
+with open_path("file.root") as reader:
+    anchor = reader.fetch(reader.keylist().get_by_name(b"ntuple"))
+    rntuple = reader.fetch.rntuple(anchor)  # header, footer, page lists
+    for cluster in rntuple.clusters():
+        for column_range in cluster.columnRanges:
+            for page in column_range.pages:
+                data = reader.fetch(page.pageDescription.page_locator)
+```
+
+`FileReader.open` builds classes from the whole StreamerInfo record, which can
+fail on files whose RNTuples are still readable: an RNTuple needs only the
+bootstrap classes. A `Fetcher` on `BOOTSTRAP_CONTEXT` reads them without the
+StreamerInfo:
+
+```python
+from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT
+from rootfilespec.bootstrap.TFile import InitialReadLocator
+from rootfilespec.reader import Fetcher
+
+fetch = Fetcher(read_at, BOOTSTRAP_CONTEXT)
+file = fetch(InitialReadLocator())
+tfile = fetch.resolve(file.tfile_locator)
+keylist = fetch.resolve(tfile.rootdir.keylist_locator)
+rntuple = fetch.rntuple(fetch(keylist.get_by_name(b"ntuple")))
+```

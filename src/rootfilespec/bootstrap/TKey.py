@@ -7,7 +7,6 @@ from rootfilespec.bootstrap.strings import TString
 from rootfilespec.bootstrap.TDatime import TDatime, TDatime_to_datetime
 from rootfilespec.dispatch import normalize
 from rootfilespec.serializable import (
-    DataFetcher,
     Members,
     ReadBuffer,
     ROOTSerializable,
@@ -107,18 +106,18 @@ class TKey(ROOTSerializable):
         return members, buffer
 
     @overload
-    def read_object(self, fetch_data: DataFetcher) -> object: ...
+    def _read_payload(self, buffer: ReadBuffer, objtype: None) -> object: ...
 
     @overload
-    def read_object(
-        self, fetch_data: DataFetcher, objtype: type[ObjType]
-    ) -> ObjType: ...
+    def _read_payload(self, buffer: ReadBuffer, objtype: type[ObjType]) -> ObjType: ...
 
-    def read_object(
-        self,
-        fetch_data: DataFetcher,
-        objtype: type[ObjType] | None = None,
+    def _read_payload(
+        self, buffer: ReadBuffer, objtype: type[ObjType] | None
     ) -> object:
+        """Read the object from a buffer holding the key and its payload
+
+        The object is read as objtype, or by default as the key's class
+        """
         if self.fClassName == b"RBlob":
             # An RBlob key's fObjLen is decorative, and one blob can hold several
             # pages, each with a checksum fObjLen does not count (root-io-spec
@@ -128,7 +127,6 @@ class TKey(ROOTSerializable):
                 "the anchor's envelope locators and the page lists, not through their keys"
             )
             raise ValueError(msg)
-        buffer = fetch_data(self.fSeekKey, self.header.fNbytes)
         # TODO: should we compare the key in the buffer with ourself?
         buffer = buffer[self.header.fKeylen :]
         # The payload is fNbytes - fKeyLen bytes. Decide from the key, not from
@@ -170,7 +168,7 @@ class TKey(ROOTSerializable):
             # TODO: implement checksum verification
             buffer = buffer[8:]
         if buffer:
-            msg = f"TKey.read_object: buffer not empty after reading object of type {typename}."
+            msg = f"TKey.read_from: buffer not empty after reading object of type {typename}."
             msg += f"\n{self=}"
             msg += f"\n{compressed=}"
             msg += f"\n{obj=}"
@@ -189,7 +187,7 @@ class TKey(ROOTSerializable):
     def read_from(self, buffer: ReadBuffer) -> object:
         """The key's object: a ROOTSerializable, or a builtin for a class that
         reads as one, such as ``bytes`` for a ``TString`` (#68, #135)"""
-        return self.read_object(lambda _seek, _size: buffer)
+        return self._read_payload(buffer, None)
 
 
 @dataclass(frozen=True)
@@ -215,4 +213,4 @@ class TypedTKey(Generic[ObjType], ROOTSerializable):
         return cls(key=key, objtype=objtype), buffer  # type: ignore[arg-type]
 
     def read_from(self, buffer: ReadBuffer) -> ObjType:
-        return self.key.read_object(lambda _seek, _size: buffer, objtype=self.objtype)
+        return self.key._read_payload(buffer, self.objtype)

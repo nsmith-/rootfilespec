@@ -2,9 +2,10 @@ from pathlib import Path
 
 from skhep_testdata import data_path  # type: ignore[import-not-found]
 
-from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT, ROOT3a3aRNTuple, ROOTFile
+from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT, ROOT3a3aRNTuple
 from rootfilespec.bootstrap.compression import RCompressionSettings
-from rootfilespec.reader import open_path
+from rootfilespec.bootstrap.TFile import InitialReadLocator
+from rootfilespec.reader import Fetcher, open_path
 from rootfilespec.rntuple.envelope import REnvelopeLink, RFeatureFlags
 from rootfilespec.rntuple.footer import ClusterGroup, FooterEnvelope, SchemaExtension
 from rootfilespec.rntuple.header import HeaderEnvelope
@@ -18,7 +19,6 @@ from rootfilespec.rntuple.schema import (
     ColumnType,
     FieldDescription,
 )
-from rootfilespec.serializable import BufferContext, ReadBuffer
 
 # TODO: Add test for a more complex RNTuple with complex schema and multiple clusters
 
@@ -43,7 +43,7 @@ def test_read_contributors():
         )
 
         assert isinstance(anchor, ROOT3a3aRNTuple)
-        rntuple = RNTuple.from_anchor(anchor, reader.fetch.buffer)
+        rntuple = reader.fetch.rntuple(anchor)
         assert rntuple == RNTuple(
             headerEnvelope=HeaderEnvelope(
                 typeID=1,
@@ -398,30 +398,23 @@ def test_read_contributors():
 
 
 def test_read_multiple_rntuples():
-    # This one keeps to the DataFetcher interface (get_TFile, get_KeyList and
-    # read_object) rather than rootfilespec.reader, as long as that exists (#114)
+    # Bootstrap classes only, as for a file whose StreamerInfo can't be turned
+    # into classes (#41): an RNTuple needs nothing else
     filename = "rntviewer-testfile-multiple-rntuples-v1-0-0-0.root"
     path = Path(data_path(filename))
     with path.open("rb") as filehandle:
 
-        def fetch_data(seek: int, size: int):
-            filehandle.seek(seek)
-            return ReadBuffer(
-                memoryview(filehandle.read(size)),
-                0,
-                BOOTSTRAP_CONTEXT,
-                BufferContext(abspos=seek),
-            )
+        def read_at(offset: int, size: int) -> bytes:
+            filehandle.seek(offset)
+            return filehandle.read(size)
 
-        def fetch_from_locator(loc):
-            return fetch_data(loc.offset, loc.size)
+        fetch = Fetcher(read_at, BOOTSTRAP_CONTEXT)
+        file = fetch(InitialReadLocator())
+        tfile = fetch.resolve(file.tfile_locator)
+        keylist = fetch.resolve(tfile.rootdir.keylist_locator)
 
-        buffer = fetch_data(0, 512)
-        file, _ = ROOTFile.read(buffer)
-        tfile = file.get_TFile(fetch_data)
-        keylist = tfile.get_KeyList(fetch_data)
-
-        anchor_a = keylist.get_by_name(b"A").read_object(fetch_data, ROOT3a3aRNTuple)
+        anchor_a = fetch(keylist.get_by_name(b"A"))
+        assert isinstance(anchor_a, ROOT3a3aRNTuple)
         assert anchor_a == ROOT3a3aRNTuple(
             fVersionEpoch=1,
             fVersionMajor=0,
@@ -436,7 +429,7 @@ def test_read_multiple_rntuples():
             fMaxKeySize=1073741824,
         )
 
-        rntuple_a = RNTuple.from_anchor(anchor_a, fetch_from_locator)
+        rntuple_a = fetch.rntuple(anchor_a)
         assert rntuple_a == RNTuple(
             headerEnvelope=HeaderEnvelope(
                 typeID=1,
@@ -619,7 +612,8 @@ def test_read_multiple_rntuples():
             for column in rntuple_a.columns()
         ] == [(ColumnType.kSplitReal32, b"f")]
 
-        anchor_b = keylist.get_by_name(b"B").read_object(fetch_data, ROOT3a3aRNTuple)
+        anchor_b = fetch(keylist.get_by_name(b"B"))
+        assert isinstance(anchor_b, ROOT3a3aRNTuple)
         assert anchor_b == ROOT3a3aRNTuple(
             fVersionEpoch=1,
             fVersionMajor=0,
@@ -634,7 +628,7 @@ def test_read_multiple_rntuples():
             fMaxKeySize=1073741824,
         )
 
-        rntuple_b = RNTuple.from_anchor(anchor_b, fetch_from_locator)
+        rntuple_b = fetch.rntuple(anchor_b)
         assert rntuple_b == RNTuple(
             headerEnvelope=HeaderEnvelope(
                 typeID=1,

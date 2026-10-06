@@ -35,7 +35,7 @@ def _read(flags: int) -> RNTuple:
     (key,) = [k for k in reader.keylist().values() if k.fClassName == b"ROOT::RNTuple"]
     anchor = reader.fetch(key)
     assert isinstance(anchor, ROOT3a3aRNTuple)
-    return RNTuple.from_anchor(anchor, reader.fetch.buffer)
+    return reader.fetch.rntuple(anchor)
 
 
 def test_unchanged():

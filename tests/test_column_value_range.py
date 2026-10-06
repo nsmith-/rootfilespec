@@ -2,7 +2,6 @@ from skhep_testdata import data_path  # type: ignore[import-not-found]
 
 from rootfilespec.bootstrap import ROOT3a3aRNTuple
 from rootfilespec.reader import open_path
-from rootfilespec.rntuple.RNTuple import RNTuple
 from rootfilespec.rntuple.schema import ColumnType
 
 
@@ -17,7 +16,7 @@ def test_column_value_range_is_double():
     with open_path(data_path(filename)) as reader:
         anchor = reader.fetch(reader.keylist().get_by_name(b"ntuple"))
         assert isinstance(anchor, ROOT3a3aRNTuple)
-        rntuple = RNTuple.from_anchor(anchor, reader.fetch.buffer)
+        rntuple = reader.fetch.rntuple(anchor)
 
     columns = rntuple.schemaDescription.columnDescriptions
     with_range = [i for i, c in enumerate(columns) if c.fFlags & 0x02]

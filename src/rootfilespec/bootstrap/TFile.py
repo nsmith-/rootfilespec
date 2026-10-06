@@ -9,7 +9,6 @@ from rootfilespec.bootstrap.TKey import TKey, TypedTKey
 from rootfilespec.bootstrap.TList import TList
 from rootfilespec.bootstrap.TUUID import TUUID
 from rootfilespec.serializable import (
-    DataFetcher,
     Members,
     ReadBuffer,
     ROOTSerializable,
@@ -182,42 +181,12 @@ class ROOTFile(ROOTSerializable):
         """Get a locator for the TFile object (root directory) in the file."""
         return TFileLocator(self.header.fBEGIN, self.header.fNbytesName)
 
-    def get_TFile(self, fetch_data: DataFetcher):
-        """Get the TFile object (root directory) from the file."""
-        buffer = fetch_data(self.header.fBEGIN, self.header.fNbytesName)
-        key, buffer = TKey.read(buffer)
-        if key.fSeekKey != self.header.fBEGIN:
-            msg = f"key.fSeekKey != self.header.fBEGIN: {key.fSeekKey} != {self.header.fBEGIN}"
-            raise ValueError(msg)
-        if key.fSeekPdir != 0:
-            msg = f"key.fSeekPdir != 0: {key.fSeekPdir} != 0"
-            raise ValueError(msg)
-        return key.read_object(fetch_data, objtype=TFile)
-
     @property
     def streamerinfo_locator(self) -> StreamerInfoLocator | None:
         """Get a locator for the StreamerInfo record in the file, if it exists."""
         if self.header.fNbytesInfo == 0:
             return None
         return StreamerInfoLocator(self.header.fSeekInfo, self.header.fNbytesInfo)
-
-    def get_StreamerInfo(self, fetch_data: DataFetcher):
-        if self.header.fNbytesInfo == 0:
-            return None
-        buffer = fetch_data(self.header.fSeekInfo, self.header.fNbytesInfo)
-        key, _ = TKey.read(buffer)
-        if key.fSeekKey != self.header.fSeekInfo:
-            msg = f"ROOTFile.get_StreamerInfo: fSeekKey != fSeekInfo: {key.fSeekKey} != {self.header.fSeekInfo}"
-            raise ValueError(msg)
-        if key.header.fNbytes != self.header.fNbytesInfo:
-            msg = f"ROOTFile.get_StreamerInfo: fNbytes != fNbytesInfo: {key.header.fNbytes} != {self.header.fNbytesInfo}"
-            raise ValueError(msg)
-
-        def fetch_cached(seek: int, size: int):
-            seek -= self.header.fSeekInfo
-            return buffer[seek : seek + size]
-
-        return key.read_object(fetch_cached, objtype=TList)
 
 
 @dataclass(frozen=True)
@@ -259,9 +228,6 @@ class TFile(ROOTSerializable):
     """The title of the ROOT file."""
     rootdir: TDirectory
     """The root TDirectory of the ROOT file (formatted like a normal TDirectory)."""
-
-    def get_KeyList(self, fetch_data):
-        return self.rootdir.get_KeyList(fetch_data)
 
 
 @dataclass(frozen=True)

@@ -45,7 +45,7 @@ def test_raw_payload_longer_than_objlen():
     key, record = _key(b"TString", b"s", b"\x03abc\x00\x00", objlen=4)
     assert not key.header.is_compressed()
     # A TString stored as an object of its own reads as bytes (#68)
-    obj = key.read_object(lambda _seek, _size: _buffer(record, 100))
+    obj = key.read_from(_buffer(record, 100))
     assert obj == b"abc"
 
 
@@ -65,7 +65,7 @@ def test_rblob_key_is_refused():
     cannot be read through the key"""
     key, record = _key(b"RBlob", b"", b"\x00" * 34, objlen=26)
     with pytest.raises(ValueError, match="is an RBlob"):
-        key.read_object(lambda _seek, _size: _buffer(record, 100))
+        key.read_from(_buffer(record, 100))
 
 
 @pytest.mark.parametrize(("version", "short"), [(4, True), (1000, True), (1004, False)])

@@ -1,14 +1,12 @@
-from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Annotated, Generic, TypeVar, cast
+from typing import Annotated, Generic, TypeVar
 
 import xxhash  # type: ignore[import-not-found]
 from typing_extensions import Self
 
 from rootfilespec.bootstrap.compression import decompress
-from rootfilespec.rntuple.RLocator import RLocator
+from rootfilespec.rntuple.RLocator import FileLocator, RLocator, in_file
 from rootfilespec.serializable import (
-    Locator,
     Members,
     ReadBuffer,
     ROOTSerializable,
@@ -138,7 +136,7 @@ class REnvelopeLocator(Generic[EnvType]):
 
     length: int
     """The uncompressed length of the envelope."""
-    locator: RLocator
+    locator: FileLocator
     """The locator for the envelope (offset and size)."""
     envtype: type[EnvType]
     """The envelope type to deserialize."""
@@ -146,9 +144,7 @@ class REnvelopeLocator(Generic[EnvType]):
     @property
     def offset(self) -> int:
         """The byte offset of the envelope in the file."""
-        # Note: self.locator is always StandardLocator or LargeLocator at runtime,
-        # which have offset fields. Cast needed because base RLocator doesn't have offset.
-        return cast(Locator[ROOTSerializable], self.locator).offset
+        return self.locator.offset
 
     @property
     def size(self) -> int:
@@ -208,15 +204,9 @@ class REnvelopeLink(ROOTSerializable):
     """The locator for the envelope."""
 
     def envelope_locator(self, envtype: type[EnvType]) -> REnvelopeLocator[EnvType]:
-        """Get a locator for the envelope."""
-        return REnvelopeLocator(self.length, self.locator, envtype)
+        """Get a locator for the envelope.
 
-    def read_envelope(
-        self,
-        fetch_data: Callable[[Locator[ROOTSerializable]], ReadBuffer],
-        envtype: type[EnvType],
-    ) -> EnvType:
-        """Reads the Envelope from the given data source using the locator."""
-        loc = self.envelope_locator(envtype)
-        buffer = fetch_data(loc)
-        return loc.read_from(buffer)
+        Raises NotImplementedError if the envelope's locator is not in the file."""
+        return REnvelopeLocator(
+            self.length, in_file(self.locator, envtype.__name__), envtype
+        )
