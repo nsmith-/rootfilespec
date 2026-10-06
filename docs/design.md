@@ -257,6 +257,31 @@ tfile = tfile_loc.read_from(buffers[0])
 streamerinfo = si_loc.read_from(buffers[1]) if si_loc else None
 ```
 
+For an RNTuple, the header and the footer are independent, and the page lists
+are known once the footer is read. With an asynchronous `fetch_data`, both steps
+fetch in parallel:
+
+```python
+import asyncio
+
+from rootfilespec.rntuple.RNTuple import RNTuple
+
+
+async def read_rntuple(anchor, fetch_data):
+    async def fetch(loc):
+        return loc.read_from(await fetch_data(loc.offset, loc.size))
+
+    # The header and the footer, in parallel
+    header, footer = await asyncio.gather(
+        fetch(anchor.header_locator), fetch(anchor.footer_locator)
+    )
+    # Then every page list, in parallel
+    pagelists = await asyncio.gather(*map(fetch, footer.pagelist_locators))
+    return RNTuple.from_envelopes(header, footer, list(pagelists))
+```
+
+The pages follow in the same way, from each page description's `page_locator`.
+
 ### A minimal synchronous reader
 
 For the common case of one blocking read per locator, `rootfilespec.reader`
