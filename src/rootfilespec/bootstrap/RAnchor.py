@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Annotated
 
 import xxhash  # type: ignore[import-not-found]
@@ -20,6 +20,10 @@ if TYPE_CHECKING:
     from rootfilespec.rntuple.footer import FooterEnvelope
     from rootfilespec.rntuple.header import HeaderEnvelope
 
+ANCHOR_MIN_SIZE = 78
+"""The size of an anchor of class version 2 with its checksum, the smallest
+that ROOT reads (``kMinNTupleSize``, ``RMiniFile.cxx:812-818`` at 6.40.04)"""
+
 _CHECKSUM_SIZE = 8
 _UNCHECKED_SIZE = 6
 """The byte count and the class version, which the checksum does not cover"""
@@ -27,18 +31,25 @@ _UNCHECKED_SIZE = 6
 
 @dataclass
 class _AnchorFrame(StreamedObject):
-    """What follows the anchor's fields on disk: its checksum, outside the
-    object's byte count (root-io-spec RNTuple ERRATA 3)"""
+    """What surrounds the anchor's fields on disk: ROOT::RNTuple's class version
+    before them, and the checksum after them, outside the object's byte count
+    (root-io-spec RNTuple ERRATA 2 and 3)"""
 
+    fVersionClass: int
+    """ROOT::RNTuple's class version, not the format version: 2, or a later one,
+    which can only append fields (spec, *Anchor schema*)"""
     checksum: int
     """The anchor's XXH3-64 checksum, as stored (big-endian)"""
+    _unknown: bytes = field(init=False, repr=False, compare=False)
+    """The fields that a class version after 2 appends, as stored"""
 
 
 @serializable
 class ROOT3a3aRNTuple(_AnchorFrame):
     """The anchor of an RNTuple in a ROOT file: a ``ROOT::RNTuple`` object
 
-    Read it with ``read``, from the whole uncompressed payload that holds it.
+    Its members are those of class version 2. Read it with ``read``, from the
+    whole uncompressed payload that holds it.
     """
 
     fVersionEpoch: Annotated[int, Fmt(">H")]
@@ -57,12 +68,19 @@ class ROOT3a3aRNTuple(_AnchorFrame):
     def read(cls, buffer: ReadBuffer) -> tuple[Self, ReadBuffer]:
         """Read the anchor from the whole uncompressed payload that holds it
 
-        The payload is the anchor object, then its checksum in the payload's
-        last 8 bytes (``RMiniFileReader::GetNTupleProperAtOffset``,
-        ``RMiniFile.cxx:825-858`` at 6.40.04). Through a TKey, the payload is
-        the key's fObjLen bytes.
+        The payload is the anchor object, then its checksum: the payload's
+        last 8 bytes, whatever its length. A later class version can make it
+        longer by appending fields, which are kept as stored
+        (``RMiniFileReader::GetNTupleProperAtOffset``, ``RMiniFile.cxx:825-858``
+        at 6.40.04). Through a TKey, the payload is the key's fObjLen bytes.
         """
         size = len(buffer)
+        if size < ANCHOR_MIN_SIZE:
+            msg = (
+                f"RNTuple anchor of {size} bytes: class version 2 has "
+                f"{ANCHOR_MIN_SIZE} with its checksum, and ROOT reads none shorter"
+            )
+            raise ValueError(msg)
         anchor, trailer = (
             buffer[: size - _CHECKSUM_SIZE],
             buffer[size - _CHECKSUM_SIZE :],
@@ -82,7 +100,7 @@ class ROOT3a3aRNTuple(_AnchorFrame):
 
         #### The object's byte count and class version (ERRATA 2)
         # The checksum lies outside the byte count, so the count spans the rest
-        (byteCount, _), fields = anchor.unpack(">Ih")
+        (byteCount, fVersionClass), fields = anchor.unpack(">Ih")
         mask = _StreamConstants.kByteCountMask
         if not byteCount & mask or (byteCount & ~mask) + 4 != len(anchor):
             msg = (
@@ -90,12 +108,14 @@ class ROOT3a3aRNTuple(_AnchorFrame):
                 f"{len(anchor)} bytes before its checksum"
             )
             raise ValueError(msg)
-
-        members: Members = {"checksum": checksum}
-        members, tail = cls.update_members(members, fields)
-        if tail:
-            msg = f"RNTuple anchor: {len(tail)} bytes after its fields"
+        # ROOT reads class version 2, the first, and later ones, which append
+        # fields (RMiniFile.cxx:812-813, :827-829)
+        if fVersionClass < 2:
+            msg = f"RNTuple anchor of class version {fVersionClass}: the first is 2"
             raise ValueError(msg)
+
+        members: Members = {"fVersionClass": fVersionClass, "checksum": checksum}
+        members, tail = cls.update_members(members, fields)
 
         # Of the format version, only the epoch says whether a reader can read
         # the file (spec, *Versioning Notes*), and ROOT refuses any but 1
@@ -108,7 +128,12 @@ class ROOT3a3aRNTuple(_AnchorFrame):
             msg = f"RNTuple format version {version}: only epoch 1 is supported"
             raise NotImplementedError(msg)
 
-        return cls(**members), rest
+        #### Keep the fields of a later class version as stored
+        _unknown, _ = tail.consume(len(tail))
+
+        out = cls(**members)
+        out._unknown = _unknown
+        return out, rest
 
     @property
     def header_locator(self) -> "REnvelopeLocator[HeaderEnvelope]":

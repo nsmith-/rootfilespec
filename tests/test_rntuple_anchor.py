@@ -1,10 +1,12 @@
-"""The RNTuple anchor's checksum (#85)
+"""The RNTuple anchor's checksum, and anchors of other lengths (#85, #98)
 
 ROOT reads an anchor from the whole payload of its key: the ROOT::RNTuple
 object, then an XXH3-64 checksum in the payload's last 8 bytes, outside the
 object's byte count, over the object after its byte count and class version
 (root-io-spec RNTuple ERRATA 2 and 3; RMiniFileReader::GetNTupleProperAtOffset,
-tree/ntuple/src/RMiniFile.cxx:825-858 at 6.40.04).
+tree/ntuple/src/RMiniFile.cxx:825-858 at 6.40.04). A later class version may
+append fields, so the payload may be longer; ROOT refuses one shorter than
+class version 2's 78 bytes (RMiniFile.cxx:812-818).
 """
 
 import zlib
@@ -92,6 +94,8 @@ def test_checksum():
     anchor = fetch(key)
     assert isinstance(anchor, ROOT3a3aRNTuple)
     assert anchor.checksum == CHECKSUM
+    assert anchor.fVersionClass == 2
+    assert anchor._unknown == b""
     assert (anchor.fVersionEpoch, anchor.fSeekHeader, anchor.fMaxKeySize) == (
         1,
         268,
@@ -143,6 +147,40 @@ def test_through_a_key():
     anchor = _read_through_key(payload)
     assert isinstance(anchor, ROOT3a3aRNTuple)
     assert anchor.checksum == CHECKSUM
+
+
+def test_longer_anchor_keeps_its_tail():
+    """A later class version that appends 8 bytes of fields: ROOT reads the
+    fields it knows and takes the checksum from the last 8 bytes"""
+    tail = bytes(range(1, 9))
+    anchor = _read_through_key(_payload(_fields() + tail, version=3))
+    assert isinstance(anchor, ROOT3a3aRNTuple)
+    assert anchor.fVersionClass == 3
+    assert anchor._unknown == tail
+    assert anchor.fSeekHeader == 268
+    assert anchor.fMaxKeySize == 1073741824
+
+
+def test_later_class_version():
+    anchor = _read_through_key(_payload(_fields(), version=3))
+    assert isinstance(anchor, ROOT3a3aRNTuple)
+    assert anchor.fVersionClass == 3
+    assert anchor._unknown == b""
+
+
+@pytest.mark.parametrize("size", [70, 77])
+def test_short_anchor_raises(size: int):
+    """70 bytes is class version 2 without its checksum"""
+    payload = _payload(_fields())[:size]
+    with pytest.raises(ValueError, match=f"RNTuple anchor of {size} bytes"):
+        _read_through_key(payload)
+
+
+@pytest.mark.parametrize("version", [0, 1])
+def test_earlier_class_version_raises(version: int):
+    payload = _payload(_fields(), version=version)
+    with pytest.raises(ValueError, match=f"class version {version}: the first is 2"):
+        _read_through_key(payload)
 
 
 @pytest.mark.parametrize("epoch", [0, 2])
