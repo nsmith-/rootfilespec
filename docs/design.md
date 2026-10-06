@@ -285,6 +285,10 @@ async def read_rntuple(anchor, fetch_data):
 ```
 
 The pages follow in the same way, from each page description's `page_locator`.
+The footer's attribute sets are known at the same step: their anchors, from each
+record's `anchor_locator`, can be fetched in parallel with the page lists, and
+each set read with `read_rntuple` and checked with `record.check`, as
+`Fetcher.attribute_set` does.
 
 ### A minimal synchronous reader
 
