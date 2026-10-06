@@ -200,21 +200,17 @@ previous one points to:
 
 - the anchor (`ROOT3a3aRNTuple`, read through its `TKey`, its checksum verified)
   has a `header_locator` and a `footer_locator`;
-- the footer (`FooterEnvelope`) has `pagelist_locators`, one per cluster group,
-  and each of its linked attribute set records (`LinkedAttributeSet`) has an
-  `anchor_locator`: a set is an RNTuple of its own, whose anchor no key list
-  holds;
+- the footer (`FooterEnvelope`) has `pagelist_locators`, one per cluster group;
 - each page description (`RPageDescription`) in a page list has a
   `page_locator`, which also fetches and verifies the page's checksum.
 
 Records keep what is on disk, and their locators are built from them:
 `REnvelopeLink` is the footer's record of a page list and `REnvelopeLocator`
 fetches it, as `RPageDescription` is a page's record and `RPageLocator` fetches
-it, and `LinkedAttributeSet` is the footer's record of an attribute set and
-`RAnchorLocator` fetches its anchor. All keep the record's `RLocator`. Only the
-locators of a byte range in the file (`StandardLocator`, `LargeLocator`) can be
-fetched this way; a non-standard locator of another type is kept as an
-`UnknownLocator`, and asking for its locator raises.
+it. Both keep the record's `RLocator`. Only the locators of a byte range in the
+file (`StandardLocator`, `LargeLocator`) can be fetched this way; a non-standard
+locator of another type is kept as an `UnknownLocator`, and asking for its
+locator raises.
 
 `RNTuple.from_envelopes(header, footer, pagelists)` builds the RNTuple from the
 fetched envelopes and checks that they belong together. It does no I/O.
@@ -285,10 +281,6 @@ async def read_rntuple(anchor, fetch_data):
 ```
 
 The pages follow in the same way, from each page description's `page_locator`.
-The footer's attribute sets are known at the same step: their anchors, from each
-record's `anchor_locator`, can be fetched in parallel with the page lists, and
-each set read with `read_rntuple` and checked with `record.check`, as
-`Fetcher.attribute_set` does.
 
 ### A minimal synchronous reader
 
@@ -324,9 +316,6 @@ with open_path("file.root") as reader:
         for column_range in cluster.columnRanges:
             for page in column_range.pages:
                 data = reader.fetch(page.pageDescription.page_locator)
-    # Its attribute sets, each an RNTuple of its own
-    for record in rntuple.footerEnvelope.attributeSets or []:
-        attributes = reader.fetch.attribute_set(record)
 ```
 
 `FileReader.open` builds classes from the whole StreamerInfo record, which can
