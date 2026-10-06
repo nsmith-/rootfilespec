@@ -292,6 +292,13 @@ class RNTuple:
             if pagelistEnvelope.headerChecksum != headerEnvelope.checksum:
                 msg = f"PageListEnvelope header checksum mismatch: {pagelistEnvelope.headerChecksum} != {headerEnvelope.checksum}"
                 raise ValueError(msg)
+        # Linked attribute sets have non-empty, distinct names (spec, *Linked
+        # Attribute Sets*), and ROOT refuses a footer whose sets don't
+        # (RNTupleDescriptor.cxx:1156-1159, :1438-1446 at 6.40.04)
+        names = [record.fName for record in footerEnvelope.attributeSets or []]
+        if b"" in names or len(set(names)) != len(names):
+            msg = f"Attribute set names are not all non-empty and distinct: {names}"
+            raise ValueError(msg)
         return cls(headerEnvelope, footerEnvelope, pagelistEnvelopes)
 
     @property

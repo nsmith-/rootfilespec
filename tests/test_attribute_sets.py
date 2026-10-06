@@ -7,9 +7,11 @@ before the checksum (root-io-spec RNTuple ERRATA 11; RNTupleSerialize.cxx:2015-2
 at 6.40.04).
 """
 
+import dataclasses
 from pathlib import Path
 
 import pytest
+import xxhash  # type: ignore[import-not-found]
 from skhep_testdata import data_path  # type: ignore[import-not-found]
 
 from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT, ROOT3a3aRNTuple
@@ -18,6 +20,8 @@ from rootfilespec.reader import Fetcher
 from rootfilespec.rntuple.footer import FooterEnvelope, LinkedAttributeSet
 from rootfilespec.rntuple.RFrame import ListFrame
 from rootfilespec.rntuple.RLocator import StandardLocator, UnknownLocator
+from rootfilespec.rntuple.RNTuple import RNTuple
+from rootfilespec.rntuple.schema import AliasColumnDescription, FieldDescription
 
 DATA = Path(__file__).parent.parent / "reference" / "root-io-spec" / "data" / "rntuple"
 FIXTURES = sorted(DATA.glob("*.root"))
@@ -186,3 +190,125 @@ def test_anchor_not_in_the_file():
     )
     with pytest.raises(NotImplementedError, match="attribute set b'runs'"):
         _ = record.anchor_locator
+
+
+@pytest.mark.skipif(not FIXTURES, reason="reference/root-io-spec not checked out")
+def test_attribute_set():
+    """Fetcher.attribute_set opens both sets, which pass the checks"""
+    fetch, records = _attribute_sets()
+    for record in records:
+        rntuple = fetch.attribute_set(record)
+        assert rntuple == fetch.rntuple(fetch(record.anchor_locator))
+
+
+@pytest.mark.skipif(not FIXTURES, reason="reference/root-io-spec not checked out")
+def test_unknown_major_version():
+    """attributes.root with the "runs" record's Schema Version Major (3844)
+    set to 2, and the main footer's checksum (3684, length 233) recomputed:
+    the main RNTuple reads and "flags" opens, but "runs" is refused, as ROOT
+    does (root-io-spec RNTuple ERRATA 13)"""
+    raw = bytearray((DATA / "attributes.root").read_bytes())
+    assert raw[3844:3846] == (1).to_bytes(2, "little")
+    raw[3844:3846] = (2).to_bytes(2, "little")
+    footer, length = 3684, 233
+    checksum: int = xxhash.xxh3_64_intdigest(bytes(raw[footer : footer + length - 8]))
+    raw[footer + length - 8 : footer + length] = checksum.to_bytes(8, "little")
+    fetch = _fetcher(bytes(raw))
+    (anchor,) = _anchors(fetch)
+    records = fetch.rntuple(anchor).footerEnvelope.attributeSets
+    assert records is not None
+    runs, flags = records
+    assert (runs.fSchemaVersionMajor, runs.fSchemaVersionMinor) == (2, 0)
+    with pytest.raises(NotImplementedError, match="schema version 2.0"):
+        fetch.attribute_set(runs)
+    fetch.attribute_set(flags)
+
+
+def _runs() -> tuple[LinkedAttributeSet, RNTuple]:
+    """The record of attributes.root's set "runs", and its RNTuple"""
+    fetch, (runs, _) = _attribute_sets()
+    return runs, fetch.rntuple(fetch(runs.anchor_locator))
+
+
+def _with_fields(rntuple: RNTuple, fields: list[FieldDescription]) -> RNTuple:
+    header = rntuple.headerEnvelope
+    items = dataclasses.replace(header.fieldDescriptions, items=fields)
+    return dataclasses.replace(
+        rntuple, headerEnvelope=dataclasses.replace(header, fieldDescriptions=items)
+    )
+
+
+@pytest.mark.skipif(not FIXTURES, reason="reference/root-io-spec not checked out")
+@pytest.mark.parametrize("minor", [0, 1])
+def test_fourth_top_level_field(minor: int):
+    """ "runs" with its field "run" (field 3, under _userData) made top-level:
+    ROOT refuses a fourth top-level field whatever the minor version, where the
+    spec says a newer minor version's fields are ignored (ERRATA 13)"""
+    runs, rntuple = _runs()
+    fields = rntuple.schemaDescription.fieldDescriptions
+    assert fields[3].fFieldName == b"run"
+    fields[3] = dataclasses.replace(fields[3], fParentFieldID=3)
+    record = dataclasses.replace(runs, fSchemaVersionMinor=minor)
+    with pytest.raises(ValueError, match="top-level fields"):
+        record.check(_with_fields(rntuple, fields))
+
+
+@pytest.mark.skipif(not FIXTURES, reason="reference/root-io-spec not checked out")
+def test_renamed_meta_field():
+    runs, rntuple = _runs()
+    fields = rntuple.schemaDescription.fieldDescriptions
+    fields[1] = dataclasses.replace(fields[1], fFieldName=b"_rangeLength")
+    with pytest.raises(ValueError, match="top-level fields"):
+        runs.check(_with_fields(rntuple, fields))
+
+
+@pytest.mark.skipif(not FIXTURES, reason="reference/root-io-spec not checked out")
+def test_restrictions():
+    """The spec's three restrictions on an attribute set's RNTuple"""
+    runs, rntuple = _runs()
+    footer = rntuple.footerEnvelope
+    nested = dataclasses.replace(
+        rntuple,
+        footerEnvelope=dataclasses.replace(
+            footer, attributeSets=ListFrame(fSize=48, items=[runs])
+        ),
+    )
+    with pytest.raises(ValueError, match="links attribute sets of its own"):
+        runs.check(nested)
+
+    header = rntuple.headerEnvelope
+    alias = AliasColumnDescription(fSize=16, fPhysicalColumnID=0, fFieldID=3)
+    aliased = dataclasses.replace(
+        rntuple,
+        headerEnvelope=dataclasses.replace(
+            header,
+            aliasColumnDescriptions=ListFrame(fSize=28, items=[alias]),
+        ),
+    )
+    with pytest.raises(ValueError, match="alias columns"):
+        runs.check(aliased)
+
+    fields = rntuple.schemaDescription.fieldDescriptions
+    fields[3] = dataclasses.replace(fields[3], fStructuralRole=0x04)
+    with pytest.raises(ValueError, match="structural role 0x04"):
+        runs.check(_with_fields(rntuple, fields))
+
+
+@pytest.mark.skipif(not FIXTURES, reason="reference/root-io-spec not checked out")
+@pytest.mark.parametrize("name", [b"runs", b""])
+def test_names_are_distinct_and_not_empty(name: bytes):
+    """ROOT refuses a footer whose attribute sets have the same name, or none"""
+    fetch = _fetcher((DATA / "attributes.root").read_bytes())
+    (anchor,) = _anchors(fetch)
+    rntuple = fetch.rntuple(anchor)
+    footer = rntuple.footerEnvelope
+    assert footer.attributeSets is not None
+    runs, flags = footer.attributeSets
+    records = dataclasses.replace(
+        footer.attributeSets, items=[runs, dataclasses.replace(flags, fName=name)]
+    )
+    footer = dataclasses.replace(footer, attributeSets=records)
+    with pytest.raises(ValueError, match="not all non-empty and distinct"):
+        RNTuple.from_envelopes(
+            rntuple.headerEnvelope, footer, rntuple.pagelistEnvelopes
+        )

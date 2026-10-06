@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
 from rootfilespec.rntuple.envelope import (
@@ -22,6 +22,13 @@ from rootfilespec.serializable import (
     serializable,
 )
 from rootfilespec.structutil import Fmt, IfBytesRemain
+
+if TYPE_CHECKING:
+    from rootfilespec.rntuple.RNTuple import RNTuple
+
+ATTRIBUTE_META_FIELDS = [b"_rangeStart", b"_rangeLen", b"_userData"]
+"""The top-level fields of an attribute set of schema version 1.x, in order
+(spec, *Attribute Schema Version*)"""
 
 
 @serializable
@@ -110,12 +117,55 @@ class LinkedAttributeSet(RecordFrame):
         ``fetch.rntuple(fetch(record.anchor_locator))``.
 
         Raises NotImplementedError if the anchor's locator is not in the file.
+        ``Fetcher.attribute_set`` opens the set and checks it (``check``).
         """
         return REnvelopeLocator(
             self.fAnchorLength,
             in_file(self.locator, f"The anchor of attribute set {self.fName!r}"),
             ROOT3a3aRNTuple,
         )
+
+    def check(self, rntuple: "RNTuple") -> None:
+        """Check that the RNTuple this record links is an attribute set of its version
+
+        As ROOT checks when it opens a set (``RNTupleAttrSetReader``,
+        ``RNTupleAttrReading.cxx:20-46`` at 6.40.04), and with the spec's
+        restrictions (spec, *Linked Attribute Sets*). Raises NotImplementedError
+        for a major schema version other than 1, which this reader doesn't know,
+        and ValueError for anything else.
+        """
+        name = self.fName
+        version = f"{self.fSchemaVersionMajor}.{self.fSchemaVersionMinor}"
+        # A new major version breaks forward compatibility (spec, *Attribute
+        # Schema Version*)
+        if self.fSchemaVersionMajor != 1:
+            msg = f"Attribute set {name!r} has schema version {version}: only major version 1 is supported"
+            raise NotImplementedError(msg)
+        schema = rntuple.schemaDescription
+        # The three fields of schema 1.x, and no other top-level field: ROOT
+        # refuses a fourth whatever the minor version, which the spec says
+        # adds fields to ignore (root-io-spec RNTuple ERRATA 13)
+        toplevel = [
+            field.fFieldName
+            for fieldID, field in enumerate(schema.fieldDescriptions)
+            if field.fParentFieldID == fieldID
+        ]
+        if toplevel != ATTRIBUTE_META_FIELDS:
+            msg = f"Attribute set {name!r} of schema version {version} has the top-level fields {toplevel}, not {ATTRIBUTE_META_FIELDS}"
+            raise ValueError(msg)
+        # The spec's restrictions, which ROOT's writer keeps and its reader
+        # doesn't check (root-io-spec RNTuple NOTES 8)
+        if rntuple.footerEnvelope.attributeSets:
+            msg = f"Attribute set {name!r} links attribute sets of its own"
+            raise ValueError(msg)
+        if schema.aliasColumnDescriptions:
+            msg = f"Attribute set {name!r} has alias columns"
+            raise ValueError(msg)
+        if any(field.fStructuralRole == 0x04 for field in schema.fieldDescriptions):
+            msg = (
+                f"Attribute set {name!r} has a field of structural role 0x04 (streamer)"
+            )
+            raise ValueError(msg)
 
 
 @serializable
