@@ -163,10 +163,6 @@ class TKey(ROOTSerializable):
             # if keys are deleted there is extra space?
             remaining_bytes = self.header.fNbytes - buffer.relpos
             buffer = buffer[remaining_bytes:]
-        elif typename == "ROOT3a3aRNTuple":
-            # A checksum is added to the end of the buffer
-            # TODO: implement checksum verification
-            buffer = buffer[8:]
         if buffer:
             msg = f"TKey.read_from: buffer not empty after reading object of type {typename}."
             msg += f"\n{self=}"
