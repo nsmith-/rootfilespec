@@ -200,7 +200,10 @@ previous one points to:
 
 - the anchor (`ROOT3a3aRNTuple`, read through its `TKey`, its checksum verified)
   has a `header_locator` and a `footer_locator`;
-- the footer (`FooterEnvelope`) has `pagelist_locators`, one per cluster group;
+- the footer (`FooterEnvelope`) has `pagelist_locators`, one per cluster group,
+  and each of its linked attribute set records (`LinkedAttributeSet`) has an
+  `anchor_locator`: a set is an RNTuple of its own, whose anchor no key list
+  holds;
 - each page description (`RPageDescription`) in a page list has a
   `page_locator`, which also fetches and verifies the page's checksum.
 
@@ -316,6 +319,9 @@ with open_path("file.root") as reader:
         for column_range in cluster.columnRanges:
             for page in column_range.pages:
                 data = reader.fetch(page.pageDescription.page_locator)
+    # Its attribute sets, each an RNTuple of its own
+    for record in rntuple.footerEnvelope.attributeSets or []:
+        attributes = reader.fetch.attribute_set(record)
 ```
 
 `FileReader.open` builds classes from the whole StreamerInfo record, which can
