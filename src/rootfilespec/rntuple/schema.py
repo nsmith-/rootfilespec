@@ -104,13 +104,31 @@ class ColumnType(IntEnum):
         return f"{self.__class__.__name__}.{self.name}"
 
 
-FIELD_STRUCTURAL_ROLES = {
-    0x00: "Plain field",
-    0x01: "Collection parent",
-    0x02: "Record parent",
-    0x03: "Variant parent",
-    0x04: "ROOT Streamer serialized object",
-}
+class StructuralRole(IntEnum):
+    """The structural role of a field (spec, *Field Description*)
+
+    Named as ROOT's ``ENTupleStructure``. A field keeps its role as stored
+    (``FieldDescription.fStructuralRole``), since a later format may add roles
+    that a reader must skip rather than refuse (spec, *Notes on Backward and
+    Forward Compatibility*); ``FieldDescription.structural_role`` gives this
+    enum, or ``None`` for a role it does not list."""
+
+    kPlain = 0x00
+    """Plain field in the schema tree that does not carry a particular structural role
+
+    A plain field is either a leaf or a "wrapper field" in the schema tree, such as
+    the parent field of an enum (spec v1.0.2.1; "leaf field" before)."""
+    kCollection = 0x01
+    "The field is the parent of a collection (e.g., a vector)"
+    kRecord = 0x02
+    "The field is the parent of a record (e.g., a struct)"
+    kVariant = 0x03
+    "The field is the parent of a variant"
+    kStreamer = 0x04
+    "The field stores objects serialized with the ROOT streamer"
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}.{self.name}"
 
 
 @serializable
@@ -132,16 +150,8 @@ class FieldDescription(RecordFrame):
     """The ID of the parent field, if this field is a sub-field.
         Top-level fields have their own field ID set as parent ID."""
     fStructuralRole: Annotated[int, Fmt("<H")]
-    """The structural role of the field; can have one of the following values:
-        - Value: Meaning
-        - 0x00:  Plain field in the schema tree that does not carry a particular structural role
-        - 0x01:  The field is the parent of a collection (e.g., a vector)
-        - 0x02:  The field is the parent of a record (e.g., a struct)
-        - 0x03:  The field is the parent of a variant
-        - 0x04:  The field stores objects serialized with the ROOT streamer
-
-    A plain field is either a leaf or a "wrapper field" in the schema tree, such as
-    the parent field of an enum (spec v1.0.2.1; "leaf field" before)."""
+    """The structural role of the field, as stored: a ``StructuralRole`` value, or
+    one that a later format adds. ``structural_role`` interprets it."""
     fFlags: Annotated[int, Fmt("<H")]
     """The flags for the field; can have any of the following bits set:
         - Bit:   Meaning
@@ -166,9 +176,18 @@ class FieldDescription(RecordFrame):
     """The ROOT type checksum for the field. Present only if flag 0x04 is set (has ROOT type checksum)."""
 
     @property
-    def structural_role(self) -> str | None:
-        """Get the structural role of the field."""
-        return FIELD_STRUCTURAL_ROLES.get(self.fStructuralRole, "Unknown")
+    def structural_role(self) -> StructuralRole | None:
+        """The structural role of the field, or ``None`` if ``StructuralRole``
+        does not list the stored value
+
+        ROOT reads such a role as ``kUnknown``, and skips the field on request
+        (``DeserializeFieldStructure``, ``RNTupleSerialize.cxx:833-848``;
+        ``RFieldDescriptor::CreateField``, ``RNTupleDescriptor.cxx:80-90``, at
+        6.40.04)."""
+        try:
+            return StructuralRole(self.fStructuralRole)
+        except ValueError:
+            return None
 
 
 @serializable
