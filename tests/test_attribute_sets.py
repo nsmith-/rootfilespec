@@ -8,6 +8,7 @@ at 6.40.04).
 """
 
 import dataclasses
+import zlib
 from pathlib import Path
 
 import pytest
@@ -17,11 +18,13 @@ from skhep_testdata import data_path  # type: ignore[import-not-found]
 from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT, ROOT3a3aRNTuple
 from rootfilespec.bootstrap.TFile import InitialReadLocator
 from rootfilespec.reader import Fetcher
+from rootfilespec.rntuple.envelope import RAnchorLocator
 from rootfilespec.rntuple.footer import FooterEnvelope, LinkedAttributeSet
 from rootfilespec.rntuple.RFrame import ListFrame
 from rootfilespec.rntuple.RLocator import StandardLocator, UnknownLocator
 from rootfilespec.rntuple.RNTuple import RNTuple
 from rootfilespec.rntuple.schema import AliasColumnDescription, FieldDescription
+from rootfilespec.serializable import BufferContext, ReadBuffer
 
 DATA = Path(__file__).parent.parent / "reference" / "root-io-spec" / "data" / "rntuple"
 FIXTURES = sorted(DATA.glob("*.root"))
@@ -127,6 +130,7 @@ def test_sets_open_through_their_records():
     the set opens as an RNTuple named after it"""
     fetch, records = _attribute_sets()
     runs, flags = records
+    assert isinstance(runs.anchor_locator, RAnchorLocator)
     assert (runs.anchor_locator.offset, runs.anchor_locator.size) == (2508, 78)
     assert (flags.anchor_locator.offset, flags.anchor_locator.size) == (3451, 78)
     runs_anchor = fetch(runs.anchor_locator)
@@ -177,6 +181,28 @@ def test_ranges():
         b"runs": {b"_rangeStart": (1768, [0, 3]), b"_rangeLen": (1834, [3, 3])},
         b"flags": {b"_rangeStart": (2812, [3, 1]), b"_rangeLen": (2878, [0, 4])},
     }
+
+
+@pytest.mark.skipif(not FIXTURES, reason="reference/root-io-spec not checked out")
+def test_compressed_anchor():
+    """No fixture has a compressed attribute set, so "runs"' anchor (2508, 78
+    bytes) in a zlib block like compressed.root's anchor: "ZL", method 8, then
+    the compressed and uncompressed sizes in 3 bytes each"""
+    anchor = (DATA / "attributes.root").read_bytes()[2508 : 2508 + 78]
+    body = zlib.compress(anchor)
+    block = b"ZL\x08" + len(body).to_bytes(3, "little") + (78).to_bytes(3, "little")
+    stored = block + body
+    locator = RAnchorLocator(78, StandardLocator(size=len(stored), offset=0))
+    buffer = ReadBuffer(memoryview(stored), 0, BOOTSTRAP_CONTEXT, BufferContext(None))
+    raw = RAnchorLocator(78, StandardLocator(size=78, offset=2508))
+    raw_buffer = ReadBuffer(
+        memoryview(anchor), 0, BOOTSTRAP_CONTEXT, BufferContext(None)
+    )
+    assert locator.read_from(buffer) == raw.read_from(raw_buffer)
+    with pytest.raises(
+        ValueError, match="RNTuple anchor at .*: expected 78 bytes, got 77"
+    ):
+        raw.read_from(raw_buffer[:77])
 
 
 def test_anchor_not_in_the_file():

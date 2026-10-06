@@ -5,6 +5,7 @@ import xxhash  # type: ignore[import-not-found]
 from typing_extensions import Self
 
 from rootfilespec.bootstrap.compression import decompress
+from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
 from rootfilespec.rntuple.RLocator import FileLocator, RLocator, in_file
 from rootfilespec.serializable import (
     Members,
@@ -124,18 +125,37 @@ class REnvelope(ROOTSerializable):
 
 
 EnvType = TypeVar("EnvType", bound=REnvelope)
-LinkedType = TypeVar("LinkedType", bound=ROOTSerializable)
+
+
+def _uncompressed(
+    buffer: ReadBuffer, locator: FileLocator, length: int, what: str
+) -> ReadBuffer:
+    """The fetched bytes of what a locator and a length link, uncompressed
+
+    ``what`` names the linked block for the errors.
+    """
+    size = locator.size
+    if len(buffer) != size:
+        msg = f"{what} at {locator}: expected {size} bytes, got {len(buffer)}"
+        raise ValueError(msg)
+
+    # RNTuple decompression tests equality of the stored size (the locator's)
+    # and the length: equal means stored raw, smaller compressed, and larger
+    # is an error (root-io-spec NOTES 2; RNTupleZip.hxx:106-113)
+    if size > length:
+        msg = (
+            f"{what} at {locator}: stored size {size} is larger than its "
+            f"uncompressed length {length}"
+        )
+        raise ValueError(msg)
+    if size < length:
+        buffer = decompress(buffer, length)
+    return buffer
 
 
 @dataclass(frozen=True)
-class REnvelopeLocator(Generic[LinkedType]):
-    """A locator for an RNTuple Envelope, or for an RNTuple anchor a footer links.
-
-    ROOT reaches both through a link of an uncompressed length and a locator,
-    and decompresses both the same way: it opens an attribute set's anchor from
-    its footer record as such a link (``RNTupleLink``,
-    ``RPageSourceFile::OpenWithDifferentAnchor``, ``RPageStorageFile.cxx:369-376``
-    at 6.40.04).
+class REnvelopeLocator(Generic[EnvType]):
+    """A locator for an RNTuple Envelope.
 
     This follows the locator pattern: it describes where an envelope is located
     and how to deserialize it, but the caller controls when/how to fetch the data.
@@ -145,8 +165,8 @@ class REnvelopeLocator(Generic[LinkedType]):
     """The uncompressed length of the envelope."""
     locator: FileLocator
     """The locator for the envelope (offset and size)."""
-    envtype: type[LinkedType]
-    """The type to deserialize: an envelope type, or ROOT3a3aRNTuple."""
+    envtype: type[EnvType]
+    """The envelope type to deserialize."""
 
     @property
     def offset(self) -> int:
@@ -158,30 +178,12 @@ class REnvelopeLocator(Generic[LinkedType]):
         """The (compressed) size of the envelope data."""
         return self.locator.size
 
-    def read_from(self, buffer: ReadBuffer) -> LinkedType:
+    def read_from(self, buffer: ReadBuffer) -> EnvType:
         """Read the envelope from the given buffer.
 
         Envelopes are compressed, so this decompresses and deserializes.
         """
-        if len(buffer) != self.size:
-            msg = (
-                f"{self.envtype.__name__} at {self.locator}: expected {self.size} "
-                f"bytes, got {len(buffer)}"
-            )
-            raise ValueError(msg)
-
-        #### Decompress the buffer if necessary
-        # RNTuple decompression tests equality of the stored size (the locator's)
-        # and the length: equal means stored raw, smaller compressed, and larger
-        # is an error (root-io-spec NOTES 2; RNTupleZip.hxx:106-113)
-        if self.size > self.length:
-            msg = (
-                f"{self.envtype.__name__} at {self.locator}: stored size "
-                f"{self.size} is larger than its uncompressed length {self.length}"
-            )
-            raise ValueError(msg)
-        if self.size < self.length:
-            buffer = decompress(buffer, self.length)
+        buffer = _uncompressed(buffer, self.locator, self.length, self.envtype.__name__)
 
         #### Now read the envelope
         envelope, buffer = self.envtype.read(buffer)
@@ -191,6 +193,39 @@ class REnvelopeLocator(Generic[LinkedType]):
             raise ValueError(msg)
 
         return envelope
+
+
+@dataclass(frozen=True)
+class RAnchorLocator:
+    """A locator for an RNTuple anchor that a footer links: an attribute set's.
+
+    A linked anchor is found and decompressed like an envelope, from its
+    uncompressed length and a locator: ROOT opens it as an ``RNTupleLink``,
+    the link envelopes use (``RPageSourceFile::OpenWithDifferentAnchor``,
+    ``RPageStorageFile.cxx:369-376`` at 6.40.04). It is read with
+    ``ROOT3a3aRNTuple.read``, which verifies its checksum.
+    """
+
+    length: int
+    """The uncompressed length of the anchor, its checksum included."""
+    locator: FileLocator
+    """The locator for the anchor object (offset and size)."""
+
+    @property
+    def offset(self) -> int:
+        """The byte offset of the anchor in the file."""
+        return self.locator.offset
+
+    @property
+    def size(self) -> int:
+        """The (compressed) size of the anchor."""
+        return self.locator.size
+
+    def read_from(self, buffer: ReadBuffer) -> ROOT3a3aRNTuple:
+        """Read the anchor from the given buffer, decompressing it if needed."""
+        buffer = _uncompressed(buffer, self.locator, self.length, "RNTuple anchor")
+        anchor, _ = ROOT3a3aRNTuple.read(buffer)
+        return anchor
 
 
 @serializable

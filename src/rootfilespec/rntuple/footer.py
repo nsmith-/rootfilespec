@@ -1,8 +1,8 @@
 from typing import TYPE_CHECKING, Annotated
 
-from rootfilespec.bootstrap.RAnchor import ROOT3a3aRNTuple
 from rootfilespec.rntuple.envelope import (
     ENVELOPE_TYPE_MAP,
+    RAnchorLocator,
     REnvelope,
     REnvelopeLink,
     REnvelopeLocator,
@@ -110,7 +110,7 @@ class LinkedAttributeSet(RecordFrame):
     """The name of the attribute set, which is also its RNTuple's name"""
 
     @property
-    def anchor_locator(self) -> REnvelopeLocator[ROOT3a3aRNTuple]:
+    def anchor_locator(self) -> RAnchorLocator:
         """Get a locator for the set's anchor.
 
         The set is an RNTuple of its own, so it opens like any other:
@@ -119,10 +119,9 @@ class LinkedAttributeSet(RecordFrame):
         Raises NotImplementedError if the anchor's locator is not in the file.
         ``Fetcher.attribute_set`` opens the set and checks it (``check``).
         """
-        return REnvelopeLocator(
+        return RAnchorLocator(
             self.fAnchorLength,
             in_file(self.locator, f"The anchor of attribute set {self.fName!r}"),
-            ROOT3a3aRNTuple,
         )
 
     def check(self, rntuple: "RNTuple") -> None:
