@@ -128,11 +128,12 @@ class LinkedAttributeSet(RecordFrame):
     def check(self, rntuple: "RNTuple") -> None:
         """Check that the RNTuple this record links is an attribute set of its version
 
-        As ROOT checks when it opens a set (``RNTupleAttrSetReader``,
-        ``RNTupleAttrReading.cxx:20-46`` at 6.40.04), and with the spec's
-        restrictions (spec, *Linked Attribute Sets*). Raises NotImplementedError
+        What ROOT checks when it opens a set (``RNTupleAttrSetReader``,
+        ``RNTupleAttrReading.cxx:20-46`` at 6.40.04). Raises NotImplementedError
         for a major schema version other than 1, which this reader doesn't know,
-        and ValueError for anything else.
+        and ValueError for other top-level fields. ROOT doesn't check the spec's
+        restrictions on a set when reading (root-io-spec RNTuple NOTES 8), so
+        neither does this.
         """
         name = self.fName
         version = f"{self.fSchemaVersionMajor}.{self.fSchemaVersionMinor}"
@@ -152,19 +153,6 @@ class LinkedAttributeSet(RecordFrame):
         ]
         if toplevel != ATTRIBUTE_META_FIELDS:
             msg = f"Attribute set {name!r} of schema version {version} has the top-level fields {toplevel}, not {ATTRIBUTE_META_FIELDS}"
-            raise ValueError(msg)
-        # The spec's restrictions, which ROOT's writer keeps and its reader
-        # doesn't check (root-io-spec RNTuple NOTES 8)
-        if rntuple.footerEnvelope.attributeSets:
-            msg = f"Attribute set {name!r} links attribute sets of its own"
-            raise ValueError(msg)
-        if schema.aliasColumnDescriptions:
-            msg = f"Attribute set {name!r} has alias columns"
-            raise ValueError(msg)
-        if any(field.fStructuralRole == 0x04 for field in schema.fieldDescriptions):
-            msg = (
-                f"Attribute set {name!r} has a field of structural role 0x04 (streamer)"
-            )
             raise ValueError(msg)
 
 

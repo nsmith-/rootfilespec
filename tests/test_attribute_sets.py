@@ -263,35 +263,25 @@ def test_renamed_meta_field():
 
 
 @pytest.mark.skipif(not FIXTURES, reason="reference/root-io-spec not checked out")
-def test_restrictions():
-    """The spec's three restrictions on an attribute set's RNTuple"""
+def test_restrictions_are_not_checked():
+    """The spec's three restrictions on a set, which ROOT's writer keeps and
+    its reader doesn't check (root-io-spec RNTuple NOTES 8): a set breaking all
+    of them passes, as it opens in ROOT"""
     runs, rntuple = _runs()
-    footer = rntuple.footerEnvelope
-    nested = dataclasses.replace(
-        rntuple,
-        footerEnvelope=dataclasses.replace(
-            footer, attributeSets=ListFrame(fSize=48, items=[runs])
-        ),
-    )
-    with pytest.raises(ValueError, match="links attribute sets of its own"):
-        runs.check(nested)
-
-    header = rntuple.headerEnvelope
-    alias = AliasColumnDescription(fSize=16, fPhysicalColumnID=0, fFieldID=3)
-    aliased = dataclasses.replace(
-        rntuple,
-        headerEnvelope=dataclasses.replace(
-            header,
-            aliasColumnDescriptions=ListFrame(fSize=28, items=[alias]),
-        ),
-    )
-    with pytest.raises(ValueError, match="alias columns"):
-        runs.check(aliased)
-
     fields = rntuple.schemaDescription.fieldDescriptions
     fields[3] = dataclasses.replace(fields[3], fStructuralRole=0x04)
-    with pytest.raises(ValueError, match="structural role 0x04"):
-        runs.check(_with_fields(rntuple, fields))
+    rntuple = _with_fields(rntuple, fields)
+    alias = AliasColumnDescription(fSize=16, fPhysicalColumnID=0, fFieldID=3)
+    header = dataclasses.replace(
+        rntuple.headerEnvelope,
+        aliasColumnDescriptions=ListFrame(fSize=28, items=[alias]),
+    )
+    footer = dataclasses.replace(
+        rntuple.footerEnvelope, attributeSets=ListFrame(fSize=48, items=[runs])
+    )
+    runs.check(
+        dataclasses.replace(rntuple, headerEnvelope=header, footerEnvelope=footer)
+    )
 
 
 @pytest.mark.skipif(not FIXTURES, reason="reference/root-io-spec not checked out")
