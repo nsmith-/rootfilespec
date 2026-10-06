@@ -170,6 +170,8 @@ def test_read_contributors():
                         )
                     ],
                 ),
+                # Format 1.0.0.0: the footer ends before the list (ERRATA 11)
+                attributeSets=None,
             ),
             pagelistEnvelopes=[
                 PageListEnvelope(
@@ -510,6 +512,8 @@ def test_read_multiple_rntuples():
                         )
                     ],
                 ),
+                # Format 1.0.0.0: the footer ends before the list (ERRATA 11)
+                attributeSets=None,
             ),
             pagelistEnvelopes=[
                 PageListEnvelope(
@@ -711,6 +715,8 @@ def test_read_multiple_rntuples():
                         )
                     ],
                 ),
+                # Format 1.0.0.0: the footer ends before the list (ERRATA 11)
+                attributeSets=None,
             ),
             pagelistEnvelopes=[
                 PageListEnvelope(
