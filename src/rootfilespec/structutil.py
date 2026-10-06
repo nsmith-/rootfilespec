@@ -2,7 +2,13 @@ import dataclasses
 import operator
 from typing import Literal, get_args
 
-from rootfilespec.serializable import Members, MemberSerDe, ReadBuffer, ROOTSerializable
+from rootfilespec.serializable import (
+    Members,
+    MemberSerDe,
+    ReadBuffer,
+    ROOTSerializable,
+    read_value,
+)
 
 
 @dataclasses.dataclass
@@ -171,6 +177,35 @@ class OptionalField(MemberSerDe):
         return _OptionalFieldReader(
             fname, self.fmt, self.flagname, self.operation, self.flagvalue, ftype
         )
+
+
+@dataclasses.dataclass
+class _IfBytesRemainReader:
+    fname: str
+    ftype: object
+
+    def __call__(
+        self, members: Members, buffer: ReadBuffer
+    ) -> tuple[Members, ReadBuffer]:
+        if buffer:
+            members[self.fname], buffer = read_value(self.ftype, buffer)
+        else:
+            members[self.fname] = None
+        return members, buffer
+
+
+@dataclasses.dataclass
+class IfBytesRemain(MemberSerDe):
+    """A last member that only later format versions write
+
+    ``Annotated[T | None, IfBytesRemain()]`` is read as T if any bytes remain,
+    and is None if none do. The buffer must end where the enclosing structure
+    does, as an envelope's payload ends before its checksum.
+    """
+
+    def build_reader(self, fname: str, ftype: type):
+        ftype, _ = get_args(ftype)  # The type inside Optional
+        return _IfBytesRemainReader(fname, ftype)
 
 
 @dataclasses.dataclass

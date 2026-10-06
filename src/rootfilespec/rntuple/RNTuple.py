@@ -11,6 +11,7 @@ from rootfilespec.rntuple.footer import FooterEnvelope
 from rootfilespec.rntuple.header import HeaderEnvelope
 from rootfilespec.rntuple.pagelist import ClusterSummary, PageListEnvelope
 from rootfilespec.rntuple.pagelocations import PageLocations, RPageDescription
+from rootfilespec.rntuple.RLocator import UnknownLocator
 from rootfilespec.rntuple.schema import (
     AliasColumnDescription,
     ColumnDescription,
@@ -262,6 +263,36 @@ class InterpretableCluster:
     (*Page Locations*): a position is the column ID."""
 
 
+def _check_attribute_sets(footer: FooterEnvelope) -> None:
+    """Refuse a footer whose attribute sets ROOT refuses as it reads the footer
+
+    A set with no name, or the name of another (spec, *Linked Attribute
+    Sets*); an anchor length of 0; an anchor locator of a type ROOT doesn't
+    know, which is any non-standard type but 0x01 and 0x02
+    (``RNTupleAttrSetDescriptorBuilder::MoveDescriptor`` and
+    ``RNTupleDescriptorBuilder::AddAttributeSet``, ``RNTupleDescriptor.cxx:1156-1163``,
+    ``:1438-1446``; ``DeserializeLocator``, ``RNTupleSerialize.cxx:1131-1141``,
+    at 6.40.04). A DAOS (0x02) anchor, which ROOT knows, fails only when the
+    set is opened, through ``anchor_locator``.
+    """
+    records = footer.attributeSets.items if footer.attributeSets else []
+    names = [record.fName for record in records]
+    if b"" in names or len(set(names)) != len(names):
+        msg = f"Attribute set names are not all non-empty and distinct: {names}"
+        raise ValueError(msg)
+    for record in records:
+        if record.fAnchorLength == 0:
+            msg = f"Attribute set {record.fName!r} has an anchor length of 0"
+            raise ValueError(msg)
+        locator = record.locator
+        if isinstance(locator, UnknownLocator) and locator.locatorType != 0x02:
+            msg = (
+                f"Attribute set {record.fName!r} has an anchor locator of type "
+                f"{locator.locatorType:#04x}, which ROOT does not know"
+            )
+            raise ValueError(msg)
+
+
 @dataclasses.dataclass
 class RNTuple:
     """A class representing an RNTuple."""
@@ -292,6 +323,7 @@ class RNTuple:
             if pagelistEnvelope.headerChecksum != headerEnvelope.checksum:
                 msg = f"PageListEnvelope header checksum mismatch: {pagelistEnvelope.headerChecksum} != {headerEnvelope.checksum}"
                 raise ValueError(msg)
+        _check_attribute_sets(footerEnvelope)
         return cls(headerEnvelope, footerEnvelope, pagelistEnvelopes)
 
     @property

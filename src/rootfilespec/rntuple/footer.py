@@ -1,7 +1,8 @@
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from rootfilespec.rntuple.envelope import (
     ENVELOPE_TYPE_MAP,
+    RAnchorLocator,
     REnvelope,
     REnvelopeLink,
     REnvelopeLocator,
@@ -9,16 +10,25 @@ from rootfilespec.rntuple.envelope import (
 )
 from rootfilespec.rntuple.pagelist import PageListEnvelope
 from rootfilespec.rntuple.RFrame import ListFrame, RecordFrame
+from rootfilespec.rntuple.RLocator import RLocator, in_file
 from rootfilespec.rntuple.schema import (
     AliasColumnDescription,
     ColumnDescription,
     ExtraTypeInformation,
     FieldDescription,
+    RNTupleString,
 )
 from rootfilespec.serializable import (
     serializable,
 )
-from rootfilespec.structutil import Fmt
+from rootfilespec.structutil import Fmt, IfBytesRemain
+
+if TYPE_CHECKING:
+    from rootfilespec.rntuple.RNTuple import RNTuple
+
+ATTRIBUTE_META_FIELDS = [b"_rangeStart", b"_rangeLen", b"_userData"]
+"""The top-level fields of an attribute set of schema version 1.x, in order
+(spec, *Attribute Schema Version*)"""
 
 
 @serializable
@@ -76,6 +86,76 @@ class SchemaExtension(RecordFrame):
 
 
 @serializable
+class LinkedAttributeSet(RecordFrame):
+    """A class representing an RNTuple Linked Attribute Set Record Frame.
+    These Record Frames are found in the last List Frame of the Footer Envelope.
+
+    Each links an attribute set: an RNTuple of its own, holding user metadata
+    about ranges of this RNTuple's entries (spec, *Linked Attribute Sets*). Its
+    anchor is a ROOT::RNTuple object whose key no directory lists, so this
+    record is the only way to it (root-io-spec RNTuple NOTES 8).
+    """
+
+    fSchemaVersionMajor: Annotated[int, Fmt("<H")]
+    """The major version of the attribute schema, the set's internal fields"""
+    fSchemaVersionMinor: Annotated[int, Fmt("<H")]
+    """The minor version of the attribute schema"""
+    fAnchorLength: Annotated[int, Fmt("<I")]
+    """The uncompressed length of the set's anchor: the whole ROOT::RNTuple
+    object and its checksum, 78 bytes for class version 2 (root-io-spec RNTuple
+    ERRATA 12)"""
+    locator: RLocator
+    """The locator of the set's anchor: the anchor object, not its key"""
+    fName: RNTupleString
+    """The name of the attribute set, which is also its RNTuple's name"""
+
+    @property
+    def anchor_locator(self) -> RAnchorLocator:
+        """Get a locator for the set's anchor.
+
+        The set is an RNTuple of its own, so it opens like any other:
+        ``fetch.rntuple(fetch(record.anchor_locator))``.
+
+        Raises NotImplementedError if the anchor's locator is not in the file.
+        ``Fetcher.attribute_set`` opens the set and checks it (``check``).
+        """
+        return RAnchorLocator(
+            self.fAnchorLength,
+            in_file(self.locator, f"The anchor of attribute set {self.fName!r}"),
+        )
+
+    def check(self, rntuple: "RNTuple") -> None:
+        """Check that the RNTuple this record links is an attribute set of its version
+
+        What ROOT checks when it opens a set (``RNTupleAttrSetReader``,
+        ``RNTupleAttrReading.cxx:20-46`` at 6.40.04). Raises NotImplementedError
+        for a major schema version other than 1, which this reader doesn't know,
+        and ValueError for other top-level fields. ROOT doesn't check the spec's
+        restrictions on a set when reading (root-io-spec RNTuple NOTES 8), so
+        neither does this.
+        """
+        name = self.fName
+        version = f"{self.fSchemaVersionMajor}.{self.fSchemaVersionMinor}"
+        # A new major version breaks forward compatibility (spec, *Attribute
+        # Schema Version*)
+        if self.fSchemaVersionMajor != 1:
+            msg = f"Attribute set {name!r} has schema version {version}: only major version 1 is supported"
+            raise NotImplementedError(msg)
+        schema = rntuple.schemaDescription
+        # The three fields of schema 1.x, and no other top-level field: ROOT
+        # refuses a fourth whatever the minor version, which the spec says
+        # adds fields to ignore (root-io-spec RNTuple ERRATA 13)
+        toplevel = [
+            field.fFieldName
+            for fieldID, field in enumerate(schema.fieldDescriptions)
+            if field.fParentFieldID == fieldID
+        ]
+        if toplevel != ATTRIBUTE_META_FIELDS:
+            msg = f"Attribute set {name!r} of schema version {version} has the top-level fields {toplevel}, not {ATTRIBUTE_META_FIELDS}"
+            raise ValueError(msg)
+
+
+@serializable
 class FooterEnvelope(REnvelope):
     """A class representing the RNTuple Footer Envelope payload structure."""
 
@@ -87,6 +167,11 @@ class FooterEnvelope(REnvelope):
     """The Schema Extension Record Frame"""
     clusterGroups: ListFrame[ClusterGroup]
     """The List Frame of Cluster Group Record Frames"""
+    attributeSets: Annotated[ListFrame[LinkedAttributeSet] | None, IfBytesRemain()]
+    """The List Frame of Linked Attribute Set Record Frames, or None if the
+    footer ends before it, as one written before format 1.0.1.0 does: ROOT reads
+    it only if bytes remain before the checksum (root-io-spec RNTuple ERRATA 11;
+    RNTupleSerialize.cxx:2015-2017 at 6.40.04)"""
 
     @property
     def pagelist_locators(self) -> list[REnvelopeLocator[PageListEnvelope]]:

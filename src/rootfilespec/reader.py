@@ -21,6 +21,7 @@ from rootfilespec.bootstrap.TKey import ObjType, TypedTKey
 from rootfilespec.bootstrap.TList import TList
 from rootfilespec.bootstrap.TStreamerInfo import TStreamerInfo
 from rootfilespec.dynamic import build_file_context
+from rootfilespec.rntuple.footer import LinkedAttributeSet
 from rootfilespec.rntuple.RNTuple import RNTuple
 from rootfilespec.serializable import (
     BufferContext,
@@ -83,6 +84,18 @@ class Fetcher:
         footer = self(anchor.footer_locator)
         pagelists = [self(loc) for loc in footer.pagelist_locators]
         return RNTuple.from_envelopes(header, footer, pagelists)
+
+    def attribute_set(self, record: LinkedAttributeSet) -> RNTuple:
+        """Fetch the RNTuple of an attribute set that a footer links, as ROOT opens one
+
+        Its anchor, through the record's ``anchor_locator``, and its envelopes,
+        as ``rntuple`` does; then ``record.check`` refuses a set of a major
+        schema version other than 1, or one that isn't an attribute set of its
+        version.
+        """
+        rntuple = self.rntuple(self(record.anchor_locator))
+        record.check(rntuple)
+        return rntuple
 
 
 @dataclass
