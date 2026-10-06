@@ -33,5 +33,14 @@ primitive types (and numpy arrays thereof). The goal of the project is to
 provide a stable and feature-complete read/write backend for packages such as
 uproot.
 
+RNTuple: rootfilespec reads format 1.0.2.x, as written by ROOT 6.40.04, and
+earlier versions of epoch 1. Its reference is the
+[RNTuple specification v1.0.2.1](https://github.com/ariostas/root-io-spec/blob/d1618ad96c7e55277b291eb9e3af4ee8d0c359d9/spec/05-rntuple/BinaryFormatSpecification.md)
+that ROOT 6.40.04 ships, read with root-io-spec's
+[errata](https://github.com/ariostas/root-io-spec/blob/d1618ad96c7e55277b291eb9e3af4ee8d0c359d9/spec/05-rntuple/ERRATA.md)
+(ROOT writes 1.0.2.0 into the anchor: erratum 1). An RNTuple that sets a feature
+flag is refused, as the specification requires of a reader that does not
+implement it.
+
 Further details on the design decisions can be found in
 [docs/design.md](docs/design.md).

@@ -51,6 +51,9 @@ UNTRACED = {
     # The walker of test_read.py does not read these baskets (#113)
     "ttree/basket",
     "ttree/basket-compressed",
+    # Every assertion is inside the baskets of branch p, an unsplit object
+    # branch with a leaf, whose baskets the walker skips as well (#113)
+    "ttree/basket-displacement-refs",
     "ttree/basket-multiblock",
 }
 

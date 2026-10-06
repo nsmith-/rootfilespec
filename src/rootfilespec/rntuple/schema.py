@@ -31,7 +31,8 @@ class ColumnType(IntEnum):
         a specified range of values. For this column type, flag 0x02 (column with range) is always set.
     Future versions of the file format may introduce additional column types without changing the minimum version
         of the header or introducing a feature flag. Old readers need to ignore these columns and fields constructed
-        from such columns. Old readers can, however, figure out the number of elements stored in such unknown columns."""
+        from such columns. Old readers can, however, figure out the number of elements stored in such unknown columns.
+        rootfilespec does not yet: a column type missing here raises when the schema is read (#157)."""
 
     kBit = 0x00
     "Boolean value"
@@ -80,7 +81,11 @@ class ColumnType(IntEnum):
     kSplitUInt64 = 0x16
     "Like UInt64 but in split encoding"
     kSplitReal16 = 0x17
-    "Like Real16 but in split encoding"
+    """Like Real16 but in split encoding
+
+    In the spec's table, but ROOT's C++ has no such type: it cannot write it, and
+    reads 0x17 as an unknown column type. Only JSROOT implements it (root-io-spec
+    RNTuple ERRATA 6). Kept, as the spec lists it."""
     kSplitReal32 = 0x18
     "Like Real32 but in split encoding"
     kSplitReal64 = 0x19
@@ -99,13 +104,31 @@ class ColumnType(IntEnum):
         return f"{self.__class__.__name__}.{self.name}"
 
 
-FIELD_STRUCTURAL_ROLES = {
-    0x00: "Plain field",
-    0x01: "Collection parent",
-    0x02: "Record parent",
-    0x03: "Variant parent",
-    0x04: "ROOT Streamer serialized object",
-}
+class StructuralRole(IntEnum):
+    """The structural role of a field (spec, *Field Description*)
+
+    Named as ROOT's ``ENTupleStructure``. A field keeps its role as stored
+    (``FieldDescription.fStructuralRole``), since a later format may add roles
+    that a reader must skip rather than refuse (spec, *Notes on Backward and
+    Forward Compatibility*); ``FieldDescription.structural_role`` gives this
+    enum, or ``None`` for a role it does not list."""
+
+    kPlain = 0x00
+    """Plain field in the schema tree that does not carry a particular structural role
+
+    A plain field is either a leaf or a "wrapper field" in the schema tree, such as
+    the parent field of an enum (spec v1.0.2.1; "leaf field" before)."""
+    kCollection = 0x01
+    "The field is the parent of a collection (e.g., a vector)"
+    kRecord = 0x02
+    "The field is the parent of a record (e.g., a struct)"
+    kVariant = 0x03
+    "The field is the parent of a variant"
+    kStreamer = 0x04
+    "The field stores objects serialized with the ROOT streamer"
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}.{self.name}"
 
 
 @serializable
@@ -117,18 +140,18 @@ class FieldDescription(RecordFrame):
     fFieldVersion: Annotated[int, Fmt("<I")]
     """The version of the field. Used for schema evolution."""
     fTypeVersion: Annotated[int, Fmt("<I")]
-    """The version of the field type. Used for schema evolution."""
+    """The version of the field type. Used for schema evolution.
+
+    For a class, its class version. 0xFFFFFFFF means "unversioned": a class with
+    no ClassDef, whose class version of -1 is written to this unsigned field. It
+    is not a version newer than all others; such a class is identified by its
+    type checksum (flag 0x04) instead (root-io-spec RNTuple ERRATA 8)."""
     fParentFieldID: Annotated[int, Fmt("<I")]
     """The ID of the parent field, if this field is a sub-field.
         Top-level fields have their own field ID set as parent ID."""
     fStructuralRole: Annotated[int, Fmt("<H")]
-    """The structural role of the field; can have one of the following values:
-        - Value: Meaning
-        - 0x00:  Plain field in the schema tree that does not carry a particular structural role
-        - 0x01:  The field is the parent of a collection (e.g., a vector)
-        - 0x02:  The field is the parent of a record (e.g., a struct)
-        - 0x03:  The field is the parent of a variant
-        - 0x04:  The field stores objects serialized with the ROOT streamer"""
+    """The structural role of the field, as stored: a ``StructuralRole`` value, or
+    one that a later format adds. ``structural_role`` interprets it."""
     fFlags: Annotated[int, Fmt("<H")]
     """The flags for the field; can have any of the following bits set:
         - Bit:   Meaning
@@ -153,9 +176,18 @@ class FieldDescription(RecordFrame):
     """The ROOT type checksum for the field. Present only if flag 0x04 is set (has ROOT type checksum)."""
 
     @property
-    def structural_role(self) -> str | None:
-        """Get the structural role of the field."""
-        return FIELD_STRUCTURAL_ROLES.get(self.fStructuralRole, "Unknown")
+    def structural_role(self) -> StructuralRole | None:
+        """The structural role of the field, or ``None`` if ``StructuralRole``
+        does not list the stored value
+
+        ROOT reads such a role as ``kUnknown``, and skips the field on request
+        (``DeserializeFieldStructure``, ``RNTupleSerialize.cxx:833-848``;
+        ``RFieldDescriptor::CreateField``, ``RNTupleDescriptor.cxx:80-90``, at
+        6.40.04)."""
+        try:
+            return StructuralRole(self.fStructuralRole)
+        except ValueError:
+            return None
 
 
 @serializable
@@ -164,20 +196,14 @@ class ColumnDescription(RecordFrame):
     This Record Frame is found in the Header Envelope of an RNTuple and can be extended in the Footer Envelope.
     It describes a column in the RNTuple schema."""
 
-    """ abbott TODO: read this when not sick and understand it
-    Future versions of the file format may introduce additional column types without
-    changing the minimum version of the header or introducing a feature flag.
-    Old readers need to ignore these columns and fields constructed from such columns.
-    Old readers can, however, figure out the number of elements stored in such unknown columns.
-    """
-
     fColumnType: Annotated[ColumnType, Fmt("<H")]
-    """The type of the column."""
+    """The type of the column. A type that ColumnType does not list raises (#157)."""
     fBitsOnStorage: Annotated[int, Fmt("<H")]
     """The number of bits used to store the column value."""
     fFieldID: Annotated[int, Fmt("<I")]
     """The ID of the field that this column belongs to.
-    The field ID is the zero-based index of the field in the serialized list of field descriptions in the Header Envelope."""
+    The field ID is the zero-based index of the field in the serialized list of field descriptions:
+    the header's, continued by the footer's schema extension."""
     fFlags: Annotated[int, Fmt("<H")]
     """The flags for the column; can have any of the following bits set:
         - Bit:   Meaning
@@ -187,7 +213,12 @@ class ColumnDescription(RecordFrame):
     """The index of the representation of the column in the list of representations for the field."""
     fFirstElementIndex: Annotated[int | None, OptionalField("<q", "fFlags", "&", 0x01)]
     """The index of the first element in the column. Present only if flag 0x01 is set (deferred column).
-    Signed: a negative value means the column is deferred and suppressed."""
+    Signed: a negative value means the column is deferred and suppressed.
+
+    An unsuppressed deferred column has no ancestor field that is a collection or a
+    variant, whose element count the format does not record (spec v1.0.2.1).
+    ``RNTuple.clusters()`` refuses one that has. Feature flag 0 (Nested Deferred
+    Columns) would allow it, and is refused (``RFeatureFlags``)."""
     fMinValue: Annotated[float | None, OptionalField("<d", "fFlags", "&", 0x02)]
     """The minimum value of the column, an IEEE 754 double.
     Present only if flag 0x02 is set (column with range of values)."""

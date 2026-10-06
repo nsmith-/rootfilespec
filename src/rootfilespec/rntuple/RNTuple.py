@@ -17,6 +17,7 @@ from rootfilespec.rntuple.schema import (
     ColumnDescription,
     ExtraTypeInformation,
     FieldDescription,
+    StructuralRole,
 )
 from rootfilespec.serializable import (
     BufferContext,
@@ -435,7 +436,10 @@ def _repetitions(schema: SchemaDescription, columnID: int) -> int:
     fieldID = schema.columnDescriptions[columnID].fFieldID
     chain = schema._field_chain(fieldID)
     for fid in chain[1:]:
-        if fields[fid].fStructuralRole in (0x01, 0x03):  # collection, variant
+        if fields[fid].structural_role in (
+            StructuralRole.kCollection,
+            StructuralRole.kVariant,
+        ):
             msg = (
                 f"Column {columnID} is deferred, but its field "
                 f"{schema.field_path(fieldID)!r} is inside the collection or "

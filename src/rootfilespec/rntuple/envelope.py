@@ -18,18 +18,32 @@ from rootfilespec.structutil import Fmt
 # Map of envelope type to string for printing
 ENVELOPE_TYPE_MAP = {0x00: "Reserved"}
 
+FEATURE_FLAGS = {0: "Nested Deferred Columns"}
+"""The feature flags the spec defines, by bit (spec v1.0.2.1, *Feature Flags*)"""
+
 
 @dataclass
 class RFeatureFlags(ROOTSerializable):
-    """A class representing the RNTuple Feature Flags.
-    RNTuple Feature Flags appear in the Header and Footer Envelopes.
-    This class reads the RNTuple Feature Flags from the buffer.
-    It also checks if the flags are set for a given feature.
-    It aborts reading when an unknown feature is encountered (unknown bit set).
+    """The RNTuple feature flags, in the header and footer envelopes
+
+    Each bit is a forward-incompatible feature that the RNTuple uses, and a
+    reader must refuse an RNTuple with a flag it does not know (spec, *Feature
+    Flags* and *Notes on Backward and Forward Compatibility*; root-io-spec
+    RNTuple NOTES 6). rootfilespec implements none, so reading raises
+    ``NotImplementedError`` on any bit set:
+
+    - flag 0, *Nested Deferred Columns*, defined since spec v1.0.2.1. No ROOT
+      6.40.04 writer sets it (root-io-spec RNTuple ERRATA 1), and ROOT
+      6.40.04's reader refuses it too (``CheckFeatureFlags``,
+      ``RNTupleSerialize.cxx:1869-1877``);
+    - bits 1 to 62, which the spec does not define;
+    - bit 63, which says that flags above 62 are set, in the 64-bit words that
+      follow. Those words are not read.
     """
 
     flags: int
-    """The RNTuple Feature Flags (signed 64-bit integer)"""
+    """The first 64-bit word of the flags (signed), as stored: 0 in every
+    RNTuple that reads"""
 
     @classmethod
     def update_members(cls, members: Members, buffer: ReadBuffer):
@@ -38,10 +52,18 @@ class RFeatureFlags(ROOTSerializable):
         # Read the flags from the buffer
         (flags,), buffer = buffer.unpack("<q")  # Signed 64-bit integer
 
-        # There are no feature flags defined for RNTuple yet
-        # So abort if any bits are set
         if flags != 0:
-            msg = f"Unknown feature flags encountered. int:{flags}; binary:{bin(flags)}"
+            word = flags & 0xFFFF_FFFF_FFFF_FFFF
+            names = [
+                f"flag {bit} ({FEATURE_FLAGS[bit]})"
+                if bit in FEATURE_FLAGS
+                else f"unknown flag {bit}"
+                for bit in range(63)
+                if word >> bit & 1
+            ]
+            if word >> 63:
+                names.append("flags above 62 (bit 63)")
+            msg = f"Unsupported RNTuple feature flags {word:#018x}: {', '.join(names)}"
             raise NotImplementedError(msg)
         members["flags"] = flags
         return members, buffer
