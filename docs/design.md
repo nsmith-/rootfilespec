@@ -198,8 +198,8 @@ specialized locator object. The locator has:
 An RNTuple is reached through a chain of locators, each found in what the
 previous one points to:
 
-- the anchor (`ROOT3a3aRNTuple`, read through its `TKey`) has a `header_locator`
-  and a `footer_locator`;
+- the anchor (`ROOT3a3aRNTuple`, read through its `TKey`, its checksum verified)
+  has a `header_locator` and a `footer_locator`;
 - the footer (`FooterEnvelope`) has `pagelist_locators`, one per cluster group;
 - each page description (`RPageDescription`) in a page list has a
   `page_locator`, which also fetches and verifies the page's checksum.

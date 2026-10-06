@@ -29,6 +29,8 @@ def test_read_contributors():
         anchor = reader.fetch(reader.keylist().get_by_name(b"Contributors"))
 
         assert anchor == ROOT3a3aRNTuple(
+            fVersionClass=2,
+            checksum=0xDA437B17D6E104E9,
             fVersionEpoch=1,
             fVersionMajor=0,
             fVersionMinor=0,
@@ -416,6 +418,8 @@ def test_read_multiple_rntuples():
         anchor_a = fetch(keylist.get_by_name(b"A"))
         assert isinstance(anchor_a, ROOT3a3aRNTuple)
         assert anchor_a == ROOT3a3aRNTuple(
+            fVersionClass=2,
+            checksum=0x284202578C9F4826,
             fVersionEpoch=1,
             fVersionMajor=0,
             fVersionMinor=0,
@@ -615,6 +619,8 @@ def test_read_multiple_rntuples():
         anchor_b = fetch(keylist.get_by_name(b"B"))
         assert isinstance(anchor_b, ROOT3a3aRNTuple)
         assert anchor_b == ROOT3a3aRNTuple(
+            fVersionClass=2,
+            checksum=0x595F6D89EE3BF102,
             fVersionEpoch=1,
             fVersionMajor=0,
             fVersionMinor=0,
