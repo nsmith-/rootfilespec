@@ -69,8 +69,9 @@ class SchemaExtension(RecordFrame):
     Note that the field IDs and physical column IDs given by the serialization order should
         continue from the largest IDs found in the header.
 
-    Note that is it possible to extend existing fields by additional column representations.
+    Note that it is possible to extend existing fields by additional column representations.
         This means that columns of the extension header may point to fields of the regular header.
+        Fields of the extension header may also be subfields of fields of the regular header (spec v1.0.2.1).
 
     In practice, deferred columns only appear in the schema extension record frame.
     """
