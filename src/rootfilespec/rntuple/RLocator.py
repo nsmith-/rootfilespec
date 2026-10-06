@@ -34,7 +34,15 @@ class RLocator(ROOTSerializable):
 
     @classmethod
     def read(cls, buffer: ReadBuffer) -> tuple["RLocator", ReadBuffer]:
-        """Reads a RNTuple locator from the given buffer."""
+        """Reads a RNTuple locator from the given buffer.
+
+        Which class a locator is depends on its first word, so locators are read
+        through ``RLocator.read``; reading one as ``LargeLocator`` or
+        ``UnknownLocator`` could give another class, and raises TypeError.
+        """
+        if cls is not RLocator:
+            msg = f"Read locators through RLocator.read, not {cls.__name__}.read"
+            raise TypeError(msg)
 
         #### Peek (don't update buffer) at the first 32 bit integer in the buffer to determine the locator type
         # We don't want to consume the buffer yet, because RLocator_Standard will need to consume it

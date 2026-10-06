@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT, ROOT3a3aRNTuple
+from rootfilespec.bootstrap.TDirectory import TKeyList
 from rootfilespec.bootstrap.TFile import InitialReadLocator
 from rootfilespec.reader import Fetcher, FileReader, open_path
 from rootfilespec.rntuple.RNTuple import RNTuple
@@ -24,7 +25,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _anchors(fetch: Fetcher, keylist) -> dict[bytes, ROOT3a3aRNTuple]:
+def _anchors(fetch: Fetcher, keylist: TKeyList) -> dict[bytes, ROOT3a3aRNTuple]:
     anchors = {}
     for key in keylist.values():
         if key.fClassName == b"ROOT::RNTuple":

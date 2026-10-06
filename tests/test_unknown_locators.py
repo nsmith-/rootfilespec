@@ -87,6 +87,17 @@ def test_unknown_type_is_kept(locator_type: int, payload: bytes):
     assert bytes(rest.data) == b"next"
 
 
+@pytest.mark.parametrize("cls", [LargeLocator, UnknownLocator])
+def test_only_rlocator_reads_a_locator(cls: type[RLocator]):
+    """Which class a locator is depends on its first word: LargeLocator.read on
+    a standard locator would give a StandardLocator"""
+    data = (12).to_bytes(4, "little") + (550).to_bytes(8, "little")
+    assert _read(data)[0] == StandardLocator(12, 550)
+    buffer = ReadBuffer(memoryview(data), 0, BOOTSTRAP_CONTEXT, BufferContext(abspos=0))
+    with pytest.raises(TypeError, match=f"not {cls.__name__}.read"):
+        cls.read(buffer)
+
+
 def test_locator_shorter_than_its_header_raises():
     with pytest.raises(ValueError, match="less than its own 4-byte header"):
         _read(_head(0x7E, -2))

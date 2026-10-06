@@ -10,24 +10,26 @@ ones (get_header, from_anchor, ...) all did.
 import importlib
 import inspect
 import pkgutil
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from types import ModuleType
 
 import rootfilespec.bootstrap
 import rootfilespec.rntuple
 
 
-def _modules() -> Iterator[object]:
+def _modules() -> Iterator[ModuleType]:
     for package in (rootfilespec.bootstrap, rootfilespec.rntuple):
         yield package
         for info in pkgutil.iter_modules(package.__path__, package.__name__ + "."):
             yield importlib.import_module(info.name)
 
 
-def _public_functions() -> Iterator[tuple[str, object]]:
+def _public_functions() -> Iterator[tuple[str, Callable[..., object]]]:
     for module in _modules():
         for name, obj in vars(module).items():
-            if name.startswith("_") or getattr(obj, "__module__", None) != getattr(
-                module, "__name__", None
+            if (
+                name.startswith("_")
+                or getattr(obj, "__module__", None) != module.__name__
             ):
                 continue
             if inspect.isfunction(obj):
@@ -48,8 +50,8 @@ def _public_functions() -> Iterator[tuple[str, object]]:
                         )
 
 
-def _takes_callable(function: object) -> bool:
-    for parameter in inspect.signature(function).parameters.values():  # type: ignore[arg-type]
+def _takes_callable(function: Callable[..., object]) -> bool:
+    for parameter in inspect.signature(function).parameters.values():
         annotation = parameter.annotation
         text = annotation if isinstance(annotation, str) else repr(annotation)
         if "Callable" in text or "fetch" in parameter.name.lower():
