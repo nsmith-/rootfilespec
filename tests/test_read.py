@@ -28,6 +28,61 @@ from rootfilespec.serializable import (
 
 TESTABLE_FILES = [f for f in known_files if f.endswith(".root")]
 
+# Keep known unsupported files explicit: new failures must fail the test.
+KNOWN_UNSUPPORTED: dict[str, str] = {
+    "uproot-Event.root": r"Unimplemented format double32",
+    "uproot-double32-float16.root": r"Unimplemented format float16",
+    "uproot-from-geant4.root": (
+        r"Suspicious THx with fByteCount == 0 \(e\.g\. uproot-issue-250\.root\)"
+    ),
+    "uproot-issue-181.root": r"TFormula\.update_members is not implemented",
+    "uproot-issue-250.root": (
+        r"Suspicious THx with fByteCount == 0 \(e\.g\. uproot-issue-250\.root\)"
+    ),
+    "uproot-issue-268.root": r"Memberwise reading of StdVector not implemented",
+    "uproot-issue-308.root": r"Unimplemented format double32",
+    "uproot-issue-350.root": (
+        r"RooRealVar not declared in the StreamerInfo, e\.g\. uproot-issue49\.root"
+    ),
+    "uproot-issue-359.root": (
+        r"Missing derived class streamer for TMatrixTSym3cdouble3e, "
+        r"e\.g\. uproot-issue-359\.root"
+    ),
+    "uproot-issue-418.root": r"Unknown type StIOEvent \(version None\): not found in",
+    "uproot-issue-607.root": r"Unknown type MGTRun \(version None\): not found in",
+    "uproot-issue-76.root": (
+        r"Memberwise streaming not implemented for TObject base class"
+    ),
+    "uproot-issue-861.root": r"Unknown type TTime \(version None\): not found in",
+    "uproot-issue261.root": (
+        r"fSeekKey is 0 0 \(bad key but KeyList is valid, e\.g\. uproot-issue261\.root\)"
+    ),
+    "uproot-issue407.root": (
+        r"Memberwise streaming not implemented for TObject base class"
+    ),
+    "uproot-issue408.root": (
+        r"Memberwise streaming not implemented for TObject base class"
+    ),
+    "uproot-issue412.root": (
+        r"fSeekKey is 0 0 \(bad key but KeyList is valid, e\.g\. uproot-issue261\.root\)"
+    ),
+    "uproot-issue413.root": (
+        r"TLeafI not declared in StreamerInfo, e\.g\. uproot-issue413\.root"
+    ),
+    "uproot-issue433-splitlevel2.root": (
+        r"Memberwise streaming not implemented for TObject base class"
+    ),
+    "uproot-issue433-splitlevel4.root": (
+        r"Memberwise streaming not implemented for TObject base class"
+    ),
+    "uproot-issue434.root": (
+        r"Memberwise streaming not implemented for TObject base class"
+    ),
+    "uproot-issue49.root": (
+        r"RooRealVar not declared in the StreamerInfo, e\.g\. uproot-issue49\.root"
+    ),
+}
+
 
 def _walk_RNTuple(anchor: ROOT3a3aRNTuple, fetch: Fetcher):
     _header = fetch(anchor.header_locator)
@@ -228,9 +283,16 @@ def read_file(path: Path) -> None:
         raise NotImplementedError(",".join(set(failures)))
 
 
+def test_known_unsupported_exist():
+    assert set(KNOWN_UNSUPPORTED) <= set(TESTABLE_FILES)
+
+
 @pytest.mark.parametrize("filename", TESTABLE_FILES)
 def test_read_file(filename: str):
-    try:
+    expected = KNOWN_UNSUPPORTED.get(filename)
+    if expected is None:
         read_file(Path(data_path(filename)))
-    except NotImplementedError as ex:
-        pytest.xfail(reason=str(ex))
+        return
+    with pytest.raises(NotImplementedError, match=expected):
+        read_file(Path(data_path(filename)))
+    pytest.xfail(reason=expected)

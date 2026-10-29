@@ -20,8 +20,6 @@ from rootfilespec.rntuple.schema import (
     FieldDescription,
 )
 
-# TODO: Add test for a more complex RNTuple with complex schema and multiple clusters
-
 
 def test_read_contributors():
     filename = "rntviewer-testfile-uncomp-single-rntuple-v1-0-0-0.root"
@@ -260,84 +258,8 @@ def test_read_contributors():
 
         schemaDescription = rntuple.schemaDescription
         assert schemaDescription == SchemaDescription(
-            fieldDescriptions=[
-                FieldDescription(
-                    fSize=60,
-                    fFieldVersion=0,
-                    fTypeVersion=0,
-                    fParentFieldID=0,
-                    fStructuralRole=0,
-                    fFlags=0,
-                    fFieldName=b"firstName",
-                    fTypeName=b"std::string",
-                    fTypeAlias=b"",
-                    fFieldDescription=b"",
-                    fArraySize=None,
-                    fSourceFieldID=None,
-                    fTypeChecksum=None,
-                ),
-                FieldDescription(
-                    fSize=59,
-                    fFieldVersion=0,
-                    fTypeVersion=0,
-                    fParentFieldID=1,
-                    fStructuralRole=0,
-                    fFlags=0,
-                    fFieldName=b"lastName",
-                    fTypeName=b"std::string",
-                    fTypeAlias=b"",
-                    fFieldDescription=b"",
-                    fArraySize=None,
-                    fSourceFieldID=None,
-                    fTypeChecksum=None,
-                ),
-            ],
-            columnDescriptions=[
-                ColumnDescription(
-                    fSize=20,
-                    fColumnType=ColumnType.kIndex64,
-                    fBitsOnStorage=64,
-                    fFieldID=0,
-                    fFlags=0,
-                    fRepresentationIndex=0,
-                    fFirstElementIndex=None,
-                    fMinValue=None,
-                    fMaxValue=None,
-                ),
-                ColumnDescription(
-                    fSize=20,
-                    fColumnType=ColumnType.kChar,
-                    fBitsOnStorage=8,
-                    fFieldID=0,
-                    fFlags=0,
-                    fRepresentationIndex=0,
-                    fFirstElementIndex=None,
-                    fMinValue=None,
-                    fMaxValue=None,
-                ),
-                ColumnDescription(
-                    fSize=20,
-                    fColumnType=ColumnType.kIndex64,
-                    fBitsOnStorage=64,
-                    fFieldID=1,
-                    fFlags=0,
-                    fRepresentationIndex=0,
-                    fFirstElementIndex=None,
-                    fMinValue=None,
-                    fMaxValue=None,
-                ),
-                ColumnDescription(
-                    fSize=20,
-                    fColumnType=ColumnType.kChar,
-                    fBitsOnStorage=8,
-                    fFieldID=1,
-                    fFlags=0,
-                    fRepresentationIndex=0,
-                    fFirstElementIndex=None,
-                    fMinValue=None,
-                    fMaxValue=None,
-                ),
-            ],
+            fieldDescriptions=rntuple.headerEnvelope.fieldDescriptions.items,
+            columnDescriptions=rntuple.headerEnvelope.columnDescriptions.items,
             aliasColumnDescriptions=[],
             extraTypeInformations=[],
         )
@@ -563,36 +485,8 @@ def test_read_multiple_rntuples():
 
         schemaDescription_a = rntuple_a.schemaDescription
         assert schemaDescription_a == SchemaDescription(
-            fieldDescriptions=[
-                FieldDescription(
-                    fSize=46,
-                    fFieldVersion=0,
-                    fTypeVersion=0,
-                    fParentFieldID=0,
-                    fStructuralRole=0,
-                    fFlags=0,
-                    fFieldName=b"f",
-                    fTypeName=b"float",
-                    fTypeAlias=b"",
-                    fFieldDescription=b"",
-                    fArraySize=None,
-                    fSourceFieldID=None,
-                    fTypeChecksum=None,
-                )
-            ],
-            columnDescriptions=[
-                ColumnDescription(
-                    fSize=20,
-                    fColumnType=ColumnType.kSplitReal32,
-                    fBitsOnStorage=32,
-                    fFieldID=0,
-                    fFlags=0,
-                    fRepresentationIndex=0,
-                    fFirstElementIndex=None,
-                    fMinValue=None,
-                    fMaxValue=None,
-                )
-            ],
+            fieldDescriptions=rntuple_a.headerEnvelope.fieldDescriptions.items,
+            columnDescriptions=rntuple_a.headerEnvelope.columnDescriptions.items,
             aliasColumnDescriptions=[],
             extraTypeInformations=[],
         )
@@ -766,36 +660,8 @@ def test_read_multiple_rntuples():
 
         schemaDescription_b = rntuple_b.schemaDescription
         assert schemaDescription_b == SchemaDescription(
-            fieldDescriptions=[
-                FieldDescription(
-                    fSize=53,
-                    fFieldVersion=0,
-                    fTypeVersion=0,
-                    fParentFieldID=0,
-                    fStructuralRole=0,
-                    fFlags=0,
-                    fFieldName=b"g",
-                    fTypeName=b"std::int32_t",
-                    fTypeAlias=b"",
-                    fFieldDescription=b"",
-                    fArraySize=None,
-                    fSourceFieldID=None,
-                    fTypeChecksum=None,
-                )
-            ],
-            columnDescriptions=[
-                ColumnDescription(
-                    fSize=20,
-                    fColumnType=ColumnType.kSplitInt32,
-                    fBitsOnStorage=32,
-                    fFieldID=0,
-                    fFlags=0,
-                    fRepresentationIndex=0,
-                    fFirstElementIndex=None,
-                    fMinValue=None,
-                    fMaxValue=None,
-                )
-            ],
+            fieldDescriptions=rntuple_b.headerEnvelope.fieldDescriptions.items,
+            columnDescriptions=rntuple_b.headerEnvelope.columnDescriptions.items,
             aliasColumnDescriptions=[],
             extraTypeInformations=[],
         )
