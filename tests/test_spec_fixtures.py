@@ -135,7 +135,6 @@ def test_read_fixture(fixture: str):
     # other fixture with a collection written by ROOT >= 6.36)
     expected = EXPECTED_FAILURES.get(fixture)
     if expected is None:
-        # Unlike in test_read.py, a NotImplementedError is a failure here
         read_file(DATA / fixture)
         return
     with pytest.raises(expected.raises, match=expected.match):
@@ -176,17 +175,16 @@ def test_streamerbase_checksum():
     assert base.fBaseCheckSum == 0x901BC02D
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=ValueError,
-    reason="#96: TBasket header flag 78 not supported (the header has an fIOBits byte)",
-)
 def test_basket_iobits():
-    """Issue #96: the walker of test_read.py does not read the baskets of a branch
-    of a fundamental type, so test_read_fixture cannot see this one
+    """Issue #96: flag 78 includes an unsupported fIOBits byte.
+
+    The walker does not read fundamental-type baskets, so test_read_fixture
+    cannot see this one. The intended supported result has fNevBuf == 3 and flag == 0.
     """
-    with open_path(DATA / "ttree/basket-iofeatures.root") as reader:
-        # The basket of branch n, see gen/cases/ttree/basket-iofeatures/case.toml
-        basket, _ = TBasket.read(reader.fetch.buffer_at(offset=302, size=78))
-    assert basket.bheader.fNevBuf == 3
-    assert basket.bheader.flag == 0
+    # The basket of branch n, see gen/cases/ttree/basket-iofeatures/case.toml
+    with (
+        open_path(DATA / "ttree/basket-iofeatures.root") as reader,
+        pytest.raises(ValueError, match="TBasket header flag 78 not supported"),
+    ):
+        TBasket.read(reader.fetch.buffer_at(offset=302, size=78))
+    pytest.xfail(reason="#96: TBasket header flag 78 not supported")
