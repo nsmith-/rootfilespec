@@ -35,5 +35,8 @@ def test_compressed_size_is_the_payload_length(algorithm: str):
             assert not rest
             assert compressed.compressed_size() == len(payload)
             assert compressed.uncompressed_size() == header.fObjlen
+            # The aggregate sums every chunk, including each chunk's header.
+            multiple = RCompressed(chunks=compressed.chunks * 2)
+            assert multiple.compressed_size() == 2 * len(payload)
             checked += 1
     assert checked

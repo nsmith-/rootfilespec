@@ -41,9 +41,11 @@ def test_valid_record_and_list():
     record, _ = ExtraTypeInformation.read(_buffer(_record_of_size(28) + b"xy"))
     assert record._unknown == b"xy"
 
-    data = struct.pack("<qI", -(12 + 2 * 26), 2) + 2 * RECORD
+    data = struct.pack("<qI", -(12 + 2 * 26 + 2), 2) + 2 * RECORD + b"xy"
     frame, rest = read_value(ListFrame[ExtraTypeInformation], _buffer(data + b"next"))
     assert len(frame) == 2
+    assert [(item.fTypeName, item.fContent) for item in frame] == [(b"ab", b"")] * 2
+    assert frame._unknown == b"xy"
     assert rest.data.tobytes() == b"next"
 
 

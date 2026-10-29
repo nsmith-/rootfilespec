@@ -71,17 +71,18 @@ def test_negative_cycle_is_its_magnitude():
     assert keep.header.fCycle == -3
 
 
-def test_duplicate_cycle_raises():
+@pytest.mark.parametrize("cycle", [2, -2])
+def test_duplicate_cycle_raises(cycle: int):
     """Two keys of one name and cycle (Directory §9.14) can't both be in the
     mapping: reading such a key list raises instead of hiding one of them"""
     data = bytearray((DATA / CYCLES[0]).read_bytes())
     # The key list record at 995 (fSeekKeys) holds nKeys, then a copy of each
     # key, 66 bytes each; fCycle is at byte 16 of a short key. Make the third
-    # key's cycle (1) a second cycle 2.
+    # key's cycle (1) a second cycle 2, with or without the keep flag.
     (keylist_keylen,) = struct.unpack_from(">h", data, 995 + 14)
     cycle_offset = 995 + keylist_keylen + 4 + 2 * 66 + 16
     assert struct.unpack_from(">h", data, cycle_offset) == (1,)
-    struct.pack_into(">h", data, cycle_offset, 2)
+    struct.pack_into(">h", data, cycle_offset, cycle)
 
     reader = FileReader.open(lambda offset, size: bytes(data[offset : offset + size]))
     with pytest.raises(ValueError, match=r"two keys named b'str' with cycle 2"):

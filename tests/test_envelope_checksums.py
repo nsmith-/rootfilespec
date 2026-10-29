@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+import xxhash  # type: ignore[import-not-found]
 
 from rootfilespec.bootstrap import BOOTSTRAP_CONTEXT, ROOT3a3aRNTuple
 from rootfilespec.reader import open_path
@@ -85,14 +86,40 @@ def test_corrupted_header_envelope_raises():
         _read(bytes(raw), loc)
 
 
-def test_corrupted_checksum_raises():
+@pytest.mark.parametrize(
+    ("envelope", "error"),
+    [
+        ("header", "HeaderEnvelope checksum mismatch"),
+        ("footer", "FooterEnvelope checksum mismatch"),
+        ("pagelist", "PageListEnvelope checksum mismatch"),
+    ],
+)
+def test_corrupted_checksum_raises(envelope: str, error: str):
     path = DATA / "anchor.root"
     raw = bytearray(path.read_bytes())
     (anchor,) = _anchors(path)
-    loc = anchor.header_locator
+    footer = _read(bytes(raw), anchor.footer_locator)
+    loc = {
+        "header": anchor.header_locator,
+        "footer": anchor.footer_locator,
+        "pagelist": footer.pagelist_locators[0],
+    }[envelope]
     raw[loc.offset + loc.length - 1] ^= 0x01
-    with pytest.raises(ValueError, match="HeaderEnvelope checksum mismatch"):
+    with pytest.raises(ValueError, match=error):
         _read(bytes(raw), loc)
+
+
+def test_header_keeps_unknown_tail():
+    """Unknown envelope contents are kept, inside the length and checksum."""
+    raw = (DATA / "anchor.root").read_bytes()
+    # The case.toml pins the header at 268..508, with its checksum at 500.
+    covered = bytearray(raw[268:500] + b"xy")
+    covered[:8] = ((len(covered) + 8) << 16 | 0x01).to_bytes(8, "little")
+    data = bytes(covered) + xxhash.xxh3_64_intdigest(covered).to_bytes(8, "little")
+    header, rest = HeaderEnvelope.read(_buffer(data, 0, len(data)))
+    assert header._unknown == b"xy"
+    assert header.fName == b"ntpl"
+    assert not rest
 
 
 def test_stored_size_larger_than_length_raises():

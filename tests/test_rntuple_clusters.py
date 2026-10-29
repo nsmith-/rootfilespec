@@ -129,6 +129,10 @@ def test_columns_user_class():
     assert [
         (column.fieldPath, column.columnDescription.fColumnType) for column in columns
     ] == [(path, type_) for _, path, type_ in pinned]
+    for column in columns:
+        assert (
+            column.fieldDescription.fFieldName == column.fieldPath.rsplit(b".", 1)[-1]
+        )
     # A std::string has an index column and a character column
     assert [
         column.index for column in columns if column.fieldPath == b"fHit.fLabel"
@@ -138,6 +142,33 @@ def test_columns_user_class():
     ]
     for cluster in rntuple.clusters():
         assert [columnRange.column for columnRange in cluster.columnRanges] == columns
+
+
+@pytest.mark.skipif(not DATA.exists(), reason="reference/root-io-spec not checked out")
+def test_projected_alias_columns():
+    """projected/case.toml pins each physical column and projected field pair."""
+    schema = _load(DATA / "projected.root").schemaDescription
+    assert [
+        (alias.fPhysicalColumnID, alias.fFieldID)
+        for alias in schema.aliasColumnDescriptions
+    ] == [(2, 3), (0, 4), (1, 5), (0, 6), (0, 7)]
+
+
+@pytest.mark.skipif(not DATA.exists(), reason="reference/root-io-spec not checked out")
+def test_bit_page_size_rounds_up_to_a_byte():
+    """fundamental-types writes one bool entry, with one bit on storage."""
+    (cluster,) = _load(DATA / "fundamental-types.root").clusters()
+    (column_range,) = [
+        column_range
+        for column_range in cluster.columnRanges
+        if column_range.column.fieldPath == b"fBool"
+    ]
+    description = column_range.column.columnDescription
+    assert description.fColumnType == ColumnType.kBit
+    assert description.fBitsOnStorage == 1
+    (page,) = column_range.pages
+    assert page.pageDescription.n_elements == 1
+    assert page.uncompressedSize == 1
 
 
 def test_field_paths_schema_extension():

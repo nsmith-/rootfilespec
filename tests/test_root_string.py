@@ -56,8 +56,8 @@ def test_rntuple_string_is_plain_bytes():
 
 
 def test_string_too_short():
-    with pytest.raises(Exception):  # noqa: B017, PT011
-        _Named.read(_buffer(b"\x09\x00\x00\x00abc"))
+    with pytest.raises(IndexError):
+        _read("RNTuple", b"\x09\x00\x00\x00abc")
 
 
 @pytest.mark.parametrize(
