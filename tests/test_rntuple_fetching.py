@@ -84,6 +84,29 @@ def test_bootstrap_only_equals_reader(path: Path):
     assert bootstrap
 
 
+def test_fetcher_reads_each_envelope_once():
+    """A bare Fetcher reads the header, footer and page lists, and no pages."""
+    raw = (DATA / "anchor.root").read_bytes()
+    calls: list[tuple[int, int]] = []
+
+    def read_at(offset: int, size: int) -> bytes:
+        calls.append((offset, size))
+        return raw[offset : offset + size]
+
+    fetch = Fetcher(read_at, BOOTSTRAP_CONTEXT)
+    file = fetch(InitialReadLocator())
+    tfile = fetch.resolve(file.tfile_locator)
+    keylist = fetch.resolve(tfile.rootdir.keylist_locator)
+    (anchor,) = _anchors(fetch, keylist).values()
+    calls.clear()
+
+    fetch.rntuple(anchor)
+
+    # anchor/case.toml pins the header/footer payloads and the page-list RBlob.
+    # The page-list record is at 590 (206 bytes), with a 42-byte TKey.
+    assert calls == [(268, 240), (838, 160), (632, 164)]
+
+
 def test_footer_for_another_header_raises():
     reader, anchor = _anchor(DATA / "anchor.root")
     with reader:

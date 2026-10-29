@@ -168,6 +168,20 @@ def test_later_class_version():
     assert anchor._unknown == b""
 
 
+def test_format_patch_one():
+    """README's supported 1.0.2.x includes the specification's 1.0.2.1."""
+    fields = _fields()
+    fields = fields[:6] + b"\x00\x01" + fields[8:]
+    anchor = _read_through_key(_payload(fields))
+    assert isinstance(anchor, ROOT3a3aRNTuple)
+    assert (
+        anchor.fVersionEpoch,
+        anchor.fVersionMajor,
+        anchor.fVersionMinor,
+        anchor.fVersionPatch,
+    ) == (1, 0, 2, 1)
+
+
 @pytest.mark.parametrize("size", [70, 77])
 def test_short_anchor_raises(size: int):
     """70 bytes is class version 2 without its checksum"""
